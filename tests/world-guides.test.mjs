@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {area,cloneTree} from '../src/layout.js';
 import {ensureViewportOptions,viewportPreferences} from '../src/viewport-options.js';
-import {gridSpacing} from '../src/world-guides.js';
+import {gridSpacing,createWorldGuides} from '../src/world-guides.js';
+import * as THREE from '../src/vendor/three.module.js';
 import {FACTORY_PREFERENCES} from '../src/preferences.js';
 import {gameParams} from '../src/game-renderer.js';
 
@@ -31,4 +32,12 @@ test('ambient shape contrast defaults gently and preserves the flat-lighting opt
  d.ambientDetail=0;assert.equal(ensureViewportOptions(view).ambientDetail,0);
  d.ambientDetail=2;assert.equal(ensureViewportOptions(view).ambientDetail,.35);
  d.ambientDetail=.6;assert.equal(ensureViewportOptions(JSON.parse(JSON.stringify(view))).ambientDetail,.6);
+});
+
+test('grid hides when a perspective eye lies in the floor plane (exact side views)',()=>{
+ const view=area().view;ensureViewportOptions(view);view.grid=true;const guides=createWorldGuides(),theme={grid:'#555555',majorGrid:'#666666'};
+ const look=(camera,y)=>{camera.position.set(10,y,0);camera.lookAt(0,y,0);camera.updateMatrixWorld();camera.updateProjectionMatrix();guides.update(camera,view,800,600,theme,1,0);return guides.grid.visible;};
+ assert.equal(look(new THREE.PerspectiveCamera(50,4/3,.1,1000),0),false);
+ assert.equal(look(new THREE.PerspectiveCamera(50,4/3,.1,1000),2),true);
+ assert.equal(look(new THREE.OrthographicCamera(-4,4,3,-3,.1,1000),0),true);
 });

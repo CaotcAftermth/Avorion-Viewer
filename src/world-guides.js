@@ -32,9 +32,15 @@ export function createWorldGuides(){
       float denominator=dot(ray,planeNormal);
       if(abs(denominator)<.000001)discard;
       float t=-dot(origin,planeNormal)/denominator;
-      if(t<0.)discard;
+      // An orthographic ray is a whole line: floor points nearer than the eye plane
+      // are still in view (they sit between the camera and the viewer), so only
+      // perspective rays stop at the eye. Otherwise low angles cut the grid off
+      // in a band below the model.
+      if(t<0.&&projection[3][3]<.5)discard;
       vec3 point=origin+ray*t;
       vec4 eye=worldView*vec4(point,1.),clip=projection*eye;
+      // A hit at the eye itself has no perspective depth (w = 0).
+      if(clip.w<=0.)discard;
       float alpha;vec3 tint=color;
       if(axisMode>.5){
         float along=dot(point,axis);
@@ -92,6 +98,11 @@ export function createWorldGuides(){
         corners.forEach(([along,across],j)=>positions.setXYZ(j,2*(cx-ny*along*extent+nx*across*half)/width-1,2*(cy+nx*along*extent+ny*across*half)/height-1,0));positions.needsUpdate=true;
 
       }else{
+        // A perspective eye lying in the floor plane sees the grid exactly edge-on.
+        // Every ray then meets the plane at the eye, so one grid line would fill the
+        // whole viewport (exact side views of a model centred on the floor).
+        const eye=new THREE.Vector3().setFromMatrixPosition(camera.matrixWorld);
+        if(camera.isPerspectiveCamera&&Math.abs(eye.dot(u.planeNormal.value))<=Math.max(1,eye.length())*1e-6){mesh.visible=false;continue;}
         u.spacing.value=spacing;u.color.value.setStyle(theme.grid,THREE.LinearSRGBColorSpace);u.majorColor.value.setStyle(theme.majorGrid,THREE.LinearSRGBColorSpace);
       }
     }
