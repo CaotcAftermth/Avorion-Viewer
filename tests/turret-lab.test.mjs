@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from '../src/vendor/three.module.js';
-import {demoProject,partMatrices,frame,socketAtFace,validateProject,readProject,writeProject,componentEnvelope,effectiveScale,upgradeProject} from '../prototypes/turret-lab/core.js';
+import {demoProject,partMatrices,frame,socketAtFace,validateProject,readProject,writeProject,componentEnvelope,effectiveScale,upgradeProject} from '../src/turrets/core.js';
 const near=(a,b)=>assert.ok(a.distanceTo(b)<1e-9,`${a.toArray()} != ${b.toArray()}`);
 test('attachment stays on every socket when scaling up/down with a rotated source attachment',()=>{
  const p=demoProject(),a=p.assets[0];a.attachment={position:[3,-2,1],rotation:[15,30,80]};
