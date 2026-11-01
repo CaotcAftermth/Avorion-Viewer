@@ -2,19 +2,10 @@
 
 A Blender-inspired tiled workspace for viewing Avorion XML models, inspecting native blocks, and adjusting a WebGL2 game-style shader.
 
-## Run locally
-
-Requires Node.js 20 or newer. Running the app requires no package installation; browser dependencies are vendored locally. Development tests require `npm ci`. Three.js 0.169.0 is vendored with its MIT license; WebGL2 is required for model rendering.
-
-```sh
-npm run dev
-```
-
-Open http://127.0.0.1:5173. Run `npm test` for layout, navigation, viewport, and preferences tests and `npm run build` to produce the static site in `dist/`. Preview the build with `node scripts/serve.mjs --dist` after stopping the development server.
 
 ## Local asset persistence
 
-The current model (including paint edits and placement) and imported texture originals are saved automatically in IndexedDB and restored after reload. Storage belongs to this browser profile and site address. The local server redirects `localhost` and other spellings to `http://127.0.0.1:5173`, so every visit reaches the same storage, and the app asks the browser to keep saved textures instead of evicting them under disk pressure. A toast confirms when saved textures are restored, and Preferences > Asset Library shows how many are saved.
+The current model (including paint edits and placement) and imported texture originals are saved automatically in IndexedDB and restored after reload. Storage belongs to this browser profile and site address. A toast confirms when saved textures are restored, and Preferences > Asset Library shows how many are saved.
 
 File > Asset folders… remembers the texture, model, and other folders you choose. In Chrome and Edge each folder is stored as a browser folder handle and reopens on the next visit: without a prompt when the browser kept the permission, otherwise after one **Reconnect folders** click. Model folders are searched recursively and shown in a model browser: search by name or subfolder, see block count, size, and date, star **Favorites**, and reopen from **Recent**. Double-click or press Enter to open a model. Block counts are cached per file version, so large folders are only read once. **Forget** stops remembering a folder without touching the files. Chrome and Edge refuse to remember folders inside Program Files or AppData, which is where Steam installs Avorion and where the game saves ships; picking one shows "Can't open this folder". After that, the row offers **Use one-time picker…**, the classic folder input, which can read those folders but is forgotten afterwards. Textures read this way are saved in the browser as usual, so it is a one-time step. Ships read this way are saved as a copy in IndexedDB, so the model browser works on every visit; **Refresh…** re-reads the folder to pick up ships saved since, and **Forget** deletes the copy. Browsers without the File System Access API always use the one-time picker. Typed folder paths were removed because browsers cannot open a folder from a path string. File > Clear scene saves an empty scene; File > Unload textures removes saved texture imports. Browser data clearing or eviction removes these copies, so keep your source files. Storage failures are reported without interrupting the current session.
 
