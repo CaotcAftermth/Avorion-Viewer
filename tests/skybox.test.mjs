@@ -12,7 +12,7 @@ test('sky controls persist and old preference files gain world defaults',()=>{
   const p={...FACTORY_PREFERENCES,worldSeed:123,worldDust:.8,worldPalette:'custom',worldColorA:'#ff1111'};
   assert.deepEqual(parsePreferences(JSON.stringify(p)),p);
   assert.equal(parsePreferences('{"version":1}').worldResolution,512);
-  assert.ok(PREFERENCE_SECTIONS.find(s=>s.id==='viewport').panels.find(p=>p.label==='World'));
+  assert.ok(PREFERENCE_SECTIONS.find(s=>s.id==='world').panels.find(p=>p.label==='World'));
 });
 test('rotation and visibility reuse the sky; generation changes invalidate it',()=>{
   assert.equal(skyKey(WORLD_DEFAULTS),skyKey({...WORLD_DEFAULTS,worldRotation:90,worldEnabled:false}));
@@ -21,3 +21,4 @@ test('rotation and visibility reuse the sky; generation changes invalidate it',(
   assert.equal(skySpecification({...WORLD_DEFAULTS,worldStars:0}).density,0);
   assert.deepEqual(skySpecification({...WORLD_DEFAULTS,worldPalette:'custom',worldColorA:'#ff0000'}).colors[0],[1,0,0]);
 });
+

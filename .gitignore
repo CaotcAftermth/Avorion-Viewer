@@ -1,4 +1,15 @@
 node_modules/
 dist/
 test-results/
+output/
+_backup*/
+directional-slice/
+weapon-coverage-improvements/
+*.log
+.env
+.env.*
+!.env.example
+*.pem
+*.key
 .DS_Store
+Thumbs.db
