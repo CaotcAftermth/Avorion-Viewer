@@ -1,4 +1,12 @@
-# Turret animation engine — Phase 3
+# Weapon-family effects and resources — development history
+
+> Historical milestone report. For current behavior, see [Turret Studio](TURRET_STUDIO.md).
+
+## Status since this milestone
+
+Later work added cinematic playback, deterministic animation export and local comparison/calibration tools. Recommendations below for those features are historical. Matched native references, verified native unit conversion and audio remain unresolved.
+
+## Milestone record
 
 Implemented October 29, 2026. All 19 standard families now produce firing visuals from the current turret's authored muzzle transforms, or the existing labeled fallback when muzzle data is absent. This completes functional effect coverage, not native visual parity. No audio, video export, combat damage, ship physics, recoil animation or new XML format was added.
 
@@ -71,7 +79,7 @@ Discrete beams default to 0.14 seconds with linear visual fade, independently of
 
 The existing fixed 120 Hz simulation remains authoritative. Firing snapshots interpolate pose within each step. Swept projectile/target tests prevent tunneling; articulated block geometry is tested at the step pose rather than continuously swept through rotation. Native targeting lead, exact restart hysteresis and RNG equivalence remain unverified.
 
-## Verification and performance
+## Verification and performance recorded at this milestone
 
 - Automated suite: 327 tests pass, including 33 Phase 3 tests and the existing importer, transform, rendering and export tests.
 - All 19 families have profile/lifecycle, render-pool, deterministic replay and cleanup coverage. Additional tests cover guided/lost targets, timed flak misses, independent discrete beams, material colors, dual offsets, layers, source burst equations, recovery, playback speed, mounting orientation, coaxial limits and stationary/linear/orbit targets passing behind arcs or beyond range.
@@ -84,6 +92,6 @@ The existing fixed 120 Hz simulation remains authoritative. Firing snapshots int
 
 Visual review caught and corrected ribbon twisting in electrical/swirl paths. Stress testing caught excessive exhaust sampling and reduced presentation density without altering trajectories, event timing or range. Native visual parity is still not established by these tests.
 
-## Phase 4 recommendations
+## Follow-up proposed at this milestone
 
 Capture known native weapon instances and frame-aligned gameplay for every family, especially seeker loss/reacquisition, Lightning/Tesla geometry, dual repair, Force layering and flak death. Verify unit conversion, cooling thresholds and initial barrel phase before tuning approximate shaders and envelopes. Add source-backed audio synchronization and deterministic cinematic export as separate work. Neither is claimed complete here.

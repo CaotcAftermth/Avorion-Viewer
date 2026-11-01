@@ -1,4 +1,12 @@
-# Turret animation engine — Phase 2
+# Initial weapon effects — development history
+
+> Historical milestone report. For current behavior, see [Turret Studio](TURRET_STUDIO.md).
+
+## Status since this milestone
+
+The three-family limit and “visuals pending” status below were superseded by the all-family implementation. Later work added guided rockets, electrical beams, repair/force layers, resource behavior, effect capture and animation export. Native visual parity remains unverified.
+
+## Milestone record
 
 Implemented October 29, 2026. Visual support is limited to ChainGun, Cannon and standard Laser. The other 16 families remain selectable with an explicit “visuals pending” label. No substitute rendering, recoil, damage or ship physics was added.
 
@@ -41,14 +49,14 @@ Source-confirmed numbers do not establish visual parity. No matched native gamep
 
 Tune `CALIBRATION` for flash brightness/duration/expansion, streak length/opacity, beam core/aura intensity, physical/explosive duration, explosion radius, particle count and contact size. Tune source-derived profiles separately. Cannon explosion radius is provisionally 2 viewer-coordinate units: the native generator's damage-dependent radius cannot be resolved without a corresponding representative damage pipeline, which is outside this phase. Particle positions are seeded and derived from impact age, so quality changes preserve stable prefixes. Low quality draws 8 particles per impact; standard draws 24. GPU resources remain bounded/reusable while presentation is hidden and are disposed when the workspace closes.
 
-## Verification
+## Verification recorded at this milestone
 
 - Full automated suite: 294 passing tests (283 existing plus 11 focused effects tests).
 - Focused tests cover frozen shot direction, timestamp travel, range/lifetime misses, swept hits and moving targets, nearest obstruction, impact categories/expiry, beam lifecycle/intersection, deterministic seeds, low-frame-rate multishot scheduling, pause/replay, presentation isolation, BVH reuse and pool overflow/disposal.
 - Edge/SwiftShader integration validates all three families, shader compilation, visibility controls, pause/restart, pending families, existing pose/color editing, save/reopen and main-workspace isolation.
-- Deterministic browser captures validate two muzzle hits for both ballistic families, two sustained laser contacts, replacement of an existing asset and cleanup. Captures: `test-results/turret-effects-visible-ChainGun.png`, `turret-effects-visible-Cannon.png`, `turret-effects-visible-Laser.png`.
+- Deterministic browser captures validate two muzzle hits for both ballistic families, two sustained laser contacts, replacement of an existing asset and cleanup. Local captures (not bundled): `test-results/turret-effects-visible-ChainGun.png`, `turret-effects-visible-Cannon.png`, `turret-effects-visible-Laser.png`.
 - Static production build succeeds. Captures demonstrate renderer behavior; they are not native-appearance parity evidence.
 
-## Phase 3
+## Follow-up proposed at this milestone
 
 First obtain native recordings with known weapon statistics and verify distance/size conversion. Calibrate beam widths, flash curves and explosion radius/particles against those references. Then add source-specific projectile and straight-beam profiles using these foundations. Discrete rail beams, guided rockets, lightning arcs, repair/force layering and flak require their own explicit behavior extensions; none is silently represented by current effects.

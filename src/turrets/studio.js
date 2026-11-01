@@ -37,7 +37,7 @@ export function createStudio(asset,scene,redraw){
  scene.turretStudio=runtime;reset();return runtime;
 }
 export function mountStudio(host,runtime){
- if(!runtime)return;const s=runtime.settings,d=document.createElement('details');d.className='panel';d.open=true;d.innerHTML='<summary>Turret Studio · Phase 4</summary>';host.append(d);
+ if(!runtime)return;const s=runtime.settings,d=document.createElement('details');d.className='panel';d.open=true;d.innerHTML='<summary>Turret Studio</summary>';host.append(d);
  const note=document.createElement('p');note.className='panel-note';note.textContent='19 source-based weapon presets. Native visual calibration remains pending. Custom firing overrides change the demonstration only.';d.append(note);
  const conditional=[];let refresh=()=>{};
  function row(label,key,when){const r=document.createElement('label');r.className='field-row';r.append(label);d.append(r);if(when)conditional.push([r,when]);return r;}
