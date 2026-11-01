@@ -23,7 +23,7 @@ File > Asset folders… remembers the texture, model, and other folders you choo
 | Focus mode | Ctrl+Alt+Space |
 | Restore / cancel operation | Escape |
 | Toggle viewport toolbar / sidebar | T / N |
-| Input style | Help > Input style (included with model and texture loading on first launch) or Preferences > Input: Blender, Laptop (Alt+left-drag, number-row views) or Trackpad (two-finger swipe orbits, pinch zooms, Shift+swipe pans) |
+| Input style | Help > Input style (also available beside model and texture loading in the No ship loaded screen) or Preferences > Input: Blender, Laptop (Alt+left-drag, number-row views) or Trackpad (two-finger swipe orbits, pinch zooms, Shift+swipe pans) |
 | Orbit / pan | Middle mouse / Shift+middle mouse, or the left toolbar tools |
 | Snap orbit to an axis | Hold Alt when releasing an orbit drag |
 | Stepped orbit | Numpad 2 / 4 / 6 / 8 (15°) |

@@ -216,19 +216,8 @@ function openAssetFolders(){
   const dialog=$('#asset-folders-dialog'),host=dialog.querySelector('.asset-folders-body');
   if(dialog.open)return;
   host.replaceChildren();
-  for(const choice of dialog.querySelectorAll('[data-style]')){
-    choice.classList.toggle('active',choice.dataset.style===preferences.value.inputStyle);
-    choice.setAttribute('aria-pressed',String(choice.dataset.style===preferences.value.inputStyle));
-    choice.onclick=()=>{
-      preferences.set('inputStyle',choice.dataset.style);
-      for(const button of dialog.querySelectorAll('[data-style]')){
-        const selected=button===choice;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected));
-      }
-    };
-  }
-  dialog.querySelector('[data-import-model]').onclick=()=>{dialog.close();importXml();};
   const panel=mountPreferences(host,preferences,{},{...assetActions,openModel:async file=>{dialog.close();await openXmlFile(file);}},{sections:[sectionById('assets')],compact:true});
-  dialog.onclose=()=>{panel.dispose();try{localStorage.setItem(INPUT_STYLE_CHOSEN,'1');}catch{}};dialog.showModal();
+  dialog.onclose=()=>panel.dispose();dialog.showModal();
 }
 function feedbackContext(){const m=scene.model;return {language:currentLanguage(),model:scene.loaded&&m?`${m.fileName||'unnamed'} · ${m.blocks.length} blocks${scene.preview?' (preview)':''}`:'none loaded',textures:`${textureLibrary.loadedCount} texture maps loaded`};}
 function showFeedback(){closeMenu();openFeedback(feedbackContext(),{notify});}
@@ -462,16 +451,26 @@ function resetWorkspace(){const template=defaults().workspaces.find(w=>w.id===wo
 function toggleMaximize(id,focus=false){if(maximized===id&&focusMode===focus){maximized=null;focusMode=false;}else{maximized=id;focusMode=focus;}render();}
 $('#restore-button').onclick=()=>{maximized=null;focusMode=false;render();};
 $('#help-button').onclick=()=>$('#help-dialog').showModal();
-const INPUT_STYLE_CHOSEN='avorion-viewer.input-style-chosen.v1';
 function navigationHint(){
   const p=preferences.value;
   if(p.trackpadNavigation)return 'Two-finger swipe Orbit · Shift + swipe Pan · Pinch Zoom';
   if(p.emulate3Button)return 'Alt + LMB Orbit · Alt + Shift + LMB Pan · '+shortcut('wheelZoom')+' Zoom';
   return shortcut('orbitDrag')+' Orbit · '+shortcut('panDrag')+' Pan · '+shortcut('wheelZoom')+' Zoom';
 }
-function openInputStyle(){openAssetFolders();}
-// Ask once on first launch; Escape keeps the Blender default.
-try{if(!embeddedAsset&&!localStorage.getItem(INPUT_STYLE_CHOSEN))queueMicrotask(openInputStyle);}catch{}
+function wireInputStyles(host){
+  for(const choice of host.querySelectorAll('[data-style]')){
+    const selected=choice.dataset.style===preferences.value.inputStyle;
+    choice.classList.toggle('active',selected);choice.setAttribute('aria-pressed',String(selected));
+    choice.onclick=()=>{
+      preferences.set('inputStyle',choice.dataset.style);
+      document.querySelectorAll('.input-style-options').forEach(wireInputStyles);
+    };
+  }
+}
+function openInputStyle(){
+  const dialog=$('#input-style-dialog');wireInputStyles(dialog);
+  if(!dialog.open)dialog.showModal();
+}
 // Drop an .xml to open it; drop texture images or a texture folder to load them.
 const TEXTURE_FILE=/\.(png|bmp|jpe?g|webp)$/i;
 async function droppedFiles(transfer){
@@ -608,6 +607,9 @@ function emptyState(){
   const recent=recentModels(),hint=card.querySelector('.empty-hint');
   if(recent.length){hint.textContent='Recent: '+recent.join(' · ')+'. Browsers cannot reopen files by path; choose or drop the file again.';}
   else hint.textContent=textureLibrary.loadedCount?`${textureLibrary.loadedCount} texture maps ready.`:'Textures are optional. Without them blocks use plain material colors.';
+  const heading=document.createElement('h3');heading.textContent='Input style';card.append(heading);
+  const controls=$('#input-style-dialog .input-style-options').cloneNode(true);
+  wireInputStyles(controls);card.append(controls);
   return card;
 }
 function textureBadge(){

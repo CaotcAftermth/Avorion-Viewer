@@ -45,8 +45,13 @@
     <button class="primary" data-close>Back to the viewer</button>
   </dialog>
   <dialog id="asset-folders-dialog" aria-labelledby="asset-folders-title">
-    <div class="dialog-heading"><span class="eyebrow">GET STARTED</span><button class="icon-button" data-close aria-label="Close">×</button></div>
-    <h2 id="asset-folders-title">Models, textures and controls</h2>
+    <div class="dialog-heading"><span class="eyebrow">ASSET FOLDERS</span><button class="icon-button" data-close aria-label="Close">×</button></div>
+    <h2 id="asset-folders-title">Open from a folder</h2>
+    <div class="asset-folders-body"></div>
+    <div class="dialog-actions"><button data-close>Done</button></div>
+  </dialog>
+  <dialog id="input-style-dialog" aria-labelledby="input-style-title">
+    <div class="dialog-heading"><span class="eyebrow">INPUT STYLE</span><button class="icon-button" data-close aria-label="Close">×</button></div>
     <h2 id="input-style-title">How do you get around?</h2>
     <p>Pick the controls that match your hardware. Change it any time in Help &gt; Input style or Preferences &gt; Input.</p>
     <div class="input-style-options">
@@ -54,9 +59,6 @@
       <button type="button" data-style="laptop"><b>Laptop</b><span>Mouse without a middle button, no numpad. Alt+left-drag orbits (add Shift to pan, Ctrl to zoom); number-row keys align views.</span></button>
       <button type="button" data-style="trackpad"><b>Trackpad</b><span>Two-finger swipe orbits, pinch zooms, Shift+swipe pans. Number-row keys align views.</span></button>
     </div>
-    <h3>Models and textures</h3>
-    <button type="button" data-import-model>Open model…</button>
-    <div class="asset-folders-body"></div>
     <div class="dialog-actions"><button data-close>Done</button></div>
   </dialog>
   <dialog id="import-error-dialog" aria-labelledby="import-error-title">
