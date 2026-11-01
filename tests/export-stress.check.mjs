@@ -1,0 +1,14 @@
+import {readFile,writeFile} from 'node:fs/promises';
+import {chromium} from 'file:///C:/Users/joshu/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import assert from 'node:assert/strict';
+const browser=await chromium.launch({headless:true,channel:'msedge',args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+try{const page=await browser.newPage();await page.goto('http://127.0.0.1:5173/');const errors=[];page.on('pageerror',e=>errors.push(e.message));
+const visual=process.argv.includes('--visual'),mode=process.argv.includes('--shell')?'shell':'grouped',tolerance=Number(process.env.EXPORT_TOLERANCE||0);
+const xml=await readFile('C:/Users/joshu/AppData/Roaming/Avorion/ships/Ship Stress Test.xml','utf8');
+const result=await page.evaluate(async ({xml,mode,tolerance,visual})=>{
+ const {parseAvorionXml}=await import('/src/block-model.js'),{captureExport}=await import('/src/export/snapshot.js');const model=parseAvorionXml(xml,'Ship Stress Test.xml',xml.length),before=new XMLSerializer().serializeToString(model.doc),snapshot=captureExport({loaded:true,visible:true,model,selectedIds:new Set(),hiddenIds:new Set(),regions:[]},{},{scope:'all',excludeThin:true});
+ let ticks=0,last=performance.now(),maxInterval=0;const heartbeat=setInterval(()=>{const now=performance.now();maxInterval=Math.max(maxInterval,now-last);last=now;ticks++;},25),start=performance.now();
+ const r=await new Promise((resolve,reject)=>{const worker=new Worker('/src/export/worker.js',{type:'module'});let ready;worker.onmessage=({data})=>{if(data.type==='error'){worker.terminate();reject(Error(data.message));}if(data.type==='ready'){ready=data.result;if(!ready.downloadable){worker.terminate();resolve({summary:ready.summary,warnings:ready.warnings,downloadable:false});}else worker.postMessage({type:'download'});}if(data.type==='file'){worker.terminate();resolve({summary:ready.summary,bytes:data.bytes.length,name:data.name,warnings:ready.warnings,downloadable:ready.downloadable});}};worker.onerror=e=>{worker.terminate();reject(Error(e.message));};worker.postMessage({type:'prepare',snapshot,options:{format:visual?'stl':mode==='shell'?'3mf':'glb',mode,longest:100,budget:mode==='shell'?1024:512,tolerance,includeTransparent:true,cleanup:true}});});clearInterval(heartbeat);
+ return {...r,milliseconds:performance.now()-start,uiHeartbeatTicks:ticks,maxHeartbeatIntervalMs:maxInterval,xmlUnchanged:before===new XMLSerializer().serializeToString(model.doc)};
+},{xml,mode,tolerance,visual});console.log(JSON.stringify(result,null,2));assert.ok(result.summary.Blocks>0);assert.equal(result.downloadable,true);assert.equal(result.xmlUnchanged,true);assert.ok(result.uiHeartbeatTicks>5);assert.deepEqual(errors,[]);await writeFile('test-results/export-stress-'+(visual?'visual-stl':mode)+'.json',JSON.stringify(result,null,2));
+}finally{await browser.close();}

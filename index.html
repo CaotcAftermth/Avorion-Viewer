@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#282828">
+  <meta name="description" content="A Blender-inspired workspace foundation for viewing Avorion ships.">
+  <title>Avorion Viewer — Layout</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./src/styles.css">
+  <link rel="stylesheet" href="./src/color-editor.css">
+  <link rel="stylesheet" href="./src/export/export.css">
+</head>
+<body>
+  <div id="app">
+    <header id="topbar" aria-label="Application menu">
+      <a class="brand" href="./" title="Avorion Viewer" aria-label="Avorion Viewer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 22 19H2Z"/><path d="m12 8 5 8H7Z"/></svg></a>
+      <nav id="main-menu" aria-label="Main menu"></nav>
+      <div class="workspace-tabs" id="workspaces" role="tablist" aria-label="Workspaces"></div>
+      <span class="project-title">Untitled <span class="muted">· Local session</span></span>
+      <button id="help-button" class="icon-button" aria-label="Window system help" title="Window system help">?</button>
+    </header>
+    <div id="restore-bar" hidden><button id="restore-button">↶ Back to Previous</button><span>Maximized area</span></div>
+    <main id="screen" aria-label="Editor areas"></main>
+    <footer id="statusbar"><span id="status-hint">Drag borders to resize · Right-click for area options</span><span id="save-status" role="status">Layout saved locally</span><button type="button" id="error-status" class="error-status" hidden></button><button type="button" class="version" id="version-button" data-no-translate>AVORION VIEWER <b>0.11.0</b></button></footer>
+  </div>
+  <div id="menu" class="popup" role="menu" hidden></div>
+  <div id="operation-overlay" hidden></div>
+  <div id="toast" role="status" hidden></div>
+  <div id="drop-overlay" hidden><div><b>Drop to open</b><span data-i18n-html>Avorion <code>.xml</code> opens as the model · texture images or a texture folder load as textures</span></div></div>
+  <dialog id="help-dialog">
+    <div class="dialog-heading"><span class="eyebrow">QUICK START</span><button class="icon-button" data-close aria-label="Close help">×</button></div>
+    <h1 data-i18n-html>Open a ship.<br>Look it over.</h1>
+    <ol class="quick-start">
+      <li><b>Open</b><span data-i18n-html>Drop an Avorion ship <code>.xml</code> onto the window, or use File &gt; Import Avorion XML.</span></li>
+      <li><b>Textures</b><span>Drop the game's block texture folder, or use File &gt; Load local texture folder. They are kept in this browser.</span></li>
+      <li><b>Orbit</b><span>Middle-drag orbits, Shift+middle-drag pans, the wheel zooms. Home frames the ship. No middle button or numpad? Help &gt; Input style switches to Laptop or Trackpad controls.</span></li>
+      <li><b>Inspect</b><span>Click a block for its details in Properties. Ship Structure groups blocks by type or material; right-click for Focus, Isolate and Hide.</span></li>
+      <li><b>Paint</b><span>Press Tab for Paint Mode, or open Window &gt; Open Color Workshop. Ctrl+Z undoes a stroke.</span></li>
+      <li><b>Save</b><span>File &gt; Save preserved XML writes your colors back into the ship file. File &gt; Advanced Export makes GLB, OBJ, STL or 3MF.</span></li>
+    </ol>
+    <h2 class="shortcut-heading">Shortcuts</h2>
+    <div class="shortcut-list"></div>
+    <p class="dialog-note" data-i18n-html>Everything stays in this browser. No accounts, uploads or backend.</p>
+    <button class="primary" data-close>Back to the viewer</button>
+  </dialog>
+  <dialog id="asset-folders-dialog" aria-labelledby="asset-folders-title">
+    <div class="dialog-heading"><span class="eyebrow">ASSET FOLDERS</span><button class="icon-button" data-close aria-label="Close">×</button></div>
+    <h2 id="asset-folders-title">Open from a folder</h2>
+    <div class="asset-folders-body"></div>
+    <div class="dialog-actions"><button data-close>Done</button></div>
+  </dialog>
+  <dialog id="input-style-dialog" aria-labelledby="input-style-title">
+    <div class="dialog-heading"><span class="eyebrow">INPUT STYLE</span><button class="icon-button" data-close aria-label="Close">×</button></div>
+    <h2 id="input-style-title">How do you get around?</h2>
+    <p>Pick the controls that match your hardware. Change it any time in Help &gt; Input style or Preferences &gt; Input.</p>
+    <div class="input-style-options">
+      <button type="button" data-style="blender"><b>Blender</b><span>Mouse with a middle button and a numpad. Middle-drag orbits, wheel zooms, numpad keys align views.</span></button>
+      <button type="button" data-style="laptop"><b>Laptop</b><span>Mouse without a middle button, no numpad. Alt+left-drag orbits (add Shift to pan, Ctrl to zoom); number-row keys align views.</span></button>
+      <button type="button" data-style="trackpad"><b>Trackpad</b><span>Two-finger swipe orbits, pinch zooms, Shift+swipe pans. Number-row keys align views.</span></button>
+    </div>
+  </dialog>
+  <dialog id="import-error-dialog" aria-labelledby="import-error-title">
+    <div class="dialog-heading"><span class="eyebrow">IMPORT FAILED</span><button class="icon-button" data-close aria-label="Close">×</button></div>
+    <h2 id="import-error-title">Could not open this file</h2>
+    <p class="import-error-file"></p>
+    <pre class="import-error-message"></pre>
+    <p class="dialog-note" data-i18n-html>Check that the file is an Avorion ship or station plan exported from the game (a <code>.xml</code> file from the ships folder). The current model was not changed.</p>
+    <div class="dialog-actions"><button data-close>Close</button><button class="primary" data-retry>Choose another file…</button></div>
+  </dialog>
+  <dialog id="name-dialog"><form method="dialog"><h2>Rename workspace</h2><label>Name <input name="workspaceName" maxlength="32" required autocomplete="off"></label><div class="dialog-actions"><button value="cancel" formnovalidate>Cancel</button><button class="primary" value="save">Save</button></div></form></dialog>
+  <dialog id="preferences-dialog" aria-label="Preferences"><div class="preferences-window-title"><span>Avorion Viewer Preferences</span><button type="button" class="icon-button" aria-label="Close preferences">×</button></div><div class="preferences-window-body"></div></dialog>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>

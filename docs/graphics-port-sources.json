@@ -1,0 +1,70 @@
+{
+  "source": "avorion-viewer-v3 graphics handoff, 2026-09-29",
+  "three": "0.169.0",
+  "files": [
+    {
+      "file": "src/avorion/types/index.js",
+      "sourceSha256": "0f01fc3c8abf71073da58d517d81fa64bbc998a54baeabd1c79c57352b5d2141"
+    },
+    {
+      "file": "src/avorion/lib/avorion/blockDefinitions.js",
+      "sourceSha256": "01a3d4e459ee12da280f5d0271aa670e93f1b6347f3287753e7b9e3edb83ef9d"
+    },
+    {
+      "file": "src/avorion/lib/avorion/orientationProfile.js",
+      "sourceSha256": "3ea0beb63fda682fb457d0f2ee538a146395c5eca04666304406c7e5bc72c061"
+    },
+    {
+      "file": "src/avorion/lib/avorion/orientation.js",
+      "sourceSha256": "903f8a1f7fa35eb2b488a9182c073758ea8c3290a9ba16262f75a70676563e6a"
+    },
+    {
+      "file": "src/avorion/lib/avorion/parseAvorionXml.js",
+      "sourceSha256": "ddfdd3f934a18f1f3d9527992782eb7135a1766fccbcf80eb0786fc3cd4b44e5"
+    },
+    {
+      "file": "src/avorion/lib/avorion/secondaryColor.js",
+      "sourceSha256": "81c6c21be9cadac2be6ccf58409606430ddd548a88f9d2dcdabc0e91deecaf2e"
+    },
+    {
+      "file": "src/avorion/lib/geometry/blockGeometry.js",
+      "sourceSha256": "c873527ab10e4fbe84fd26257f7e0c90cfd0ba346133f92e829750ea4faf45bf"
+    },
+    {
+      "file": "src/avorion/lib/geometry/blockSurface.js",
+      "sourceSha256": "81628a25aa07fb050a9c24ccf57978e2f161306c0bed6ee73e427732485a2fc8"
+    },
+    {
+      "file": "src/avorion/lib/geometry/thrusterPorts.js",
+      "sourceSha256": "8b11596f3dcaba4f5cd13c133897e4b0e7ebbe1629a1498c528d6984af93b309"
+    },
+    {
+      "file": "src/avorion/lib/geometry/portObstruction.js",
+      "sourceSha256": "e69907c9803f58757c4c385b538bb1f20b0c7b6a1e3df1073987fe4a5bd9926d"
+    },
+    {
+      "file": "src/avorion/lib/geometry/blockEffects.js",
+      "sourceSha256": "17d6d95e29a74da829294992797fc701fbd20529622af49e8a9f6aa3133eece3"
+    },
+    {
+      "file": "src/avorion/lib/geometry/blockPose.js",
+      "sourceSha256": "641ef32b010150927c13aeee52fbf9b759a73d066901484fcb1b58c3bdbf9e79"
+    },
+    {
+      "file": "src/avorion/lib/geometry/gameShader.js",
+      "sourceSha256": "90736844c0fd3f3edf7ebfdd8ef5bc615acdd16ccdf0185c352b6e37daf6728f"
+    },
+    {
+      "file": "src/avorion/lib/geometry/texturedModel.js",
+      "sourceSha256": "b627e55c4c7087df83e012c0e7fa5b34432efc5628f6b31a8ba0622119ddeb48"
+    },
+    {
+      "file": "src/avorion/lib/textures/shadingMap.js",
+      "sourceSha256": "936379faf76cf6b44f1d83f3cd60c392cf9673dad8748736e14a50dc125f26c8"
+    },
+    {
+      "file": "src/avorion/lib/textures/textureLibrary.js",
+      "sourceSha256": "d0aa8ec4403a6cea4faa8f7ab8d7623bc861f34fc236d8b727af44b50b1c8e03"
+    }
+  ]
+}

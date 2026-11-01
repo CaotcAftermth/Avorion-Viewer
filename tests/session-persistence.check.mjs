@@ -1,0 +1,40 @@
+import {chromium} from 'file:///C:/Users/joshu/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import assert from 'node:assert/strict';
+const base=process.env.VIEWER_TEST_URL||'http://127.0.0.1:5173';
+const browser=await chromium.launch({headless:true,channel:'msedge',args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+try{
+ const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const waitAsync=async(fn,arg)=>{for(let i=0;i<100;i++){if(await page.evaluate(fn,arg))return;await new Promise(r=>setTimeout(r,100));}throw Error('Async persistence condition timed out');};
+ await page.goto(base);
+ const xml='<ship><block index="2" material="0" lx="10" ly="20" lz="30" ux="12" uy="24" uz="36" color="ff123456" custom="keep"/></ship>';
+ const menu=async name=>{await page.getByRole('button',{name:'File',exact:true}).click();await page.getByRole('menuitem',{name,exact:true}).click();};
+ const chooser=page.waitForEvent('filechooser');await menu('Import Avorion XML…');await (await chooser).setFiles({name:'Persistence ship.xml',mimeType:'application/xml',buffer:Buffer.from(xml)});
+ await page.waitForFunction(()=>document.querySelector('.project-title').textContent.includes('Persistence ship.xml'));
+ await waitAsync(async()=>{const {openSessionStore}=await import('/src/session-persistence.js');return (await openSessionStore().get('model'))?.fileName==='Persistence ship.xml';});
+ const original=await page.evaluate(async xml=>{
+   const {parseAvorionXml,placeImportedModel}=await import('/src/block-model.js');
+   const {snapshotModel,restoreModel,openSessionStore}=await import('/src/session-persistence.js');
+   const {applyBlockColors}=await import('/src/block-colors.js');
+   const scene={loaded:true,preview:false,model:parseAvorionXml(xml,'Persistence ship.xml',xml.length)};placeImportedModel(scene.model,'placed');
+   applyBlockColors(scene,[{id:'b0',color:'ffabcdef',secondaryColor:'ff112233'}],{writeXml:false});
+   const record=snapshotModel(scene),model=restoreModel(record).model;
+   if(model.blocks[0].color!=='ffabcdef'||model.blocks[0].secondaryColor!=='ff112233'||model.doc.querySelector('block').getAttribute('custom')!=='keep')throw Error('Model round trip lost colors or XML');
+   if(JSON.stringify(model.bounds)!==JSON.stringify(scene.model.bounds))throw Error('Placement changed');
+   await openSessionStore().put('model',record);
+   const {textureLibrary}=await import('/src/game-renderer.js');const {allTextureNames}=await import('/src/avorion/lib/textures/shadingMap.js');
+   const canvas=document.createElement('canvas');canvas.width=canvas.height=2;canvas.getContext('2d').fillRect(0,0,2,2);
+   const blob=await new Promise(r=>canvas.toBlob(r));const name=allTextureNames()[0];await textureLibrary.loadFiles([new File([blob],name+'.png',{type:'image/png'})]);
+   return {name,bytes:Array.from(new Uint8Array(await blob.arrayBuffer()))};
+ },xml);
+ await waitAsync(async()=>{const {openSessionStore}=await import('/src/session-persistence.js');return (await openSessionStore().get('textures'))?.length===1;});
+ await page.reload();
+ await page.waitForFunction(()=>document.querySelector('.project-title').textContent.includes('Persistence ship.xml'));
+ await waitAsync(async name=>(await import('/src/game-renderer.js')).textureLibrary.has(name),original.name);
+ const restored=await page.evaluate(async name=>{const {textureLibrary}=await import('/src/game-renderer.js');return Array.from(new Uint8Array(await textureLibrary.blobs.get(name).arrayBuffer()));},original.name);assert.deepEqual(restored,original.bytes);
+ await menu('Unload textures');await menu('Clear scene');
+ await waitAsync(async()=>{const s=(await import('/src/session-persistence.js')).openSessionStore();return (await s.get('model'))?.empty&&(await s.get('textures'))?.length===0;});
+ await page.reload();await page.waitForFunction(()=>document.querySelector('.project-title')?.textContent.includes('Untitled'));
+ await page.getByRole('button',{name:'File',exact:true}).click();assert.ok(await page.getByRole('menuitem',{name:'Advanced Export…',exact:true}).isDisabled());
+ assert.equal(await page.evaluate(async()=>(await import('/src/game-renderer.js')).textureLibrary.loadedCount),0);
+ assert.deepEqual(errors,[]);console.log('Model XML, paint, placement, reload, original texture bytes, unload and clear persistence passed.');
+}finally{await browser.close();}

@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="../favicon.svg"><title>Skybox GPU checks</title>
+<style>body{margin:0;background:#101015;color:white}canvas{display:block}pre{padding:10px}</style>
+<pre id="status">Generating sky…</pre><script type="module">
+import * as THREE from '../src/vendor/three.module.js';
+import {createSkybox} from '../src/skybox.js';
+import {WORLD_DEFAULTS} from '../src/sky-settings.js';
+const renderer=new THREE.WebGLRenderer({preserveDrawingBuffer:true});renderer.setSize(900,550);renderer.outputColorSpace=THREE.LinearSRGBColorSpace;document.body.append(renderer.domElement);
+const sky=createSkybox();await sky.ready;
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(75,900/550,.1,10);camera.lookAt(1,.2,-1);
+const assert=(condition,message)=>{if(!condition)throw Error(message);};
+const pixels=()=>{const data=new Uint8Array(900*550*4);renderer.getContext().readPixels(0,0,900,550,renderer.getContext().RGBA,renderer.getContext().UNSIGNED_BYTE,data);return data;};
+const start=performance.now();scene.background=sky.texture(renderer,WORLD_DEFAULTS);assert(scene.background?.isCubeTexture,'Cubemap generated');renderer.render(scene,camera);const original=pixels();
+assert(original.some((v,i)=>i%4!==3&&v>35),'Sky has visible clouds/stars');
+assert(sky.texture(renderer,WORLD_DEFAULTS)===scene.background,'Same settings reuse texture');
+assert(sky.texture(renderer,{...WORLD_DEFAULTS,worldRotation:90})===scene.background,'Rotation does not rebake');
+scene.background=sky.texture(renderer,{...WORLD_DEFAULTS,worldSeed:43});renderer.render(scene,camera);assert(pixels().some((v,i)=>v!==original[i]),'Another seed changes rendered sky');
+scene.background=sky.texture(renderer,{...WORLD_DEFAULTS,worldBrightness:0});renderer.render(scene,camera);assert(pixels().every((v,i)=>i%4===3||v===0),'Zero brightness is black');
+scene.background=sky.texture(renderer,WORLD_DEFAULTS);renderer.render(scene,camera);
+assert(pixels().every((v,i)=>v===original[i]),'Rebuilding same seed reproduces every pixel');
+window.skyTest={passed:true,generationAndChecksMs:Math.round(performance.now()-start),textures:renderer.info.memory.textures};
+document.querySelector('#status').textContent=JSON.stringify(window.skyTest);
+</script>
+

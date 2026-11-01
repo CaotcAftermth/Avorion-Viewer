@@ -1,0 +1,8 @@
+{
+  "source": "Avorion/data/rgb.txt",
+  "sha256": "67c5bda1ad0dc6ecab2a923bc1c5768703fdebc6ded3c41d0bbdbcee1f11f300",
+  "records": 407,
+  "index": "1-based source row, not a verified game ID",
+  "relationships": "Exact variant prefix plus existing unprefixed base name",
+  "categories": "Viewer-derived browsing categories; not game metadata"
+}

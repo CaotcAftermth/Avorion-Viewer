@@ -1,0 +1,28 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="../favicon.svg"><link rel="stylesheet" href="../src/styles.css"><title>Outliner scale checks</title>
+<style>body{display:block;padding:20px}.test-host{height:400px;width:450px;overflow:auto;position:relative;border:1px solid gray}#result{white-space:pre-wrap}</style><pre id="result">Running</pre><div class="test-host"></div><script type="module">
+import {mountShipStructure,selectBlocks,setBlockVisibility} from '../src/ship-structure.js';
+const assert=(value,message)=>{if(!value)throw Error(message)},results=[];
+try{
+ for(const count of [40339,100000,500000]){
+  const host=document.querySelector('.test-host');host.replaceChildren();host.scrollTop=0;
+  const blocks=Array.from({length:count},(_,i)=>({id:'b'+i,type:'Hull',typeIndex:2,material:'Iron',position:{x:i,y:0,z:0},size:{x:1,y:1,z:1}}));
+  const scene={loaded:true,revision:1,model:{blocks,fileName:'Scale '+count},selectedIds:new Set(),hiddenIds:new Set()};
+  let focusIds;let controller;const start=performance.now();
+  const node={shipExpanded:['type:Hull']};controller=mountShipStructure(host,node,scene,{getPreferences:()=>({simplifyThreshold:30000}),select:(ids,add)=>{selectBlocks(scene,ids,add);controller.sync()},visibility:(ids,action)=>{setBlockVisibility(scene,ids,action);controller.sync()},focus:ids=>focusIds=ids,menu(){},save(){}});
+  const mountMs=performance.now()-start;await new Promise(r=>requestAnimationFrame(r));assert(host.querySelectorAll('.ship-row').length<80,'DOM not bounded');
+  const group=host.querySelector('[data-row-index="1"] .ship-name');assert(!group.disabled,'large group disabled');const t=performance.now();group.click();const groupSelectMs=performance.now()-t;assert(scene.selectedIds.size===count,'group must include unmounted rows');
+  // Clear group before measuring single-block changes.
+  selectBlocks(scene,[]);controller.sync();host.scrollTop=host.scrollHeight;host.dispatchEvent(new Event('scroll'));
+  const last=host.querySelector(`[data-row-index="${count+1}"] .ship-name`);assert(last?.textContent==='Hull · b'+(count-1),'last block missing');
+  const t1=performance.now();last.click();const selectMs=performance.now()-t1;assert(scene.selectedIds.has('b'+(count-1))&&scene.selectedIds.size===1,'individual selection');
+  host.querySelector(`[data-row-index="${count+1}"] .ship-name`).dispatchEvent(new MouseEvent('dblclick'));assert(focusIds[0]==='b'+(count-1),'focus');
+  host.querySelector(`[data-row-index="${count+1}"] .ship-eye`).click();assert(scene.hiddenIds.has('b'+(count-1)),'hide');
+  host.querySelector(`[data-row-index="${count+1}"] .ship-isolate`).click();assert(scene.hiddenIds.size===count-1&&!scene.hiddenIds.has('b'+(count-1)),'isolate');
+  node.search='b'+(count-1);host.scrollTop=0;controller.search();const filtered=host.querySelector('[data-row-index="1"] .ship-name');filtered.click();assert(scene.selectedIds.size===1,'filtered group');
+  const unchanged=performance.now();for(let i=0;i<100;i++)controller.sync();const unchangedSyncMs=performance.now()-unchanged;
+  results.push({count,mountMs,groupSelectMs,selectMs,unchangedSyncMs,rows:host.querySelectorAll('.ship-row').length});controller.dispose();
+ }
+ document.body.dataset.result='pass';
+}catch(e){document.body.dataset.result='fail';results.push({error:e.message,stack:e.stack})}
+window.scaleResults=results;document.querySelector('#result').textContent=JSON.stringify(results,null,2);
+</script>

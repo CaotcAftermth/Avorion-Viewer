@@ -1,0 +1,17 @@
+import {chromium} from 'file:///C:/Users/joshu/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import assert from 'node:assert/strict';
+const browser=await chromium.launch({headless:true,channel:'msedge',args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+try{
+ const page=await browser.newPage({viewport:{width:1400,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:5173/');
+ const info=page.locator('[data-editor=info]');await info.getByRole('button',{name:'Editor type',exact:true}).click();await page.getByRole('menuitem',{name:'Asset Library',exact:true}).click();
+ const library=page.locator('[data-editor=assets]');await library.getByRole('button',{name:'Import turret XML',exact:true}).waitFor();
+ const xml='<turret size="0.5" coaxial="false"><base px="0" py="0" pz="0"><plan><item index="0" parent="-1"><block index="2" lx="0" ly="0" lz="0" ux="1" uy="1" uz="1"/></item></plan></base><body px="0" py="1" pz="0"><plan/></body><barrel px="0" py="1" pz="0"><plan/></barrel></turret>';
+ await library.locator('input[type=file]').setInputFiles({name:'Test turret.xml',mimeType:'text/xml',buffer:Buffer.from(xml)});await library.getByRole('button',{name:'Test turret.xml',exact:true}).waitFor();
+ await page.getByRole('tab',{name:'Turrets',exact:true}).click();await page.getByText('Test turret.xml',{exact:true}).last().waitFor();await page.getByLabel('Show sockets',{exact:true}).check();await page.getByLabel('Socket scope',{exact:true}).selectOption('all');
+ await page.reload();await page.locator('[data-editor=assets]').getByRole('button',{name:'Test turret.xml',exact:true}).waitFor();await page.getByRole('tab',{name:'Turrets',exact:true}).waitFor();
+ const sockets=await page.evaluate(async()=>{const {makeBlock,makeModel}=await import('/src/block-model.js');const {drawSockets}=await import('/src/turrets/sockets.js');const {ensureCamera}=await import('/src/navigation.js');const scene={loaded:true,visible:true,revision:0,model:makeModel([makeBlock({typeIndex:21})]),selectedIds:new Set(['b0']),hiddenIds:new Set(),turretSockets:{show:true,scope:'all'}};const c=document.createElement('canvas');return drawSockets(c.getContext('2d'),scene,ensureCamera({yaw:.7,pitch:.6,zoom:1,panX:0,panY:0}),600,400,'orange').length;});assert.equal(sockets,5);
+ await library.locator('input[type=file]').setInputFiles({name:'Duplicate.xml',mimeType:'text/xml',buffer:Buffer.from(xml)});await page.getByText('Already imported: Test turret.xml',{exact:true}).waitFor();assert.equal(await library.locator('.turret-asset-tile:not(.turret-import)').count(),1);
+ await library.getByLabel('Asset name',{exact:true}).fill('Renamed turret');await library.getByRole('button',{name:'Rename asset',exact:true}).click();await library.getByRole('button',{name:'Renamed turret',exact:true}).waitFor();await page.reload();await library.getByRole('button',{name:'Renamed turret',exact:true}).click();await library.getByRole('button',{name:'Delete asset',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('.turret-asset-tile:not(.turret-import)').length===0);
+ await page.screenshot({path:'test-results/turret-main.png'});assert.deepEqual(errors,[]);console.log('PASS: editor registration, native import, selection, library reload, properties layout reload, angled socket projection; no browser errors.');
+}finally{await browser.close();}
+

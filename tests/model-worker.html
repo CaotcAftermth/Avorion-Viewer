@@ -1,0 +1,30 @@
+<!doctype html><meta charset="utf-8"><link rel="icon" href="../favicon.svg"><title>Background model preparation checks</title><pre id="status">Preparing</pre><script type="module">
+import {makeBlock,makeModel} from '../src/block-model.js';
+import {prepareLargeModel} from '../src/model-preparation.js';
+import {buildTexturedModel} from '../src/avorion/lib/geometry/texturedModel.js';
+import {defaultOrientationProfile} from '../src/avorion/lib/avorion/orientation.js';
+import {DEFAULT_GAME_SHADER} from '../src/avorion/types/index.js';
+import {drawGame,pickGame,releaseGameModel} from '../src/game-renderer.js';
+import {area} from '../src/layout.js';
+import {ensureViewportOptions} from '../src/viewport-options.js';
+import {FACTORY_PREFERENCES} from '../src/preferences.js';
+const assert=(value,message)=>{if(!value)throw Error(message)};
+try{
+ const count=40339,blocks=Array.from({length:count},(_,i)=>makeBlock({id:'b'+i,position:{x:(i%100)*2,y:Math.floor(i/100)*2,z:0},secondaryColor:i%2?'00000000':'80ff0011'})),source=makeModel(blocks),params={...DEFAULT_GAME_SHADER,simplified:true};
+ let ticks=0;const timer=setInterval(()=>ticks++,10),started=performance.now();const prepared=await prepareLargeModel(source,blocks,params).promise;clearInterval(timer);
+ const model=buildTexturedModel(source,defaultOrientationProfile(),{...params,prepared});assert(ticks>2,'worker blocked main thread');assert(model.ranges.size===count,'all block IDs survived worker');
+ const bytes=model.group.children.filter(m=>m.userData.textured).reduce((n,m)=>n+Object.values(m.geometry.attributes).reduce((sum,a)=>sum+a.array.byteLength,0),0);assert(bytes<count*200,'instanced buffers stay compact');
+ model.setSelection(new Set(['b40338']));const mesh=model.group.children.find(m=>m.userData.ranges?.has('b40338'));assert(mesh,'last block');model.dispose();
+ // Exercise the production async install and cancellation path.
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=240;document.body.append(canvas);const ctx=canvas.getContext('2d');
+ const view=area().view;Object.assign(ensureViewportOptions(view),{background:'VIEWPORT',showOverlays:false,objectOutline:false});view.grid=false;view.target=[0,0,0];view.yaw=0;view.pitch=0;
+ const scene={model:source,loaded:true,visible:true,revision:1,selectedIds:new Set(['b0']),hiddenIds:new Set()};
+ drawGame(ctx,scene,view,240,240,{...FACTORY_PREFERENCES,worldEnabled:false},1);assert(scene.renderPreparing,'production queues worker');
+ await new Promise((resolve,reject)=>{window.addEventListener('avorion-model-ready',resolve,{once:true});setTimeout(()=>reject(Error('worker install timeout')),15000)});
+ assert(!scene.renderPreparing&&!scene.renderError,'worker installed');drawGame(ctx,scene,view,240,240,{...FACTORY_PREFERENCES,worldEnabled:false},1);assert(pickGame(scene,view,240,240,120,120)==='b0','large-model picking');
+ scene.revision++;drawGame(ctx,scene,view,240,240,FACTORY_PREFERENCES,1);assert(scene.renderPreparing,'rebuild queues');
+ scene.model=makeModel([makeBlock({id:'replacement'})]);scene.revision++;drawGame(ctx,scene,view,240,240,FACTORY_PREFERENCES,1);assert(!scene.renderPreparing,'replacement cancels worker');
+ await new Promise(r=>setTimeout(r,300));assert(pickGame(scene,view,240,240,120,120)==='replacement','late worker cannot overwrite replacement');releaseGameModel();
+ document.body.dataset.result='pass';document.querySelector('#status').textContent=JSON.stringify({count,workerTicks:ticks,totalMs:performance.now()-started,attributeMiB:bytes/2**20});
+}catch(e){document.body.dataset.result='fail';document.querySelector('#status').textContent=e.stack}
+</script>

@@ -1,0 +1,34 @@
+import {chromium} from 'file:///C:/Users/joshu/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import assert from 'node:assert/strict';
+const browser=await chromium.launch({headless:true,channel:'msedge',args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+try{
+ const page=await browser.newPage({viewport:{width:1600,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:5173/');
+ await page.waitForFunction(()=>localStorage.getItem('avorion-viewer.window-system.v1')!==null);
+ const initialLayout=await page.evaluate(()=>localStorage.getItem('avorion-viewer.window-system.v1'));
+ await page.evaluate(async()=>{const {openTurretWorkspace}=await import('/src/turrets/workspace.js');const {demoProject}=await import('/src/turrets/core.js');window.originalAsset=demoProject().assets[0];window.openEditor=a=>openTurretWorkspace(a||window.originalAsset,async d=>window.savedDraft=d);window.openEditor();});
+ const dialog=page.getByRole('dialog',{name:'Turret workspace'});await dialog.getByRole('button',{name:'Save asset',exact:true}).waitFor();await page.waitForFunction(()=>!document.querySelector('.turret-workspace [data-save]').disabled);
+ const frame=page.frameLocator('.turret-app-frame');
+ assert.equal(await frame.locator('#screen .area').count(),3);
+ await frame.getByLabel('Interaction mode',{exact:true}).selectOption('object');
+ assert.equal(await frame.getByRole('button',{name:'View menu',exact:true}).count(),1);
+ assert.equal(await frame.locator('.view-cube').count(),1);
+ assert.equal(await frame.getByLabel('Search blocks',{exact:true}).count(),1);
+ assert.equal(await frame.locator('.corner-grip').count(),6);
+ await frame.getByLabel('Show rotation axes',{exact:true}).check();await frame.getByLabel('Show muzzle positions',{exact:true}).check();
+ await frame.getByRole('button',{name:'Select barrel',exact:true}).click();
+ await frame.getByLabel('Block color',{exact:true}).fill('#ff0000');await frame.getByLabel('Block color',{exact:true}).dispatchEvent('change');
+ await frame.getByLabel('Body rotation',{exact:true}).fill('30');await frame.getByLabel('Body rotation',{exact:true}).dispatchEvent('change');
+ await frame.getByRole('button',{name:'Editor type',exact:true}).first().click();await frame.getByRole('menuitem',{name:'Info',exact:true}).click();
+ assert.equal(await frame.locator('[data-editor=info]').count(),1);
+ await dialog.getByRole('button',{name:'Save asset',exact:true}).click();
+ assert.equal(await page.evaluate(()=>window.savedDraft.editorPose.yaw),30);assert.deepEqual(await page.evaluate(()=>window.savedDraft.editorGuides),{axes:true,muzzles:true});
+ assert.equal(await page.evaluate(()=>window.savedDraft.blocks.find(b=>b.id==='b2').color),'ffff0000');
+ assert.notEqual(await page.evaluate(()=>window.originalAsset.blocks.find(b=>b.id==='b2').color),'ffff0000');
+ await page.evaluate(()=>window.openEditor(window.savedDraft));await page.waitForFunction(()=>!document.querySelector('.turret-workspace [data-save]').disabled);
+ assert.equal(await frame.locator('[data-editor=info]').count(),1);
+ await frame.getByRole('button',{name:'Editor type',exact:true}).first().click();await frame.getByRole('menuitem',{name:'3D Viewport',exact:true}).click();
+ await page.screenshot({path:'test-results/turret-real-workspace.png'});
+ await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+ assert.equal(await page.evaluate(()=>localStorage.getItem('avorion-viewer.window-system.v1')),initialLayout);
+ assert.deepEqual(errors,[]);console.log('PASS full app viewport/Outliner/header parity, editor switching, turret pose/color, isolated draft, save/reopen, main layout isolation');
+}finally{await browser.close();}

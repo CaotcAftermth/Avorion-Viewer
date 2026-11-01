@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><title>Hangar verification</title>
+<style>body{background:#20252c;color:white;font:16px system-ui}main{display:flex;gap:20px}canvas{width:400px;height:400px}p{max-width:850px}</style>
+<h1>Hangar: open passage and animated barrier</h1><p>Same frozen animation frame. Left: bloom off. Right: bloom strength 4.</p><main><canvas width="400" height="400"></canvas><canvas width="400" height="400"></canvas></main><p id="status">Rendering…</p>
+<script type="module">
+import {drawGame} from '../src/game-renderer.js';import {makeBlock,makeModel} from '../src/block-model.js';import {area} from '../src/layout.js';import {frameVisibleModel} from '../src/model-framing.js';import {alignView} from '../src/navigation.js';import {FACTORY_PREFERENCES} from '../src/preferences.js';import {ensureViewportOptions} from '../src/viewport-options.js';
+const scene={loaded:true,visible:true,revision:1,model:makeModel([makeBlock({typeIndex:10,size:{x:4,y:4,z:4},position:{x:0,y:0,z:0}})]),selectedIds:new Set(),hiddenIds:new Set()};
+const canvases=[...document.querySelectorAll('canvas')];
+const views=canvases.map(()=>{const v=area().view;ensureViewportOptions(v);alignView(v,'front');v.projection='orthographic';v.grid=false;v.imageTime=.016;Object.assign(v.display,{shading:'RENDERED',showOverlays:false,background:'VIEWPORT',backgroundColor:'#20252c',dof:false,objectOutline:false});frameVisibleModel(scene,v,400,400);return v;});
+const prefs={...FACTORY_PREFERENCES,shaderBarrier:1,shaderAO:0,worldEnabled:false,vignetteEnabled:false,shaderGlow:1};
+function render(){try{let ready=true;for(let i=0;i<2;i++)ready=drawGame(canvases[i].getContext('2d'),scene,views[i],400,400,{...prefs,shaderBloom:i?4:0},1)&&ready;
+if(!ready||scene.renderPreparing){requestAnimationFrame(render);return;}
+const a=canvases[0].getContext('2d').getImageData(0,0,400,400).data,b=canvases[1].getContext('2d').getImageData(0,0,400,400).data;let max=0;for(let i=0;i<a.length;i++)max=Math.max(max,Math.abs(a[i]-b[i]));document.querySelector('#status').textContent='Rendered. Maximum pixel difference with bloom: '+max+' / 255.';
+}catch(e){document.querySelector('#status').textContent=e.stack;}}render();
+</script>
