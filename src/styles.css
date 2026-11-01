@@ -475,3 +475,19 @@ canvas.paint-mode{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org
 .empty-state{max-height:calc(100% - 32px);overflow-y:auto;box-sizing:border-box}
 .empty-state h3{margin:16px 0 8px;font-size:13px;font-weight:500;color:#eee}
 .empty-state .input-style-options{margin-top:8px}
+/* Properties › Native Data: decoded XML attributes, hierarchy links and the source XML. */
+.property-content .native-links{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.property-content .native-link{display:flex;gap:2px;min-width:0}
+.property-content .native-link>button{min-height:var(--property-row);margin:0;padding:2px 7px;border-radius:3px;background:#545454;font-size:12px;line-height:16px}
+.property-content .native-link>.native-block-link{flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;color:#a9c9e4}
+.property-content .native-link>.native-block-link:hover{background:#5f6f80;color:#fff}
+.property-content .native-link>.native-frame{flex:0 0 26px;display:grid;place-items:center;padding:2px}
+.property-content .native-link>.native-frame svg{width:14px;height:14px}
+.property-content .native-links>.native-show-all{min-height:var(--property-row);margin:0;padding:2px 8px;border-radius:3px;background:#454545;font-size:11px}
+.property-content .field-row.native-hierarchy[data-layout]{align-items:start}
+.property-content .native-hierarchy>.property-label{padding-top:3px}
+.native-xml-head{display:flex;align-items:center;justify-content:space-between;margin-top:12px}
+.native-xml-head .sub-label{margin:0}
+.property-content .native-xml-head>.native-copy{padding:1px 8px;font-size:11px;background:#454545;border-radius:3px}
+.native-xml{margin:4px 0 2px;padding:7px 9px;background:#1f1f1f;border:1px solid #444;border-radius:4px;max-height:180px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}
+.native-xml code{font:11px/1.5 Consolas,Menlo,monospace;color:#cfd8c4}

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeBlock,makeModel } from '../src/block-model.js';
-import { isThinBlock,viewportHiddenIds,isIsolated,liveBlocks,groupedBlocks,selectBlocks,setBlockVisibility,contextTargets,simplified,reconcileStructure } from '../src/ship-structure.js';
+import { isThinBlock,viewportHiddenIds,isIsolated,liveBlocks,groupedBlocks,selectBlocks,setBlockVisibility,contextTargets,simplified,reconcileStructure,blockParentIds,blockChildIds,blockLabel } from '../src/ship-structure.js';
 const setup=()=>({loaded:true,model:makeModel([
   makeBlock({id:'b123',typeIndex:8,materialIndex:1}),makeBlock({id:'b5',typeIndex:2,materialIndex:0}),makeBlock({id:'b6',typeIndex:8,materialIndex:0}),
   {...makeBlock({id:'b7'}),deleted:true},{...makeBlock({id:'b8'}),el:{isConnected:false}}
@@ -55,4 +55,11 @@ test('thin block filter covers every dimension without changing manual visibilit
   assert.deepEqual([...viewportHiddenIds(s,{showThinBlocks:false})],['b5','b123']);
   assert.deepEqual([...viewportHiddenIds(s,{showThinBlocks:true})],['b5']);
   assert.deepEqual([...s.hiddenIds],['b5']);
+});
+test('native hierarchy resolves live parents and children, and labels blocks readably',()=>{
+  const s=setup();const [a,b,c]=s.model.blocks;b.parentId='b123';c.parentId='b123';a.parentId='b7';s.model.blocks[4].parentId='b123';
+  assert.deepEqual(blockParentIds(s,['b5','b6']),['b123']);assert.deepEqual(blockParentIds(s,['b123']),[]);
+  assert.deepEqual(blockChildIds(s,['b123']),['b5','b6']);assert.deepEqual(blockChildIds(s,['b5']),[]);
+  assert.equal(blockLabel(a),'b123 · Armor · Titanium');
+  assert.equal(blockLabel({...b,itemEl:{getAttribute:n=>n==='index'?'42':null}}),'#42 · Smart Hull · Iron');
 });

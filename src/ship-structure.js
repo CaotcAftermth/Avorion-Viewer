@@ -46,11 +46,25 @@ export function isIsolated(scene,ids){
   const targets=new Set(ids),live=liveBlocks(scene);
   return targets.size>0&&live.some(b=>scene.hiddenIds?.has(b.id))&&live.every(b=>scene.hiddenIds?.has(b.id)!==targets.has(b.id));
 }
+// Native XML hierarchy: <item index="N" parent="M">. parentId is resolved at import; children are derived here.
+const familyCache=new WeakMap();
+function family(scene){
+  const live=liveBlocks(scene),cached=familyCache.get(live);if(cached)return cached;
+  const byId=new Map(live.map(b=>[b.id,b])),children=new Map();
+  for(const b of live)if(b.parentId&&byId.has(b.parentId)){if(!children.has(b.parentId))children.set(b.parentId,[]);children.get(b.parentId).push(b.id);}
+  const result={byId,children};familyCache.set(live,result);return result;
+}
+export function blockParentIds(scene,ids){const {byId}=family(scene),out=new Set();for(const id of ids){const p=byId.get(id)?.parentId;if(p&&byId.has(p))out.add(p);}return [...out];}
+export function blockChildIds(scene,ids){const {children}=family(scene),out=new Set();for(const id of ids)for(const c of children.get(id)||[])out.add(c);return [...out];}
+export function nativeItemIndex(block){return block?.itemEl?.getAttribute('index')??null;}
+// Readable name for a block: native item index first (viewer id when there is none), then type and material.
+export function blockLabel(block){const index=nativeItemIndex(block);return `${index!=null?'#'+index:block.id} · ${block.type} · ${block.material}`;}
+
 export function contextTargets(scene,ids,individual=false){
   return individual&&ids.length===1&&scene.selectedIds?.has(ids[0])?[...scene.selectedIds]:ids;
 }
 
-export function mountShipStructure(host,node,scene,{getPreferences,getView=()=>({}),select,visibility,focus,menu,save}){
+export function mountShipStructure(host,node,scene,{getPreferences,getView=()=>({}),select,visibility,focus,menu,save,reveal=()=>{}}){
   node.shipGrouping??='type';node.shipExpanded??=[];
   const toolbar=document.createElement('div');toolbar.className='ship-toolbar';
   const grouping=document.createElement('select');grouping.setAttribute('aria-label','Group blocks by');grouping.add(new Option('Block type','type'));grouping.add(new Option('Material','material'));grouping.value=node.shipGrouping;
@@ -61,6 +75,7 @@ export function mountShipStructure(host,node,scene,{getPreferences,getView=()=>(
   function popup(event,ids,individual=false){
     event.preventDefault();event.stopPropagation();
     const targets=contextTargets(scene,ids,individual),allSelected=targets.length>0&&targets.every(id=>scene.selectedIds.has(id));
+    const parents=blockParentIds(scene,targets),children=blockChildIds(scene,targets);
     const rect=event.currentTarget.getBoundingClientRect();
     menu(event.clientX||rect.left,event.clientY||rect.bottom,'Ship structure',[
       {label:'Select',action:()=>select(targets,false)},
@@ -70,7 +85,9 @@ export function mountShipStructure(host,node,scene,{getPreferences,getView=()=>(
       {label:'Hide',action:()=>visibility(targets,'hide')},
       {label:'Show',action:()=>visibility(targets,'show')},
       {label:'Show Last',disabled:!scene.visibilityHistory?.length,disabledReason:'Hide or isolate blocks first to restore the previous visibility.',action:()=>visibility([],'last')},
-      {label:'Show all',action:()=>visibility([],'all')}
+      {label:'Show all',action:()=>visibility([],'all')},null,
+      {label:'Show Parent',disabled:!parents.length,disabledReason:'No parent block. Root blocks have parent="-1" in the XML.',action:()=>reveal(parents,'parent')},
+      {label:'Show Children',disabled:!children.length,disabledReason:'No blocks name this block as their parent.',action:()=>reveal(children,'children')}
     ]);
   }
   function row(label,ids,{kind='group',expanded=false,toggle}={}){

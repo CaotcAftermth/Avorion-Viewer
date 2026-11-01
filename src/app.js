@@ -22,7 +22,7 @@ import { frameVisibleModel } from './model-framing.js';
 import { viewportHeader, viewportViewPanel, closeViewportPopover } from './viewport-controls.js';
 import { ensureViewportOptions } from './viewport-options.js';
 import { wireTabs, wirePanels } from './editor-panels.js';
-import { mountShipStructure, liveBlocks, simplified, reconcileStructure, selectBlocks, setBlockVisibility, viewportHiddenIds, isThinBlock } from './ship-structure.js';
+import { mountShipStructure, liveBlocks, blockIds, blockLabel, simplified, reconcileStructure, selectBlocks, setBlockVisibility, viewportHiddenIds, isThinBlock } from './ship-structure.js';
 import { nativeToView, makeBlock, makeModel, modelCorners, blockFramePoints, orientationGallery, parseAvorionXml, placeImportedModel } from './block-model.js';
 import { mountBlockInspector } from './block-inspector.js';
 import { textureLibrary, releaseGameModel, socketExposed } from './game-renderer.js';
@@ -163,6 +163,16 @@ function focusStructure(ids){
   const canvas=areaElement(node.id)?.querySelector('canvas');if(!canvas)return;
   frameBounds(node.view,blockFramePoints(blocks),canvas.clientWidth,canvas.clientHeight);
   renderers.find(r=>r.id===node.id)?.draw();save();
+}
+
+// Bring blocks into view by name: unhide them (even inside an isolation), select, reveal in the outliner, optionally frame.
+function revealStructure(ids,{focus=true,kind}={}){
+  const live=blockIds(scene);ids=ids.filter(id=>live.has(id));if(!ids.length)return;
+  const hidden=viewportHiddenIds(scene,structureView());
+  if(ids.some(id=>hidden.has(id)))visibilityStructure(ids,'show');
+  selectStructure(ids,false,true);
+  if(focus)focusStructure(ids);
+  if(kind){const first=liveBlocks(scene).find(b=>b.id===ids[0]);notify(ids.length===1?`${kind==='children'?'Child':'Parent'}: ${blockLabel(first)}`:`${ids.length} ${kind==='children'?'child':'parent'} blocks shown and selected.`);}
 }
 
 function loadModel(model,preview=false){
@@ -716,7 +726,7 @@ function navigationItems(node){
   ];
 }
 function renderOutliner(body,node){
-  renderers.push(mountShipStructure(body,node,scene,{getPreferences:()=>preferences.value,getView:structureView,select:selectStructure,visibility:visibilityStructure,focus:focusStructure,menu,save}));
+  renderers.push(mountShipStructure(body,node,scene,{getPreferences:()=>preferences.value,getView:structureView,select:selectStructure,visibility:visibilityStructure,focus:focusStructure,menu,save,reveal:(ids,kind)=>revealStructure(ids,{kind})}));
   renderers.push(mountTurretOutliner(body,scene,refreshStructure));
 }
 function captureViewport(){return leaves(workspace().root).find(n=>n.id===lastViewportId&&n.editor==='viewport')||leaves(workspace().root).find(n=>n.editor==='viewport');}
@@ -733,7 +743,7 @@ function renderProperties(body,node){
   const tab=node.propertyTab||'object';
   for(const [name,ico,label] of [['object','cube','Object properties'],['scene','scene','Scene properties'],['world','world','World sky'],['shaders','rendered','Shaders'],['turrets','turret','Turrets'],['workspace','properties','Workspace settings']]){const b=button(label,icon(ico),()=>{node.propertyTab=name;commit();areaElement(node.id)?.querySelector('.property-tabs .active')?.focus();},tab===name?'active':'');b.setAttribute('aria-pressed',String(tab===name));body.querySelector('nav').append(b);}
   const content=body.querySelector('.property-content');
-  if(tab==='object')mountBlockInspector(content,scene,(change)=>{if(change?.appearance){refreshStructure();return;}scene.model={...makeModel(scene.model.blocks),turretMounts:scene.model.turretMounts};scene.revision++;render();});
+  if(tab==='object')mountBlockInspector(content,scene,(change)=>{if(change?.appearance){refreshStructure();return;}scene.model={...makeModel(scene.model.blocks),turretMounts:scene.model.turretMounts};scene.revision++;render();},{reveal:revealStructure});
   if(tab==='turrets')mountTurretProperties(content,scene,refreshStructure,socket=>{const node=leaves(workspace().root).find(n=>n.editor==='viewport');const canvas=node&&areaElement(node.id)?.querySelector('canvas');return !!canvas&&socketExposed(scene,node.view,canvas.clientWidth,canvas.clientHeight,socket,preferences.value);},(direction,bounds)=>{const viewport=captureViewport();if(viewport){if(direction==='coverage'){viewport.view.target=nativeToView(bounds.center);viewport.view.zoom=3/Math.max(.1,bounds.radius);viewport.view.panX=viewport.view.panY=0;save();renderers.find(r=>r.id===viewport.id)?.draw();}else{viewport.view.projection='orthographic';setView(viewport,direction);}}});
   // World and Shaders edit live preferences beside an unobscured viewport.
   if(tab==='world'||tab==='shaders'){
