@@ -216,8 +216,19 @@ function openAssetFolders(){
   const dialog=$('#asset-folders-dialog'),host=dialog.querySelector('.asset-folders-body');
   if(dialog.open)return;
   host.replaceChildren();
+  for(const choice of dialog.querySelectorAll('[data-style]')){
+    choice.classList.toggle('active',choice.dataset.style===preferences.value.inputStyle);
+    choice.setAttribute('aria-pressed',String(choice.dataset.style===preferences.value.inputStyle));
+    choice.onclick=()=>{
+      preferences.set('inputStyle',choice.dataset.style);
+      for(const button of dialog.querySelectorAll('[data-style]')){
+        const selected=button===choice;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected));
+      }
+    };
+  }
+  dialog.querySelector('[data-import-model]').onclick=()=>{dialog.close();importXml();};
   const panel=mountPreferences(host,preferences,{},{...assetActions,openModel:async file=>{dialog.close();await openXmlFile(file);}},{sections:[sectionById('assets')],compact:true});
-  dialog.onclose=()=>panel.dispose();dialog.showModal();
+  dialog.onclose=()=>{panel.dispose();try{localStorage.setItem(INPUT_STYLE_CHOSEN,'1');}catch{}};dialog.showModal();
 }
 function feedbackContext(){const m=scene.model;return {language:currentLanguage(),model:scene.loaded&&m?`${m.fileName||'unnamed'} · ${m.blocks.length} blocks${scene.preview?' (preview)':''}`:'none loaded',textures:`${textureLibrary.loadedCount} texture maps loaded`};}
 function showFeedback(){closeMenu();openFeedback(feedbackContext(),{notify});}
@@ -458,15 +469,7 @@ function navigationHint(){
   if(p.emulate3Button)return 'Alt + LMB Orbit · Alt + Shift + LMB Pan · '+shortcut('wheelZoom')+' Zoom';
   return shortcut('orbitDrag')+' Orbit · '+shortcut('panDrag')+' Pan · '+shortcut('wheelZoom')+' Zoom';
 }
-function openInputStyle(){
-  const dialog=$('#input-style-dialog');
-  for(const choice of dialog.querySelectorAll('[data-style]')){
-    choice.classList.toggle('active',choice.dataset.style===preferences.value.inputStyle);
-    choice.onclick=()=>{preferences.set('inputStyle',choice.dataset.style);dialog.close();notify(`${choice.querySelector('b').textContent} controls on. Change them in Help > Input style.`);};
-  }
-  dialog.onclose=()=>{try{localStorage.setItem(INPUT_STYLE_CHOSEN,'1');}catch{}};
-  if(!dialog.open)dialog.showModal();
-}
+function openInputStyle(){openAssetFolders();}
 // Ask once on first launch; Escape keeps the Blender default.
 try{if(!embeddedAsset&&!localStorage.getItem(INPUT_STYLE_CHOSEN))queueMicrotask(openInputStyle);}catch{}
 // Drop an .xml to open it; drop texture images or a texture folder to load them.
@@ -736,7 +739,7 @@ function renderProperties(body,node){
   }
   if(tab==='scene')mountSceneProperties(content,scene,{getView:()=>captureViewport()?.view,preferences,capture:openCapture,textureStatus});
   if(tab==='workspace'){
-    content.innerHTML=`<div class="property-breadcrumb">${icon('properties')}Workspace</div><details class="panel" open><summary>Window system</summary><div class="field-row"><span>Workspace</span><span>${escape(workspace().name)}</span></div><div class="field-row"><span>Editor areas</span><span>${leaves(workspace().root).length}</span></div><div class="field-row"><span>Storage</span><span>This browser</span></div><p class="panel-note">Drag area borders to resize. Right-click a header or border to split, join, swap, or maximize an editor.</p><button class="setting-button" data-reset>Reset workspace layout</button></details><div class="app-title-panel"><span class="eyebrow">AVORION VIEWER / 0.1</span><h3>Built around your view.</h3><p>A lightweight, local-first workspace foundation.</p></div>`;
+    content.innerHTML=`<div class="property-breadcrumb">${icon('properties')}Workspace</div><details class="panel" open><summary>Window system</summary><div class="field-row"><span>Workspace</span><span>${escape(workspace().name)}</span></div><div class="field-row"><span>Editor areas</span><span>${leaves(workspace().root).length}</span></div><div class="field-row"><span>Storage</span><span>This browser</span></div><p class="panel-note">Drag area borders to resize. Right-click a header or border to split, join, swap, or maximize an editor.</p><button class="setting-button" data-reset>Reset workspace layout</button></details><div class="app-title-panel"><span class="eyebrow" data-no-translate>AVORION VIEWER ${APP_VERSION}</span><h3>${escape(scene.model?.fileName||'No model loaded')}</h3><p>${scene.model?`${scene.model.blocks.length} blocks`:'Open an Avorion XML model from the File menu.'}</p></div>`;
     content.querySelector('[data-reset]').onclick=resetWorkspace;
   }
   wireTabs(body.querySelector('.property-tabs'),content);

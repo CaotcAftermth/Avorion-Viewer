@@ -1,4 +1,12 @@
-# Turret Studio — Phase 4
+# Showcase, calibration and export — development history
+
+> Historical milestone report. For current behavior, see [Turret Studio](TURRET_STUDIO.md).
+
+## Status since this milestone
+
+This report records the showcase/export milestone. Its test counts, timings and browser coverage are historical measurements, not current release guarantees. The current capability summary and remaining limitations are maintained in the Turret Studio guide.
+
+## Milestone record
 
 Implemented October 29, 2026. Adds deterministic cinematic presentation, local reference comparison, reusable appearance calibration, and silent animation export to the existing Three.js workspace. Native visual parity remains unverified: no matched native gameplay recordings or approved screenshot baselines were supplied.
 
@@ -83,7 +91,7 @@ No adapter is installed. `studio.subscribe(listener)` returns an unsubscribe fun
 
 A future adapter can map these semantic events to optional sounds, pair continuous loops by channel, use muzzle/impact positions for spatialization, and read `clock.time`, `clock.playing` and `settings.speed` for synchronization. It must stop loops on pause/dispose/seek/reset, avoid duplicate continuous starts, own its volume policy and explicitly opt into any future export mixing. Seek reconstruction emits only the final timeline notification to subscribers, not replayed shot/impact events; offline exports have no subscribers. There is no AudioContext, audio asset, playback adapter, volume UI or exported audio track. Local reference video is muted.
 
-## Validation and performance
+## Validation and performance recorded at this milestone
 
 Commands: `npm test` (334 passing), `npm run build` (passing), `node tests/turret-phase4.check.mjs`, `node tests/turret-phase4-decode.check.mjs`, `node tests/turret-phase3.check.mjs`, `node tests/turret-phase3-native.check.mjs`, `node tests/turret-phase3-performance.check.mjs`. Browser scripts use installed Edge with software WebGL and route workspace files locally; they do not depend on the development server. The native fixture is the existing 250-block, three-muzzle custom XML.
 
@@ -91,7 +99,7 @@ Validated: deterministic seeking for all 19 families; camera restore and manual 
 
 Representative software-rendering export timings: cold 1080p PNG ~11.8 s; six 320×180 frames ~0.42 s GIF, ~0.75 s PNG ZIP, ~0.97 s VP8 WebM. A 4K cinematic still completed in ~66 s on software rendering. These are local diagnostic samples, not hardware performance guarantees. Eight-muzzle/four-shot stress cases cover rapid projectiles, explosive impacts, beams, lightning, force and rocket trails: no visual-pool overflow; peak 288 rockets. All-family GPU cycles stabilize at four geometries, three shader programs, zero textures; disposal returns geometries/programs to zero. Existing pools and per-frame resource release remain in place.
 
-Edge is the validated encoding runtime. Other browsers and desktop shells are unverified; VP8 is runtime-detected. Captures in `test-results/phase3-*.png` and `phase4-family-contact.png` are candidate regression references, not approved baselines. Hardware-independent native screenshot comparison remains future work.
+Edge is the validated encoding runtime. Other browsers and desktop shells are unverified; VP8 is runtime-detected. Local captures (not bundled) in `test-results/phase3-*.png` and `phase4-family-contact.png` are candidate regression references, not approved baselines. Hardware-independent native screenshot comparison remains future work.
 
 ## Files and follow-up
 

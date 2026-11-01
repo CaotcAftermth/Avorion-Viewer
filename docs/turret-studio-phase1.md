@@ -1,4 +1,12 @@
-# Turret Studio Phase 1
+# Tracking and firing scheduler — development history
+
+> Historical milestone report. For current behavior, see [Turret Studio](TURRET_STUDIO.md).
+
+## Status since this milestone
+
+Later work added visible effects for all 19 weapon families, resource behavior, comparison tools and animation export. The statements below about missing effects, cooling and export describe this milestone only. Audio, recoil and native combat simulation remain unimplemented.
+
+## Milestone record
 
 Open a library turret and expand **Turret Properties > Turret Studio**. Select any of the 19 weapon families independently of the design. Play/Resume, Pause, Restart, playback speed, target motion, world-coordinate target positions, orbit radius/period, tracking rate, normal/coaxial behavior, and demonstration mode are available. The pink wireframe target is a demonstration marker, not a combat entity. Firing simulation reports events; it does not render weapon effects. Guide toggles remain independent.
 
@@ -20,9 +28,9 @@ Scheduling starts at the first simulation tick. Alternating phase order and firs
 
 Custom targets interpolate a user-supplied list, restarting at the end of each period; linear targets ping-pong. Orbit uses an elliptical vertical component. These are viewer demonstration paths. Coordinates are native world coordinates, not Blender meters.
 
-No recoil animation or force simulation exists. No projectile, beam, flash, trail, impact, audio, or cooling visualization is implemented. Animated video export and native visual calibration remain Phase 2 work. Existing static export behavior is retained; a paused simulation pose is not a new animated-export contract.
+No recoil animation or force simulation exists. No projectile, beam, flash, trail, impact, audio, or cooling visualization is implemented. Animated export and native visual calibration were deferred at this milestone. Existing static export behavior is retained; a paused simulation pose is not a new animated-export contract.
 
-## Validation
+## Validation recorded at this milestone
 
 `node --test tests/turret-simulation.test.mjs` covers deterministic clock partitions, pause/speed/restart, profile resolution, scheduling modes and lifecycle, native pitch sign, yaw wrapping, angled/inverted mounts, multiple muzzle transforms, coaxial restrictions, custom paths, and unchanged source assets/XML.
 

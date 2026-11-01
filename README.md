@@ -1,236 +1,76 @@
 # Avorion Viewer
 
-A Blender-inspired tiled workspace for viewing Avorion XML models, inspecting native blocks, and adjusting a WebGL2 game-style shader.
+View, inspect and repaint Avorion ship models in a browser, using a Blender-inspired workspace.
+
+[Open the viewer](https://avorion-viewer.com) · [User guide](docs/USER_GUIDE.md)
+
+## Get started
+
+1. Open the viewer and choose Blender, Laptop or Trackpad controls in the startup dialog.
+2. Open an Avorion `.xml` model and choose local texture folders in the same dialog. These options remain available under **File > Asset folders…**.
+3. Select blocks to inspect them, or switch to Paint Mode to recolor them. Use **File > Save preserved XML** to save your edits to a new file.
+
+Models and textures are processed locally. Browser storage restores saved assets on later visits; clearing site data can remove those copies. Keep your original files. If a browser cannot remember a game folder, use the one-time folder picker.
+
+## Features
+
+- Resizable editor areas, saved workspaces, block selection and visibility controls.
+- Native Avorion block rendering, local textures, lighting and generated skies.
+- Color palettes, paint tools, named regions and paint undo.
+- Turret libraries, placement, tracking, firing previews and animation export.
+- Mesh export to GLB, glTF, OBJ, STL and 3MF; image and animation export.
 
 ## Run locally
 
-Requires Node.js 20 or newer. Running the app requires no package installation; browser dependencies are vendored locally. Development tests require `npm ci`. Three.js 0.169.0 is vendored with its MIT license; WebGL2 is required for model rendering.
+Requires Node.js 20 or newer and a browser with WebGL2.
 
 ```sh
+npm ci
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. Run `npm test` for layout, navigation, viewport, and preferences tests and `npm run build` to produce the static site in `dist/`. Preview the build with `node scripts/serve.mjs --dist` after stopping the development server.
+Open `http://127.0.0.1:5173`. Browser dependencies are bundled locally; `npm ci` installs the development dependencies used by tests.
 
-## Local asset persistence
+```sh
+npm test
+npm run build
+```
 
-The current model (including paint edits and placement) and imported texture originals are saved automatically in IndexedDB and restored after reload. Storage belongs to this browser profile and site address. The local server redirects `localhost` and other spellings to `http://127.0.0.1:5173`, so every visit reaches the same storage, and the app asks the browser to keep saved textures instead of evicting them under disk pressure. A toast confirms when saved textures are restored, and Preferences > Asset Library shows how many are saved.
+The build writes the static site to `dist/`. To preview it, stop the development server and run `node scripts/serve.mjs --dist`.
 
-File > Asset folders… remembers the texture, model, and other folders you choose. In Chrome and Edge each folder is stored as a browser folder handle and reopens on the next visit: without a prompt when the browser kept the permission, otherwise after one **Reconnect folders** click. Model folders are searched recursively and shown in a model browser: search by name or subfolder, see block count, size, and date, star **Favorites**, and reopen from **Recent**. Double-click or press Enter to open a model. Block counts are cached per file version, so large folders are only read once. **Forget** stops remembering a folder without touching the files. Chrome and Edge refuse to remember folders inside Program Files or AppData, which is where Steam installs Avorion and where the game saves ships; picking one shows "Can't open this folder". After that, the row offers **Use one-time picker…**, the classic folder input, which can read those folders but is forgotten afterwards. Textures read this way are saved in the browser as usual, so it is a one-time step. Ships read this way are saved as a copy in IndexedDB, so the model browser works on every visit; **Refresh…** re-reads the folder to pick up ships saved since, and **Forget** deletes the copy. Browsers without the File System Access API always use the one-time picker. Typed folder paths were removed because browsers cannot open a folder from a path string. File > Clear scene saves an empty scene; File > Unload textures removes saved texture imports. Browser data clearing or eviction removes these copies, so keep your source files. Storage failures are reported without interrupting the current session.
+## Controls
 
-## Implemented
-
-- Dense dark editor chrome, a global topbar, workspace tabs, and a contextual status bar.
-- Layout, Inspection, and Compare workspaces; add, duplicate, rename, reorder to front, and delete workspaces.
-- Tiled areas with draggable dividers, recursive minimum sizes, keyboard resizing, Ctrl snapping, and double-click equalization.
-- Vertical/horizontal splitting with placement previews. Tab changes the split direction; Escape or right-click cancels.
-- Corner drag to split, drag into a sibling to join, and Ctrl-drag to swap editor contents.
-- Right-click header/border menus, join previews, editor type switching, and top/bottom headers.
-- Hover-context shortcuts, maximize/restore, and focus mode.
-- Toolbar and resizable sidebar regions, collapsible panels, and property category tabs.
-- Local layout persistence, validation of saved state, and graceful handling of unavailable browser storage.
-- Native block and XML model rendering with turntable orbit, pan, roll, zoom, dolly, region zoom, bounds-based framing, six axis views, orthographic/perspective projection, selection, visibility, grid, and wireframe controls.
-- A live orientation gizmo with axis alignment and drag-to-orbit, plus draggable pan and zoom controls. No 3D cursor or temporary Center of Mass marker.
-- A Preferences window and dockable Preferences editor with category navigation, searchable panels, live changes, and separate local persistence.
-
-- An Info editor activity log that also records errors and warnings: import, export, render and storage failures, uncaught script errors, and console errors. **Errors & Warnings** filters to problems, **Copy** copies the log, and the status bar shows an error count that opens the filtered log.
-- Help > Send feedback… builds a report (description, app version, browser and graphics details, recent errors) that opens as a prefilled GitHub issue or copies to the clipboard. Set the repository in `FEEDBACK_TARGETS` in `src/feedback.js`.
-- Help > About Avorion Viewer (or click the version in the status bar) lists the feature areas behind the version number.
-
-## Version
-
-The app uses pre-1.0 semantic versioning, defined in `src/version.js`: `0.MINOR.PATCH`, where MINOR counts the major feature areas (currently 11) and PATCH counts smaller features and fixes since the latest area. Adding a feature area bumps MINOR and resets PATCH; a smaller feature or fix bumps PATCH. Keep `package.json` in step; `tests/version.test.mjs` checks it. 1.0.0 is reserved for the first stable release.
-
-The default arrangement follows Blender's main viewport, upper-right Outliner, and lower-right Properties. A useful activity log occupies the lower-left area in place of Blender's animation timeline.
-
-## Controls (default keymap)
-
-| Action | Control |
+| Action | Default control |
 | --- | --- |
-| Resize areas | Drag a divider; Ctrl snaps; double-click equalizes |
-| Keyboard resize | Focus divider, then arrow keys; Shift uses larger steps |
-| Split / join / swap | Right-click a header or border, or use the header's ⋮ menu |
-| Corner split | Drag the top-right or bottom-left grip inward |
-| Corner join | Drag a grip into the sibling editor |
-| Swap editor contents | Ctrl-drag a corner into another area |
-| Maximize hovered area | Ctrl+Space |
-| Focus mode | Ctrl+Alt+Space |
-| Restore / cancel operation | Escape |
-| Toggle viewport toolbar / sidebar | T / N |
-| Input style | Help > Input style (asked once on first launch) or Preferences > Input: Blender, Laptop (Alt+left-drag, number-row views) or Trackpad (two-finger swipe orbits, pinch zooms, Shift+swipe pans) |
-| Orbit / pan | Middle mouse / Shift+middle mouse, or the left toolbar tools |
-| Snap orbit to an axis | Hold Alt when releasing an orbit drag |
-| Stepped orbit | Numpad 2 / 4 / 6 / 8 (15°) |
-| Stepped pan | Ctrl+Numpad 2 / 4 / 6 / 8; Shift+wheel also pans |
-| Roll | Shift+Numpad 4 / 6 (15°); axis alignment resets roll |
-| Zoom | Wheel, Ctrl+middle mouse, Numpad + / −, or drag the magnifier |
-| Dolly | Ctrl+Shift+middle mouse; switches orthographic to perspective |
-| Zoom region | Shift+B, then left-drag to zoom in or middle-drag to zoom out |
-| Cancel navigation | Escape, right-click, pointer cancellation, or loss of window focus restores the pre-drag camera |
-| Frame all / selected | Home / Numpad .; framing uses visible geometry bounds |
-| Front / right / top view | Numpad 1 / 3 / 7, or axis buttons; Ctrl selects the opposite side |
-| Opposite view | Numpad 9; clicking the current axis also flips sides |
-| Perspective / orthographic | Numpad 5 or the projection gizmo button |
-| Select / deselect model | A / Alt+A, or click model geometry / empty space |
-| Switch workspace | Ctrl+Alt+PageUp / Ctrl+Alt+PageDown, or tabs |
-| Rename workspace | Double-click its tab |
-| Open Preferences | Edit > Preferences, Ctrl+Comma, or choose Preferences in an area's editor selector |
-| Search / clear Preferences | Ctrl+F / Alt+F inside Preferences |
+| Orbit / pan / zoom | Middle-drag / Shift+middle-drag / wheel |
+| Frame all / selected | Home / Numpad . |
+| Front / right / top | Numpad 1 / 3 / 7 |
+| Perspective / orthographic | Numpad 5 |
+| Paint Mode | Tab |
+| Undo / redo paint | Ctrl+Z / Ctrl+Shift+Z |
+| Maximize editor | Ctrl+Space |
+| Preferences | Ctrl+Comma |
 
-Text inputs and open dialogs do not trigger editor shortcuts. Some browsers or operating systems reserve shortcuts; the same actions are available in menus. Layouts preserve usable minimum sizes and scroll on narrow windows instead of collapsing editors. A desktop pointer and keyboard give the intended experience.
+Laptop and Trackpad presets are available in **Help > Input style…** and **Preferences > Input**. See the [user guide](docs/USER_GUIDE.md#controls-default-keymap) for the complete controls.
 
-## Preferences
+## Limitations
 
-**Generated space sky:** open the **World** tab (globe icon) of the Properties editor; it edits live beside the viewport. Use **Show World in Viewports** to enable it in existing layouts; new viewports use World by default. **New Sky** changes the seed. Seed and sector coordinates reproduce the same sky; palette/custom colors, cloud count/size/intensity/highlights, dark clouds, dust haze, star density/brightness, sun glow, world brightness, rotation, and cube-face resolution are saved with preferences. Changes apply live. Rotation reuses the cached sky; other generation settings rebake it once for all viewports. Choose Theme or Viewport in an individual viewport's Background controls to hide the sky there.
+This is an independent browser application, not Blender or the Avorion game engine. Turret previews use source-derived parameters and procedural effects; native visual parity is not established. Audio and native combat simulation are not implemented. Large models and exports depend on browser memory and GPU capacity. Some interfaces remain English-only.
 
-The generator uses the supplied Avorion `bg0–bg9`, `fog0–fog9`, and `star0–star2` textures bundled under `src/assets/sky/`. It approximates the game's layered nebula/highlight/dark-cloud response with seeded spherical placement and a star field. It does not reproduce exact game sectors, planets, animated rifts, or local volumetric fog. Dust Haze affects the distant sky; the existing ship lighting remains independently adjustable. These original game assets are not covered by the Three.js license.
+Imported XML structure and coordinates are preserved when saving paint edits. Mesh exports have separate conversion and repair limits described in the export documentation. Browser storage is not a backup.
 
-Preferences apply immediately across all editors. Hover a setting label for its description; descriptions remain searchable and available to assistive technology. The Interface Tooltips setting controls these hover hints. The eight categories expose app settings. Scene look settings live in the Properties editor's **World** and **Shaders** tabs, and asset folders in **File > Asset folders…**; they are still saved, reverted and reset with preferences.
+## Documentation
 
-- **Interface:** language, status bar, tooltips, and corner handle visibility.
-- **Viewport:** axis gizmo or rotating view cube (80–240 px), view labels, block statistics, and selection outline width for the legacy reference fallback. WebGL selection uses the editor accent tint.
-- **Themes:** Blender Dark, Graphite, or High Contrast, with a selection color. Each editor can override its background, header, text, and accent colors independently. Enable that editor’s Custom Colors to apply its palette; the first time, its colors start from the active theme preset. Color settings show an editable hex value beside the swatch, and per-editor colors are dimmed while Custom Colors is off.
-- **Input:** input style (Blender, Laptop, Trackpad), Alt+left-drag middle-mouse emulation, trackpad gestures, and top-row numpad emulation.
-- **Keymap:** editable application shortcuts, viewport navigation, mouse/wheel gestures, operation bindings, and layout modifiers. Click a binding and press the replacement combination; Clear removes it and Reset restores it. Conflicts in the same context are rejected. Native text editing and standard control navigation retain their usual keys. Input emulation takes priority when enabled.
-- **Navigation:** orbit and zoom sensitivity, keyboard rotation angle, automatic perspective when leaving an axis view, and inverted zoom gestures.
-- **Shaders (Properties > Shaders tab):** Blender-inspired collapsible node cards with color sockets, swatches, and blue value sliders. Drag a value bar, use arrow keys, or type into its numeric value; descriptions appear on hover. Surface, lighting, texture scale, normals, reflection, emission, crew windows, and debug passes update the WebGL2 viewport live. These are shader parameters, not a node graph editor.
-- **System:** canvas resolution limit for display quality and memory use.
-- **Save & Load:** whether workspace layouts and cameras are saved and restored.
+- [User guide and design references](docs/USER_GUIDE.md)
+- [Turret Studio: capabilities, limitations and development history](docs/TURRET_STUDIO.md)
+- [Color Editor](docs/COLOR_EDITOR.md) and [paint tools](docs/PAINT_TOOLS.md)
+- [Mesh export](docs/ADVANCED_EXPORT.md) and [image export](docs/IMAGE_EXPORT.md)
+- [Graphics implementation](docs/GRAPHICS_FOUNDATION.md) and [shader audit](docs/SHADER_AUDIT.md)
 
-Number settings show their unit: `px`, `°`, `×` for multipliers, `u` for native model units, and `blocks` for block counts. Every number default sits on its slider step, so browser validation never flags a factory value.
+Third-party license files remain with their bundled libraries. Avorion game assets are not covered by the Three.js license; see the asset notes in the user guide.
 
-### Language
+## Deployment and version
 
-**Preferences > Interface > Language** switches menus, dialogs, the status bar, Quick Start, and every preference label, description and option. Choices: Automatic (browser language), English, Deutsch, Español, Français, 日本語, Português (Brasil), Русский, 中文（简体）. Japanese uses the standard `ja` code. Preference search matches both English and the selected language.
+GitHub Actions runs tests, builds `dist/`, and deploys GitHub Pages on pushes to `main`. Repository **Settings > Pages** must use **GitHub Actions** as its source. The public site uses Cloudflare DNS pointing to GitHub Pages.
 
-Translations live in `src/i18n/<code>.js`, keyed by the English source text, and load on demand; a missing key falls back to English. `src/i18n.js` provides `t()`, `tf()` for `{0}` templates, and `translateDom()` for static markup in `index.html` (elements with inline markup use `data-i18n-html`). Not translated yet: Properties panels other than World and Shaders, Outliner and Ship Structure contents, the Color Workshop, export dialogs, the Turret Studio, and toast/log messages. Block names, file contents and key names stay as they are. `tests/i18n.test.mjs` fails when a preference string is missing from any language or a placeholder is lost.
-
-The footer's options menu controls **Auto-Save Preferences**, **Revert to Saved Preferences**, and **Load Factory Preferences**. With auto-save disabled, changes remain live until reload but persist only after **Save Preferences**. Factory preferences are a temporary preview with auto-save disabled; they replace saved preferences only when explicitly saved or auto-save is enabled. Preference storage is separate from workspace storage. Disabling workspace persistence retains the previous saved layout, pauses layout writes, and starts with the default layout on the next load.
-
-## GitHub Pages
-
-The repository includes `.github/workflows/pages.yml`. To publish:
-
-1. Push this project to the `main` branch of your GitHub repository.
-2. In **Settings → Pages → Build and deployment**, select **GitHub Actions**.
-3. Run **Deploy GitHub Pages**, or push another commit to `main`.
-
-The workflow runs tests, builds `dist/`, and publishes it. Relative asset paths support both account pages and repository subpaths. No repository or deployed site was created as part of this local foundation.
-
-## Architecture and boundaries
-
-`src/layout.js` owns a binary split tree. Leaves store editor type, region visibility, and camera settings. This provides predictable tiled layouts with no overlapping floating panels. `src/app.js` owns browser interactions, editor UI, and persistence. `src/navigation.js` owns shared camera math and shortcut resolution; `src/viewport.js` handles pointer gestures and composites a frame from `src/game-renderer.js`. One WebGL2 context and a shared model serve all tiled viewports. `src/avorion/` contains the handoff-derived block catalog, exact unit geometry, orientation rules, XML parser, texture arrays, and game shader. `src/styles.css` defines the theme, with original inline icons in `src/icons.js`.
-
-Joins currently require sibling leaves sharing one split. Blender supports more general docking across areas; that topology and native multi-window behavior are not reproduced here. The viewport supports orthographic and perspective projection with depth-tested geometry. Navigation uses a turntable camera; trackball preferences, walk/fly navigation, and sculpt-only Frame Last Stroke are outside this pass. XML loading, native shapes, materials, preview transformations, animated effects, and block counts are implemented. Imported geometry is read-only; the Color Editor repaints imported blocks. Turret assembly reconstruction remains outside this foundation. File > Advanced Export provides STL, 3MF, GLB, packaged glTF and OBJ; see docs/ADVANCED_EXPORT.md for validation and limitations. Scene selection, visibility, and activity logs are session-only; workspaces and camera settings persist locally. Existing first-pass layouts remain compatible; new camera fields are added when their viewport opens.
-
-`src/keymaps.js` is the shared binding registry for preferences, dispatch, menus, and shortcut help. `src/view-cube.js` projects the navigation cube from the current camera; face-aligned labels rotate and foreshorten with the cube, 26 selectable regions (6 faces, 12 edges, and 8 corners) align views, and dragging the cube or its background orbits. Hovering or focusing an edge or corner highlights its patches across adjacent faces. Surrounding arrows orbit by 90°; Home restores the Top Front Right camera position, zoom, and target. Home, all cube targets, and gizmo axes retain the current projection toggle; new views default to Perspective. Top and Bottom views expose clockwise/counterclockwise 90° roll buttons at the cube’s upper left. Clicking an already aligned cardinal face flips to the opposite face; edge and corner selections retain their alignment behavior. Cube size is saved under Preferences > Viewport.
-
-`src/preferences.js` owns the validated preference schema, live state, saved snapshot, and storage errors. `src/preferences-editor.js` renders the same settings interface in either a tiled area or the Preferences dialog. Settings are stored per browser origin; Blender-only categories such as add-ons, animation, and rendering devices are not exposed.
-
-The document model and WebGL renderer retain the layout engine and editor-region contracts. The current implementation does not execute Blender or include Blender source code, assets, or branding.
-
-## Design references
-
-Reviewed the Blender window system manual and the official repository's GitHub mirror (the supplied projects.blender.org URL was unavailable to the research tool):
-
-- [Window system introduction](https://docs.blender.org/manual/en/dev/interface/window_system/introduction.html): topbar, editor areas, status bar.
-- [Areas](https://docs.blender.org/manual/en/5.0/interface/window_system/areas.html): border resizing, splits/joins, corner gestures, maximizing, and hover-based context.
-- [Workspaces](https://docs.blender.org/manual/en/latest/interface/window_system/workspaces.html): saved arrangements and workspace tabs.
-- [Preferences introduction](https://docs.blender.org/manual/en/5.3/editors/preferences/introduction.html): category navigation, search, auto-save, manual save, revert, and temporary factory preferences.
-- [Regions](https://docs.blender.org/manual/en/3.1/interface/window_system/regions.html): headers, toolbars, sidebars, and panels.
-- [Navigation](https://docs.blender.org/manual/en/latest/editors/3dview/navigate/navigation.html): navigation controls and gesture mapping. The latest URL did not fetch directly; indexed [Blender 5.1 navigation documentation](https://docs.blender.org/UATEST/manual/en/dev/editors/3dview/navigate/navigation.html) and the [3.2 English manual](https://docs.blender.org/manual/en/3.2/editors/3dview/navigate/navigation.html) supplied the readable references.
-- [Blender screen data structures](https://github.com/blender/blender/blob/main/source/blender/makesdna/DNA_screen_types.h) and [screen operators](https://github.com/blender/blender/blob/main/source/blender/editors/screen/screen_ops.cc): conceptual separation of screens, areas, editor state, and regions.
-- [GitHub Pages custom workflows](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
-
-This is an independent browser implementation inspired by those behaviors, not a port of Blender's window manager.
-
-## Avorion graphics foundation
-
-- **File > Import Avorion XML**, dropping an `.xml` onto the window, or **Open Avorion XML…** on the empty viewport loads a local plan. The app starts with an empty scene (or the model restored from this browser). Dropping texture images or the game's texture folder loads them like **File > Load local texture folder**; the viewport's **Textures** badge shows how many maps are loaded. A file that fails to parse opens an error dialog and leaves the current model unchanged. Click a block to inspect its type, material, look/up, world dimensions, item identity, and color. File > Save preserved XML serializes the original DOM, retaining unknown data and embedded turret designs; it does not guarantee byte-identical formatting.
-- **Help > Developer > Load block preview** exposes the complete handoff catalog, seven materials, all 24 valid orientations, unequal dimensions, and primary/secondary colors in Properties. Preview edits are saved with the current model.
-- **Help > Developer > Load orientation gallery** displays all eight shapes in all 24 rotations with 2 × 4 × 8 native dimensions. Use Frame All to fit it.
-- **File > Load local texture folder** loads your existing Avorion block texture images for this session. Missing maps use neutral fallbacks. No proprietary textures are included in the static build.
-- **Properties > Shaders > Game Surface > View Pass** includes local face IDs (dark/bright red = −/+X, green = −/+Y, blue = −/+Z), world normals, albedo, paint masks, lighting, and projection debugging.
-- Native XML remains X-right/Y-up/Z-back. The camera bridge maps it into the existing Z-up workspace without rewriting model coordinates. Native units are not labeled as meters.
-
-Run `npm test` for CPU regression checks; open `/tests/graphics.html` on the development server for XML/GPU pixel checks. See [graphics foundation notes](docs/GRAPHICS_FOUNDATION.md) for evidence, port modifications, and remaining fidelity limits.
-
-The [September 30 shader audit](docs/SHADER_AUDIT.md) documents material accent/glow restoration, separate functional artwork layers, raw secondary-color blending, UV/normal corrections, and remaining launcher calibration limits. Reload the local texture folder after updating so newly supported material overlay maps are included.
-
-## Viewport display controls
-
-Each viewport saves its own Gizmos, Overlays, X-Ray, shading, and camera settings with the workspace. The Overlays popover groups floor/axes/grid scale, information/render timing/statistics, selection outlines, and crease-filtered wire overlays. Popovers apply edits immediately and close with Escape or an outside click. Controls activate only through their input, not their descriptive caption.
-
-Material Preview uses neutral preview lighting with imported textures. Rendered uses Preferences shader lighting, block effects, optional directional shadow maps, and optional screen-space depth of field. Solid uses block colors with Studio lighting or a procedural Red Wax MatCap approximation (not Blender's `red_wax.exr` asset). Wireframe shows block edges without triangulation diagonals. X-Ray operates in Solid and Wireframe; its header toggle and opacity controls share state. Wireframe Threshold filters crease angles; it is not line thickness. World background uses the shader world's horizon color.
-
-The View sidebar provides a 50 mm default lens (36 mm sensor fitted to the shorter viewport dimension) and Clip Start/End defaults of 0.01/1000 in native model units. No unverified conversion to meters is applied. These per-viewport clip values supersede the older global Preferences clip values. Depth of field starts disabled; focus distance uses native units and aperture controls preview blur strength. Outlines and depth of field use screen-space passes, and Rendered shadows use a 2048-pixel directional depth map; these are viewer previews rather than Blender's render engine.
-
-## Ship structure
-
-The Outliner is a flat, grouped block browser, not the XML attachment hierarchy. Its root shows the filename and live block count; deleted or detached blocks are excluded. Choose alphabetical groups by block type or material. Expand a group to inspect `Type · b123` entries; these are viewer IDs, not native XML item indices. Search matches type, material, or viewer ID without case sensitivity and expands matching groups. Group counts and actions operate on the filtered members only.
-
-Click replaces selection; Ctrl/Cmd-click adds targets or removes them when all are already selected. Double-click frames targets without changing direction or projection. Viewport selection and group highlights stay synchronized; a group highlights only when every displayed member is selected.
-
-Eyes hide all targets if any are visible, otherwise show all. Isolate shows only targets; Unhide all restores every live block. Visibility never changes XML or clears selection. Right-click offers Select, Add/Remove selection, Focus, Isolate, Hide, Show, and Show all. Right-click on an already-selected block addresses the entire current selection.
-
-Preferences > System > Simplified Rendering Threshold defaults to 30,000 live blocks. Strictly above it, textures and the game shader remain active and animated effects are omitted. Selection, focus, and picking remain available. Visibility actions remain active. Returning below the threshold restores normal rendering and the retained selection. Repeated opaque blocks share instanced geometry in spatial batches; unique shapes and translucent geometry retain a merged fallback. Very large or highly varied models can still be memory intensive.
-
-
-### Ambient lighting and world guides
-
-Material Preview uses studio lighting; Rendered honors the shader lighting toggles in Preferences. For equal illumination in any surface shading mode, enable **Viewport Shading > Lighting > Ambient Only** and adjust Ambient Brightness. This uses white ambient fill without directional lighting, reflections, or surface emission shading. Disable it to restore the previous lighting setup.
-
-**Viewport Overlays > Guides** provides Infinite Axes, total Axis Length centered on the origin, Axis Width in screen pixels, and Axis Brightness. The floor is an unbounded grid with decade-based spacing that adapts to camera zoom. Grid Scale adjusts the spacing base; Statistics reports the current cell size in native model units. Distant subpixel lines fade at the horizon.
-
-The Info header's **Newest on Top / Newest on Bottom** button reverses entry order. Each editor saves its own order with the layout.
-
-
-### Large-model optimization
-
-The Ship Structure Outliner renders only a window of rows. Group actions still include every matching block, including offscreen rows. Cached group summaries and stable block IDs preserve selection, visibility, isolation, and focus as the list scrolls. Arrow keys, Page Up/Down, Home, and End navigate virtual rows.
-
-Repeated opaque blocks with matching type, material, orientation, and dimensions share instanced geometry in spatial batches of at most 1,024 instances. Groups need at least 16 matching blocks; a model-wide batch budget favors larger groups and merges the rest to avoid excessive draw calls. Ordinary opaque surfaces use hardware backface culling; two-sided surfaces retain their existing behavior. Picking uses a hierarchy of block bounds followed by exact surface triangle tests. Fully hidden batches skip rendering. Selection and appearance edits update affected buffer ranges, and both primary and secondary ARGB channels remain independent.
-
-Large models using simplified effects prepare geometry and picking bounds in a worker. The source XML stays on the main thread; transferred preparation records include secondary-color presence separately from its numeric value. New model loads cancel stale preparation. XML parsing and final GPU uploads still have main-thread costs.
-
-The appearance transaction API returns before/after patches for stroke and region undo. The Color Editor and viewport paint tools use that API for incremental appearance changes. Existing preview color controls use the same path. Crossing opaque/translucent hologram alpha requires rebuilding render batches.
-
-Validation fixtures: `tests/outliner-scale.html` (40,339 / 100,000 / 500,000 synthetic blocks), `tests/model-worker.html` (background preparation and cancellation), and `tests/graphics.html` (merged/instanced parity, picking, both color channels, and XML preservation). Synthetic cube geometry results do not establish a universal 500,000-block frame-rate guarantee.
-
-The local Ship Stress Test imported 40,429 live blocks. Whole-ship selection, individual selection, and focus passed with 25 mounted Outliner rows. Its varied geometry uses 55 render batches and approximately 193.85 MiB of geometry attributes versus 199.05 MiB for the equivalent expanded attributes; instancing benefits repetitive ships much more. These figures exclude textures, source XML, picking data, and temporary allocations. Graphics checks use software WebGL and do not establish hardware frame-rate improvements.
-
-### Import placement and selection actions
-
-Preferences > Save & Load > Model Import > Placement applies to the next imported model. **Default** centers its bounding box on the world origin. **Placed** centers workspace X/Y and rests the lowest extent on the Z=0 floor. **As Imported** retains the imported coordinates. Placement is a viewer transform; native XML positions remain unchanged when exported.
-
-Selecting a block in the viewport brings a selected-block shortcut to the top of each Ship Structure Outliner, even when its group is collapsed or filtered out. Group membership and group selection remain unchanged. Right-click an idle viewport with a selection to open the Focus / Isolate / Hide / Show Last / Show All pie menu. Show Last reverses the most recent visibility change recorded by Hide or Isolate (up to 20 actions); Show All clears this history. Custom right-button navigation gestures retain their bindings.
-
-Viewport Overlays > Objects > Outline Selected controls both selection highlighting and the visible silhouette in the theme's Selection Color. Turning it off does not deselect blocks. The master Overlays toggle also suppresses this display. Object Outline in shading settings is a separate outline for the model.
-
-### Color Editor
-
-Open **Window > Open Color Workshop** for a viewport, Outliner, and Color Editor side by side, or choose **Color Editor** from any area's editor-type menu. The editor uses a bundled, unmodified copy of the installed game's `data/rgb.txt`: 407 named colors, comprising 132 bases and 275 variants. See [the Color Editor architecture and data notes](docs/COLOR_EDITOR.md).
-
-The Family Fan wheel samples only chromatic base colors in twelve separated hue families, with four dark-to-light bands and a large central comparison disk. Sparse ranges repeat existing bases; all colors remain accessible through the List tab. Select a base, choose one of its existing variants, and select a harmony mode. Each suggested base has its own independent variants. **Link Variants** follows the primary family only where it exists. The list searches names, RGB, hex, and source rows; neutrals and browns remain in separate list categories. No color values are synthesized.
-
-Choosing colors only changes the editor's proposed palette. **Apply to Selected** or **Apply to Region** repaints the working ship and updates the viewport immediately. Primary alpha is retained; secondary painting can preserve alpha or explicitly use full strength (FF). Existing zero secondary alpha can make its RGB change visually inactive until full strength is chosen. **Undo Paint / Redo Paint**, also available in Edit and through Ctrl+Z / Ctrl+Shift+Z, reverse color transactions. Existing preview color controls use the same paint history. Undo is limited to 30 transactions and roughly one million changed records, retaining at least the latest operation.
-
-Use **Regions > Save Selection as Region** to name an arbitrary selection. The Regions tab lists every region with its color, size, and two toggles: the eye highlights it in the viewport with its color, and the target isolates it. The card below the list edits the active region: rename it inline, click the swatch to change its color, choose Off, Highlight, or Isolate, and press **Edit in Viewport** to change members directly. While editing, click or box-drag blocks to add them, hold Ctrl to remove them, and press Esc to finish; your selection is not changed. **Add Selected**, **Remove Selected**, and **Replace with Selection** work from the current selection. **Grow** adds every block touching the region, hidden or not. Highlight and isolation update immediately after every change. If you change visibility elsewhere (for example Show All), isolation turns into a highlight instead of overriding you. A region cannot become empty; delete it instead. **Undo** reverses the last region change for the current model. Regions can overlap and do not depend on rendering chunks. They last for the loaded model's session and clear on import or scene clear. **Palettes > Add Active / Add Harmony**, then **Save Palette**, stores named Avorion color references in this browser. Palettes persist locally; models and textures are saved locally; regions remain session-only. Nothing is uploaded.
-
-Painting leaves the imported XML document and original coordinates untouched. **File > Save preserved XML** exports a cloned document with only the working color overrides applied. Unknown attributes, parent references, and embedded turret plans remain in that document. Loading another model resets paint history. Existing generated previews have no native XML document to export.
-
-### Viewport selection and painting
-
-Choose Object Mode or Paint Mode in each viewport header. In Object Mode, left-drag box-selects blocks whose projected centers fall inside the rectangle (through the model); Ctrl-left-drag subtracts those blocks. Hidden blocks are excluded. A click retains individual picking.
-
-Paint Mode shares its active color, channel, and secondary strength with the Color Editor. Its left tool shelf includes Brush, Eyedropper, Replace Color, Connected Fill, and Restore. A compact settings row beneath the header provides Whole Ship / Selected Blocks / Active Region scope locks, color, channel, radius, and undo/redo. A radius of zero paints the block under the cursor center; larger radii sample visible surfaces across a circular footprint. The segmented cursor remains an aiming aid; the blue circle shows the actual radius. Hover previews tint the actual visible block surfaces and show current ARGB, without altering selection or paint data. A stroke is one paint undo operation; Escape, pointer cancellation, or loss of focus rolls it back. Source XML stays unchanged until exporting a working copy. Without a Color Editor choice, the initial brush is Dodger Blue on the primary channel.
-
-Saved palettes have a **Make Active** control in Color Editor > Palettes and can also be chosen in the Paint palettes popover. The active palette and the twelve most recent colors persist locally. In Paint Mode, click and release MMB without dragging to open its color pie; MMB-drag still orbits. Palettes longer than eight entries have Previous/Next pages. Choosing a swatch changes the brush without painting until the next stroke. The paint cursor has a contrasting center dot for precise targeting. Hold RMB over a target to open an offset magnifier. Its source stays anchored while you move into the lens; hold LMB to paint there. Release LMB to finish a stroke, release RMB to dismiss, or press Escape to cancel. **Paint symmetry** offers native-axis mirror planes. **Paint magnifier** offers 2–8× magnification, 120–360 px lens size, and either smooth enlargement or an additional detail render. Detail rendering adds GPU work while the lens is open.
-
-See the [paint tools and T&E checklist](docs/PAINT_TOOLS.md) for tool behavior, scope rules, limitations, and validation steps.
-
-## Advanced 3D export
-
-**File > Advanced Export** opens local mesh export. Pick a goal (Blender / game asset, 3D print, Quick share) to fill the form, or adjust it as Custom; less common options sit under Advanced. GLB, glTF and OBJ default to real scale (1 Avorion unit = 1 m) and prepare automatically; STL, 3MF and printable shells are sized in millimetres and wait for Prepare & Validate. The last settings for each format are remembered. See [export documentation and test criteria](docs/ADVANCED_EXPORT.md).
-
-Image export: File > Advanced Export > Image Export supports viewport, transparent ship, and technical blueprint images. Goal buttons (Screenshot, Transparent render, Turntable GIF, Blueprint) fill the form, rarely used options sit under Advanced, and the last settings for each type are remembered. See [Image export](docs/IMAGE_EXPORT.md) for formats, resolution, framing, and limits.
+`src/version.js` supplies the displayed application version. Keep the package version synchronized; `tests/version.test.mjs` checks it.

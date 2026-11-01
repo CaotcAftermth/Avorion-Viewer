@@ -449,7 +449,6 @@ canvas.paint-mode{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org
 #import-error-dialog .import-error-message{white-space:pre-wrap;word-break:break-word;background:#222;border:1px solid #444;border-radius:5px;padding:10px 12px;font-size:11px;color:#e3a0a0;max-height:160px;overflow:auto}
 @media(max-width:600px){.quick-start li{grid-template-columns:22px 1fr}.quick-start li span{grid-column:2}}
 /* First-run input style choice. */
-#input-style-dialog{width:480px}#input-style-dialog h2{font-size:18px;font-weight:500;margin:12px 0 4px}
 .input-style-options{display:grid;gap:8px;margin-top:16px}
 .input-style-options button{display:grid;gap:3px;text-align:left;white-space:normal;padding:11px 14px;border:1px solid #474747;border-radius:6px;background:#2a2a2a}
 .input-style-options button:hover{background:#363636;border-color:#666}.input-style-options button.active{border-color:var(--accent);background:#2f2f2f}
@@ -458,10 +457,10 @@ canvas.paint-mode{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org
 .preferences-editor.compact .preferences-categories{display:none}
 .preferences-editor.compact .preferences-searchbar>span{display:none}
 .property-content.preferences-editor.compact{height:100%;overflow:hidden}
-#asset-folders-dialog{width:620px;height:min(640px,calc(100dvh - 40px));display:none;flex-direction:column}
+#asset-folders-dialog{width:620px;height:min(820px,calc(100dvh - 40px));overflow-y:auto;display:none;flex-direction:column}
 #asset-folders-dialog[open]{display:flex}
 #asset-folders-dialog h2{font-size:18px;font-weight:500;margin:12px 0 8px}
-#asset-folders-dialog .asset-folders-body{flex:1;min-height:0;display:flex}
+#asset-folders-dialog .asset-folders-body{flex:1 0 280px;min-height:280px;display:flex}
 #asset-folders-dialog .asset-folders-body.preferences-editor{flex:1;border:1px solid #444;border-radius:6px}
 .preferences-editor.compact .preferences-content>h2{display:none}
 /* Info editor levels, error badge, feedback and about dialogs */
