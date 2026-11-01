@@ -133,8 +133,18 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
       const vector = JSON.parse(button.dataset.axis);
       button.style.left = `${38 + dot(vector,b.right)*27 - 10}px`;
       button.style.top = `${38 - dot(vector,b.up)*27 - 10}px`;
-      button.style.zIndex = String(10 + Math.round(dot(vector,b.back)*5));
+      button.style.zIndex = String(100 + Math.round(dot(vector,b.back)*50));
       button.style.opacity = dot(vector,b.back) < -0.01 ? '0.55' : '1';
+    });
+    // Each half-line runs from the center to its ball's edge and is depth sorted by its midpoint,
+    // so front balls cover lines behind them and back lines sit under everything nearer.
+    body.querySelectorAll('[data-axis-line]').forEach(line => {
+      const vector = JSON.parse(line.dataset.axisLine), depth = dot(vector,b.back);
+      const dx = dot(vector,b.right)*27, dy = -dot(vector,b.up)*27, length = Math.max(0, Math.hypot(dx,dy) - 10.5);
+      line.style.width = `${length}px`;
+      line.style.transform = `rotate(${Math.atan2(dy,dx)}rad)`;
+      line.style.zIndex = String(100 + Math.round(depth*25));
+      line.style.opacity = depth < -0.01 ? '0.55' : '1';
     });
     if(scene.model&&scene.visible&&scene.loaded&&!simplified(scene,preferences)&&liveBlocks(scene).some(b=>!scene.hiddenIds?.has(b.id)&&(view.showThinBlocks!==false||!isThinBlock(b)||(b.typeIndex===3&&preferences.shaderThinEnginePlumes!==false))&&[3,7,10,13,61,62,63,64,65].includes(b.typeIndex)))invalidate();
   }

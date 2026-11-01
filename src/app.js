@@ -641,6 +641,8 @@ function renderViewport(body,node){
       if(viewLabel(node.view).toLowerCase().startsWith(`${name} `))navigate(node,{action:'opposite'});
       else setView(node,name);
     },`axis-${axis}${negative?' negative-axis':''}`);b.dataset.axis=JSON.stringify(vector);axes.append(b);
+    // Half of the axis line, from the center out to this ball; the viewport sorts it by depth.
+    const line=document.createElement('span');line.className=`axis-line axis-line-${axis}`;line.dataset.axisLine=b.dataset.axis;axes.prepend(line);
   }
   axes.insertAdjacentHTML('beforeend','<span class="axis-center"></span>');nav.append(axes);
   const cube=document.createElement('div');cube.className='view-cube';cube.dataset.navDrag='orbit';
