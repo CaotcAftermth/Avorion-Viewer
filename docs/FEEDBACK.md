@@ -17,7 +17,7 @@ Requires a Cloudflare account with Workers and R2 available. Do not enable a pai
 1. Use Node.js 22 or newer. Authenticate Wrangler: `npx wrangler login`.
 2. Create the bucket: `npx wrangler r2 bucket create avorion-viewer-feedback`.
 3. Configure a lifecycle rule for all objects to expire after **90 days** in the R2 dashboard. Keep public bucket access disabled.
-4. Deploy the disabled service: `npx wrangler deploy --config workers/feedback/wrangler.jsonc`.
+4. For a new installation, first set `ENABLED` to `false` in `wrangler.jsonc`. Deploy the disabled service: `npx wrangler deploy --config workers/feedback/wrangler.jsonc`.
 5. Create a managed Turnstile widget for `avorion-viewer.com`, `www.avorion-viewer.com`, and `caotcaftermth.github.io`. Keep production validation free of localhost/test keys. Set its public site key in `TURNSTILE_SITE_KEY` in `wrangler.jsonc`.
 6. Create a fine-grained GitHub token owned by `CaotcAftermth`, restricted to **Avorion-Viewer**, with **Issues: Read and write** only (Metadata read is implicit). Set an expiration and a rotation reminder. Never grant Contents or administration permissions. Store it as `GITHUB_TOKEN` in the feedback Worker's secret settings. Do not put it in source, GitHub Pages variables, browser storage, or chat.
 7. Store the widget secret as `TURNSTILE_SECRET`, and a securely generated 32-byte random value as `IP_HASH_SECRET`, in the same Worker's secret settings. Secret values are never placed in `wrangler.jsonc`. `.dev.vars*` and `.wrangler/` are ignored.

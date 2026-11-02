@@ -51,7 +51,7 @@ export function attachAnonymousFeedback(dialog, { report, title, kind, message }
   const button = document.createElement('button'); button.type = 'button'; button.className = 'primary';
   button.textContent = t('Submit public report'); button.hidden = true; button.disabled = true;
   dialog.querySelector('.dialog-actions').append(button);
-  let images = [], objectUrls = [], widget, token = '', busy = false, preparing = false, closed = false, attempted = false, terminal = false, selection = 0;
+  let images = [], objectUrls = [], widget, token = '', busy = false, preparing = false, closed = false, attempted = false, terminal = false, selection = 0, verificationFailed = false;
   const id = crypto.randomUUID();
   const cleanupImages = () => { objectUrls.forEach(url => URL.revokeObjectURL(url)); objectUrls = []; };
   const sync = () => {
@@ -111,7 +111,10 @@ export function attachAnonymousFeedback(dialog, { report, title, kind, message }
       if (!closed) status.textContent = `${t(error.message)} ${t('Report reference:')} ${id}${terminal ? '' : ' ' + t('Retry uses the same reference to avoid duplicates.')}`;
     } finally {
       busy = false; token = '';
-      if (!closed && widget !== undefined) window.turnstile?.reset(widget);
+      if (!closed && widget !== undefined) {
+        if (terminal) { window.turnstile?.remove(widget); widget = undefined; }
+        else window.turnstile?.reset(widget);
+      }
       sync();
     }
   };
@@ -131,11 +134,18 @@ export function attachAnonymousFeedback(dialog, { report, title, kind, message }
       const turnstile = await loadTurnstile();
       if (closed) return;
       area.hidden = false; button.hidden = false;
+      dialog.querySelectorAll('.dialog-actions .primary').forEach(control => { if (control !== button) control.classList.remove('primary'); });
+      dialog.querySelector('.feedback-destination').textContent = t('Alternatively, open a prefilled GitHub issue or copy your report.');
       widget = turnstile.render(area.querySelector('[data-verification]'), {
         sitekey: config.siteKey, action: 'feedback', theme: 'auto',
-        callback: value => { token = value; sync(); },
+        callback: value => {
+          if (closed || terminal) return;
+          token = value;
+          if (verificationFailed) { verificationFailed = false; status.textContent = ''; }
+          sync();
+        },
         'expired-callback': () => { token = ''; sync(); },
-        'error-callback': () => { token = ''; status.textContent = t('Verification failed. Use the GitHub link or reopen feedback to try again.'); sync(); },
+        'error-callback': () => { if (closed || terminal) return; verificationFailed = true; token = ''; status.textContent = t('Verification failed. Use the GitHub link or reopen feedback to try again.'); sync(); },
       });
     } catch { if (!closed) status.textContent = t('Anonymous reporting unavailable. Use the GitHub link or copy your report.'); }
   })();
