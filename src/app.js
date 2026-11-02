@@ -1,3 +1,4 @@
+import {createWelcome} from './welcome.js';
 import {createStudio} from './turrets/studio.js';
 import {attachSubmenu} from './submenu.js';
 import {mountAssetProperties,assetPoseTransforms} from './turrets/asset-properties.js';
@@ -52,6 +53,8 @@ const embeddedAsset = editorParam==='turret', embeddedBlock = editorParam==='blo
 let assetDraft=null;
 const STORAGE = 'avorion-viewer.window-system.v1';
 const preferences=createPreferencesStore({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)});
+const trackpadFallback=preferences.value.inputStyle==='trackpad';
+if(trackpadFallback)preferences.set('inputStyle','laptop');
 const preferenceEditors=new Map(),lookEditors=new Map(),preferencesWindowState={};
 let preferencesWindow=null;
 let state = defaults(), storageAvailable = true;
@@ -59,6 +62,7 @@ try { const raw = !embedded&&preferences.value.rememberLayout?localStorage.getIt
 let lastViewportId=null;
 let hovered = null, maximized = null, focusMode = false, operation = null, renderers = [], toastTimer, saveTimer;
 const scene = { loaded: false, visible: true, selected: false, selectedId:null, selectedIds:new Set(), hiddenIds:new Set(), preview:false, revision:0, model:null };
+const welcome=embedded?null:createWelcome({preferences,wireInputStyles,openModel:importXml,openTextures:loadTextures,feedback:showFeedback,trackpadFallback});
 let textureStatus='Neutral texture fallback · Load a local texture folder from File';
 installGlobalErrorCapture(window);
 addLog(`Avorion Viewer ${APP_VERSION} ready. Layout changes are saved in this browser.`,'SYSTEM');addLog('No model loaded. Drop an Avorion .xml or use File > Import Avorion XML.','SCENE');
@@ -199,6 +203,7 @@ function loadModel(model,preview=false){
     const canvas=areaElement(node.id)?.querySelector('canvas');
     frameBounds(node.view,blockFramePoints(model.blocks),canvas?.clientWidth||800,canvas?.clientHeight||600);
   }
+  welcome?.close();
   commit(`${model.fileName} · ${model.blocks.length} blocks loaded.`);
   for(const warning of model.warnings||[])if(warning.level==='warn')log(warning.message,'MODEL','warning');
 }
@@ -340,6 +345,7 @@ function renderTopbar(){
       {label:'Reset current workspace',action:resetWorkspace}
     ],
     Help:()=>[
+      {label:'Welcome',action:()=>welcome?.open()},
       {label:'Quick start & shortcuts',action:()=>$('#help-dialog').showModal()},
       {label:'Input style…',action:openInputStyle},
       {label:'Blender window system manual ↗',action:()=>window.open('https://docs.blender.org/manual/en/latest/interface/window_system/introduction.html','_blank','noopener,noreferrer')},
@@ -485,9 +491,11 @@ function navigationHint(){
 }
 function wireInputStyles(host){
   for(const choice of host.querySelectorAll('[data-style]')){
+    choice.disabled=choice.dataset.style==='trackpad';
     const selected=choice.dataset.style===preferences.value.inputStyle;
     choice.classList.toggle('active',selected);choice.setAttribute('aria-pressed',String(selected));
     choice.onclick=()=>{
+      if(choice.disabled)return;
       preferences.set('inputStyle',choice.dataset.style);
       document.querySelectorAll('.input-style-options').forEach(wireInputStyles);
     };
@@ -635,16 +643,9 @@ function renderArea(node){
 }
 function transformPanel(){const b=scene.model?.blocks.find(b=>b.id===scene.selectedId)||scene.model?.blocks[0];return b?`<details class="panel" open><summary>Native Transform</summary><div class="sub-label">Position · X / Y / Z</div><p class="panel-note">${['x','y','z'].map(a=>b.position[a].toFixed(3)).join(' / ')}</p><div class="sub-label">Dimensions · X / Y / Z</div><p class="panel-note">${['x','y','z'].map(a=>b.size[a].toFixed(3)).join(' / ')}</p><p class="panel-note">Look ${b.look} · Up ${b.up} · Native units</p></details>`:'';}
 function emptyState(){
-  const card=document.createElement('section');card.className='empty-state';card.setAttribute('aria-label','No model loaded');
-  card.innerHTML='<h2>No ship loaded</h2><p>Drop an Avorion <code>.xml</code> here, or choose one.</p><div class="empty-actions"></div><p class="empty-hint"></p>';
-  const actions=card.querySelector('.empty-actions');
-  actions.append(button('Open Avorion XML','Open Avorion XML…',importXml,'primary'),button('Load texture folder','Load texture folder…',loadTextures,'setting-button'));
-  const recent=recentModels(),hint=card.querySelector('.empty-hint');
-  if(recent.length){hint.textContent='Recent: '+recent.join(' · ')+'. Browsers cannot reopen files by path; choose or drop the file again.';}
-  else hint.textContent=textureLibrary.loadedCount?`${textureLibrary.loadedCount} texture maps ready.`:'Textures are optional. Without them blocks use plain material colors.';
-  const heading=document.createElement('h3');heading.textContent='Input style';card.append(heading);
-  const controls=$('#input-style-dialog .input-style-options').cloneNode(true);
-  wireInputStyles(controls);card.append(controls);
+  const card=document.createElement('section');card.className='empty-state';
+  card.innerHTML='<p>Drop an Avorion .xml here, or open the welcome screen.</p>';
+  card.append(button('Welcome','Open Welcome',()=>welcome?.open(),'primary'));
   return card;
 }
 function textureBadge(){
@@ -955,7 +956,7 @@ preferences.subscribe(applyPreferences);
 // Load the interface language before the first paint so English does not flash.
 requestedLanguage=preferences.value.language;await setLanguage(requestedLanguage);translateStatic();
 render();save();
-void assetPersistence.start();
+void Promise.resolve(assetPersistence.start()).then(()=>{if(!embedded&&!scene.loaded)welcome.open();});
 window.addEventListener('pagehide',event=>event.persisted?assetPersistence.flush():assetPersistence.stop());
 document.addEventListener('visibilitychange',()=>{if(document.hidden)assetPersistence.flush();});
 

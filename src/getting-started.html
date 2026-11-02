@@ -1,0 +1,77 @@
+<!-- Bundled from docs/GETTING_STARTED.md for the welcome screen. -->
+<p>Use the viewer to explore a ship&#x27;s construction, try paint schemes, inspect turret layouts, and create images, animations, or 3D files. This guide introduces what each view is useful for so you can choose where to start.</p>
+<h2>Load a ship and get your bearings</h2>
+<p>Choose <strong>Open Avorion XML…</strong> on the welcome screen, or drop a ship <code>.xml</code> onto the viewport. To replace an open ship, use <strong>File &gt; Import Avorion XML…</strong>. Textures are optional: <strong>Load texture folder…</strong> adds the game&#x27;s surface textures; without them, blocks use plain material colors.</p>
+<p>Choose <strong>Blender</strong> or <strong>Laptop</strong> controls on the welcome screen or through <strong>Help &gt; Input style…</strong>. Trackpad is temporarily unavailable while its controls are being fixed. With the default Blender controls, middle-drag rotates, Shift+middle-drag pans, and the wheel zooms. <strong>Home</strong> or <strong>Frame all</strong> brings the ship back into view. Click the view cube or axis controls for standard angles.</p>
+<h2>Choose what you want to do</h2>
+<p>The viewport&#x27;s <strong>mode menu</strong> controls how you interact with the ship. Its <strong>shading buttons</strong> control how the ship looks. Workspace tabs arrange the panels around it.</p>
+<h3>Inspect blocks: Object Mode</h3>
+<p>Use <strong>Object Mode</strong> to select and examine parts of the ship. Click a block, or drag a box to select several. Box selection can include blocks behind the visible surface; Ctrl-drag subtracts from the selection.</p>
+<p>Inspect block details such as type, material, dimensions, and color. Use <strong>Hide</strong> or <strong>Isolate</strong> to reveal internal construction or focus on one section; <strong>Show All</strong> restores hidden blocks. This is useful for checking armor arrangements, identifying components, and examining details obscured by the hull. Imported ship geometry is read-only: selection does not let you build or reshape blocks.</p>
+<h3>Try colors: Paint Mode and Color Workshop</h3>
+<p>Choose <strong>Paint Mode</strong> in the viewport header, or press <strong>Tab</strong> to switch between Object and Paint modes.</p>
+<ul>
+<li><strong>Brush</strong> paints blocks under the cursor. A radius of <strong>0</strong> targets one block at a time.</li>
+<li><strong>Eyedropper</strong> samples a block&#x27;s color.</li>
+<li><strong>Replace Color</strong> and <strong>Connected Fill</strong> help recolor matching areas.</li>
+<li><strong>Restore</strong> returns painted blocks to their imported colors.</li>
+</ul>
+<p>Choose the <strong>Primary</strong> or <strong>Secondary</strong> color channel and a scope: <strong>Whole Ship</strong>, <strong>Selected Blocks</strong>, or <strong>Active Region</strong>. Scope limits where the tool can act; Whole Ship does not make every brush stroke repaint the entire ship. <strong>Ctrl+Z</strong> undoes paint and <strong>Ctrl+Shift+Z</strong> redoes it.</p>
+<p>Open <strong>Window &gt; Open Color Workshop</strong> for palette and harmony choices, applying colors to selections, and named regions. Regions let you highlight or isolate sections such as engines, armor, or trim. Use these tools to compare a paint scheme or show how a ship is organized. Regions are session-only, so do not treat them as saved ship data.</p>
+<h3>Preview turret placement: Select Sockets</h3>
+<p>Choose <strong>Select Sockets</strong> to pick turret mounting points without selecting hull blocks. In <strong>Properties &gt; Turrets</strong>, enable <strong>Show sockets</strong>; choose <strong>All turret blocks</strong> if you want to see candidates across the ship.</p>
+<p>Select a turret asset in the <strong>Asset Library</strong>, choose an available socket, and use <strong>Attach selected asset</strong>. Pose and size controls let you explore how a mounted turret sits on the ship. This is useful for comparing placements and checking how barrels line up with nearby hull sections.</p>
+<h2>Choose how the ship looks</h2>
+<p>Use the shading buttons in the viewport header. Hover over a button to see its name.</p>
+<table><thead><tr><th>Display mode</th><th>Useful for showing…</th></tr></thead><tbody>
+<tr><td><strong>Wireframe</strong></td><td>Block edges and construction details that are harder to distinguish on shaded surfaces.</td></tr>
+<tr><td><strong>Solid</strong></td><td>Hull shape and surface form under simple lighting. Studio and MatCap options help emphasize contours.</td></tr>
+<tr><td><strong>Material Preview</strong></td><td>Colors and loaded textures under consistent preview lighting, useful while repainting.</td></tr>
+<tr><td><strong>Rendered</strong></td><td>The ship with your scene lighting settings, useful for presentation images.</td></tr>
+</tbody></table>
+<p><strong>X-Ray</strong> is available in Solid and Wireframe modes for seeing through surfaces. Overlay controls can add wire edges, block bounds, and model dimensions. Turn unnecessary overlays off for a cleaner presentation.</p>
+<p>Use <strong>Properties &gt; World</strong> to adjust the space background and <strong>Properties &gt; Shaders</strong> to adjust the ship&#x27;s appearance. Choose <strong>Rendered</strong> to judge your scene lighting changes. An orthographic view is useful for comparing proportions; perspective gives a more natural presentation view.</p>
+<p>The <strong>Layout</strong> and <strong>Inspection</strong> workspaces provide different panel arrangements. <strong>Compare</strong> places two viewports side by side so you can inspect the same ship from different angles or with different display settings. It does not load a separate ship into each viewport. Hover over a panel and press <strong>Ctrl+Space</strong> to maximize or restore it.</p>
+<h2>Explore turret behavior and coverage</h2>
+<h3>Weapon Coverage: where can the turrets aim?</h3>
+<p>After attaching turrets, open <strong>Properties &gt; Turrets &gt; Weapon Coverage</strong> and enable <strong>Show Weapon Coverage</strong>.</p>
+<ul>
+<li><strong>Directional Slices</strong> show coverage around a chosen plane. Outer arcs show distant aiming directions; the inner field shows nearby dead zones. Use top, side, or front views to examine different parts of the layout.</li>
+<li><strong>Spherical Heatmap</strong> shows coverage around the ship at a chosen distance. Use it to spot weak directions and areas covered by several turrets.</li>
+<li><strong>Coverage Display</strong> can show clear coverage, potential coverage, structural obstructions, or blind spots. Inspect a point to see contributing turrets and blocking geometry.</li>
+<li>Save a comparison baseline to see how a changed layout affects coverage. Spherical comparisons require matching radius and quality.</li>
+</ul>
+<p>Coverage is an approximate geometric analysis under the displayed aiming assumptions. It does not measure damage or simulate combat, and the analysis radius is not weapon range.</p>
+<h3>Turret Studio: how does a turret move and fire?</h3>
+<p>Open a turret library asset and select <strong>Turret Properties</strong>. This opens an isolated workspace for posing the turret, previewing tracking and firing effects, and arranging showcase cameras and playback.</p>
+<p>Use it for a close-up demonstration of a turret design or an animated presentation. Firing visuals are approximations; playback does not reproduce the full game combat system.</p>
+<h2>Choose an export</h2>
+<h3>Save a painted ship for Avorion</h3>
+<p>Use <strong>File &gt; Save preserved XML…</strong> to download a copy with your paint changes while retaining the imported XML structure and original coordinates. Keep your original file too. This is the paint-saving route, not an export of every viewport, lighting, or studio setting.</p>
+<p><strong>Ctrl+S saves the workspace layout, not the ship XML.</strong> Browser-restored models and textures are convenient working copies, not backups.</p>
+<h3>Export pictures and a rotating ship</h3>
+<p>Open <strong>File &gt; Advanced Export… &gt; Image Export</strong> and choose a goal:</p>
+<table><thead><tr><th>Export</th><th>Use it for…</th></tr></thead><tbody>
+<tr><td><strong>Screenshot</strong></td><td>A still of the current viewport&#x27;s camera and appearance, without the app&#x27;s panels or menus.</td></tr>
+<tr><td><strong>Transparent render</strong></td><td>A ship cutout for compositing onto another background. Choose PNG or WebP to retain transparency.</td></tr>
+<tr><td><strong>Blueprint</strong></td><td>A technical presentation with one view or a four-view sheet, optional grid, title block, dimensions, and annotations. Use <strong>Customize blueprint...</strong> to arrange it.</td></tr>
+<tr><td><strong>Turntable GIF</strong></td><td>A looping, full-turn presentation of the ship.</td></tr>
+</tbody></table>
+<p>Still images support <strong>PNG</strong>, <strong>WebP</strong>, and <strong>JPEG</strong>. JPEG needs an opaque background. Choose the image size, check the preview, prepare the output, and download it. Blueprint dimensions use native model units.</p>
+<p>Weapon Coverage overlays are currently viewport-only: they are not included in image or blueprint exports.</p>
+<h3>Export a 3D model</h3>
+<p>Open <strong>File &gt; Advanced Export…</strong>. Start with <strong>Blender / game asset</strong>, <strong>Quick share</strong>, or <strong>3D print</strong>, then choose the format and scope.</p>
+<table><thead><tr><th>Format</th><th>Best starting use</th></tr></thead><tbody>
+<tr><td><strong>GLB</strong></td><td>A single-file model for sharing or importing into 3D software.</td></tr>
+<tr><td><strong>glTF</strong></td><td>A ZIP package containing the model, buffer, and metadata.</td></tr>
+<tr><td><strong>OBJ</strong></td><td>A ZIP package with OBJ geometry, MTL materials, and metadata for other 3D tools.</td></tr>
+<tr><td><strong>STL</strong></td><td>Print-oriented geometry without colors or block metadata.</td></tr>
+<tr><td><strong>3MF</strong></td><td>A print-oriented package with explicit units and material information.</td></tr>
+</tbody></table>
+<p>Choose the whole ship, visible blocks, a selection, or a named region. Editable outputs retain block surfaces; <strong>printable shell</strong> combines them into a solid result. Print exports require preparation and validation. Check the processed preview and size before downloading; passing topology checks does not establish printer suitability.</p>
+<p>Mesh exports do not reproduce the full viewport shader or its animated effects, and embedded turret designs are omitted. Use XML to retain the original embedded turret plans.</p>
+<h3>Export turret animations or coverage data</h3>
+<p>In <strong>Turret Studio &gt; Export showcase</strong>, choose <strong>PNG</strong> for a still, <strong>PNG sequence ZIP</strong> for individual animation frames, <strong>GIF</strong> for a short animation, or <strong>WebM</strong> for video when the browser supports it. Animation exports are silent; MP4 is not supported.</p>
+<p>In Weapon Coverage&#x27;s <strong>Statistics and comparison</strong> section, use <strong>Export coverage CSV/JSON</strong> to save analyzed targets, coverage counts, classifications, and contributing turret IDs for further review.</p>
+<h2>A first project to try</h2>
+<p>Load a ship, inspect it in Material Preview, then switch to Solid or Wireframe to examine its shape. Try a small paint change and save a preserved XML copy. Finish with a Screenshot or Blueprint export. Explore turret placement and coverage when you want to examine the ship&#x27;s weapon layout.</p>
