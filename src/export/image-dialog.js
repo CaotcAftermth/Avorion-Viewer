@@ -7,6 +7,7 @@ import {FACTORY_PREFERENCES} from '../preferences.js';
 import {area} from '../layout.js';
 import {openBlueprintDialog} from './blueprint-dialog.js';
 import { reportError } from '../app-log.js';
+import {ringForProgress} from '../loading-indicator.js';
 
 export function mountImageExport(host,scene,sourceView,context={}){
   const view=sourceView||area().view,canvas=context.canvas;
@@ -42,7 +43,7 @@ export function mountImageExport(host,scene,sourceView,context={}){
   const actions=el('div');actions.className='dialog-actions';
   const previewButton=el('button','Preview'),renderButton=el('button','Prepare Image'),download=el('button','Download Image'),cancel=el('button','Cancel');
   for(const button of [previewButton,renderButton,download,cancel])button.type='button';
-  download.disabled=true;cancel.hidden=true;actions.append(previewButton,renderButton,download,cancel);host.append(status,progress,actions);
+  download.disabled=true;cancel.hidden=true;actions.append(previewButton,renderButton,download,cancel);host.append(status,progress,actions);ringForProgress(progress,{anchor:previewButton});
   const invalidate=()=>{result=null;download.disabled=true;revision++;save();schedulePreview();};
   function schedulePreview(){
     clearTimeout(timer);pending=null;if(previewing)controller?.abort();

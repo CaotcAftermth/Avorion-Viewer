@@ -128,15 +128,16 @@ export class TextureLibrary {
         return done;
     }
     /** Load from a FileList (folder picker or multi-select). Base name = file name minus extension. */
-    async loadFiles(files, {retainUndecoded=false,sources=null}={}) {
+    async loadFiles(files, {retainUndecoded=false,sources=null,onProgress=null}={}) {
         // Snapshot FileList before the input gets reset by its change handler.
         const input = Array.from(files);
         return (await this.enqueue(async (generation) => {
             const wanted = new Set(allTextureNames());
-            let n = 0;
+            let n = 0, seen = 0;
             for (const f of input) {
                 if (generation !== this.generation)
                     return n;
+                onProgress?.(seen++, input.length);
                 const base = f.name.replace(/\.[^.]+$/, "").toLowerCase();
                 if (!wanted.has(base))
                     continue;
@@ -153,6 +154,7 @@ export class TextureLibrary {
                 this.sourceOf.set(base, { source, file: f.name });
                 n++;
             }
+            onProgress?.(input.length, input.length);
             return n;
         })) ?? 0;
     }

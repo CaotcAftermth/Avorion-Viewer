@@ -9,6 +9,7 @@ import {mountHistory} from './turrets/mounts.js';
 import {mountTurretLibrary} from './turrets/library.js';
 import {mountTurretProperties} from './turrets/properties.js';
 import {createSessionPersistence} from './session-persistence.js';
+import {createCrashGuard,findCrashRecords,forgetCrashRecords,askCrashRecovery,warnLiveFailure,isMemoryFailure} from './crash-guard.js';
 import {mountSceneProperties} from './scene-properties.js';
 import {openExportDialog} from './export/dialog.js';
 import {renderPaletteRadial} from './palette-radial.js';
@@ -45,6 +46,7 @@ import { addLog, reportError, logEntries, onLog, clearLog, errorCount, installGl
 import { APP_VERSION } from './version.js';
 import { openFeedback, openAbout } from './feedback.js';
 import { currentLanguage } from './i18n.js';
+import { startLoading, nextPaint } from './loading-indicator.js';
 
 const $ = selector => document.querySelector(selector);
 const escape = text => String(text).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -65,8 +67,20 @@ const scene = { loaded: false, visible: true, selected: false, selectedId:null, 
 const welcome=embedded?null:createWelcome({preferences,wireInputStyles,openModel:importXml,openTextures:loadTextures,feedback:showFeedback,trackpadFallback});
 let textureStatus='Neutral texture fallback · Load a local texture folder from File';
 installGlobalErrorCapture(window);
+// Crash recovery: an unclean exit with a model on screen holds the saved model back on the next launch.
+const crashStorage=embedded?null:(()=>{try{return localStorage;}catch{return null;}})();
+const crashGuard=crashStorage?createCrashGuard({storage:crashStorage,scene}):{track(){},fail(){},close(){},resume(){}};
+const crashesAtStart=crashStorage?findCrashRecords({storage:crashStorage}):Promise.resolve([]);
+const safeStart=new URLSearchParams(location.search).has('safe');
+async function crashRecoveryGate(record){
+  const last=(await crashesAtStart)[0];
+  if(!last&&!safeStart)return {};
+  const choice=await askCrashRecovery({reason:last?last.phase:'safe',fileName:last?.fileName||record.fileName,blocks:last?.blocks,translate:t});
+  addLog(choice==='clear'?'Crash recovery: scene cleared instead of restoring the last model.':choice==='lite'?'Crash recovery: restoring the last model without textures.':'Crash recovery: restoring the last model.','STORAGE','warning');
+  return {model:choice!=='clear',textures:choice!=='lite'};
+}
 addLog(`Avorion Viewer ${APP_VERSION} ready. Layout changes are saved in this browser.`,'SYSTEM');addLog('No model loaded. Drop an Avorion .xml or use File > Import Avorion XML.','SCENE');
-const assetPersistence=embedded?{changed(){},start(){},flush(){},stop(){}}:createSessionPersistence({scene,textures:textureLibrary,restored:kind=>{if(kind==='textures'){scene.revision++;/* rebuild: the restored model was built before its textures finished loading */textureStatus=`${textureLibrary.loadedCount} texture maps - restored locally`;if(textureLibrary.loadedCount)notify(`${textureLibrary.loadedCount} saved texture maps restored.`);}render();log(`${kind==='model'?'Model':'Textures'} restored from this browser.`,'STORAGE');},onError:error=>{notify('Model/texture persistence unavailable. Current session still works.');reportError(error,'STORAGE');}});
+const assetPersistence=embedded?{changed(){},start(){},flush(){},stop(){}}:createSessionPersistence({scene,textures:textureLibrary,restored:kind=>{if(kind==='textures'){scene.revision++;/* rebuild: the restored model was built before its textures finished loading */textureStatus=`${textureLibrary.loadedCount} texture maps - restored locally`;if(textureLibrary.loadedCount)notify(`${textureLibrary.loadedCount} saved texture maps restored.`);}render();log(`${kind==='model'?'Model':'Textures'} restored from this browser.`,'STORAGE');},onError:error=>{notify('Model/texture persistence unavailable. Current session still works.');reportError(error,'STORAGE');},gate:crashRecoveryGate});
 const workspace = () => state.workspaces.find(w => w.id === state.active);
 const currentArea = () => find(workspace().root, hovered) || leaves(workspace().root)[0];
 const areaElement = id => document.querySelector(`[data-area-id="${id}"]`);
@@ -118,9 +132,10 @@ $('#menu').addEventListener('keydown',e=>{
 document.addEventListener('pointerdown',e=>{if(!$('#menu').contains(e.target)&&!activeMainMenu?.contains(e.target))closeMenu();});
 function anchorMenu(button,title,items){const rect=button.getBoundingClientRect();menu(rect.left,rect.bottom+3,title,items);}
 function button(label,content,action,className='') {const el=document.createElement('button');el.type='button';el.title=t(label);el.setAttribute('aria-label',t(label));el.dataset.label=label;el.innerHTML=content;el.className=className;el.addEventListener('click',action);return el;}
+function clearScene(){releaseGameModel();Object.assign(scene,{loaded:false,selected:false,selectedIds:new Set(),hiddenIds:new Set(),regions:[],paintHistory:null,model:null});commit('Scene cleared.');}
 function totalAreas(){return state.workspaces.reduce((sum,w)=>sum+leaves(w.root).length,0);}
 function refreshStructure(){
-  assetPersistence.changed();
+  assetPersistence.changed();crashGuard.track();
   reconcileStructure(scene);
   renderers.forEach(r=>{r.sync?.();r.draw?.();});
   for(const node of leaves(workspace().root))if(node.editor==='properties'){
@@ -226,9 +241,29 @@ function showImportError(fileName,error){
 }
 // Every model entry point (menu, drop, empty state, asset library) shares this path.
 async function openXmlFile(file){
-  let model;
-  try{model=parseAvorionXml(await file.text(),file.name,file.size);}catch(error){showImportError(file.name,error);return false;}
-  loadModel(model);rememberModel(file.name);return true;
+  let model;const loading=startLoading(t('Opening ship'),{percent:5,message:file.name,delay:0});
+  try{
+    await nextPaint();const text=await file.text();
+    loading.update(25,t('Reading blocks…'));await nextPaint();
+    model=parseAvorionXml(text,file.name,file.size);
+  }catch(error){loading.done();showImportError(file.name,error);return false;}
+  try{
+    loading.update(55,`${model.blocks.length.toLocaleString()} ${t('blocks')} · ${t('building geometry…')}`);await nextPaint();
+    loadModel(model);rememberModel(file.name);await settleModelBuild(loading);
+  }finally{loading.done();}
+  return true;
+}
+// Viewports build geometry on their next frame; very large ships finish in a
+// background worker and announce it with avorion-model-ready.
+async function settleModelBuild(loading){
+  await nextPaint();
+  if(!scene.renderPreparing)return;
+  loading.update(80,t('Building geometry in the background…'));
+  await new Promise(resolve=>{
+    const started=performance.now(),finish=()=>{clearInterval(poll);window.removeEventListener('avorion-model-ready',finish);resolve();};
+    const poll=setInterval(()=>{if(!scene.renderPreparing||performance.now()-started>180000)finish();},250);
+    window.addEventListener('avorion-model-ready',finish);
+  });
 }
 function importXml(){chooseFiles('.xml',false,async files=>{if(files[0])await openXmlFile(files[0]);});}
 function saveXml(){
@@ -237,7 +272,13 @@ function saveXml(){
   const a=document.createElement('a');a.href=url;a.download=scene.model.fileName;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 async function loadAssetTextures(files){
-  const count=await textureLibrary.loadFiles(files);textureStatus=`${textureLibrary.loadedCount} local texture maps · stored in this browser`;scene.revision++;render();notify(`${count} texture maps loaded.`);
+  const loading=startLoading(t('Loading textures'),{percent:0,message:`0 / ${files.length}`});
+  try{
+    const count=await textureLibrary.loadFiles(files,{onProgress:(done,total)=>loading.update(total?done/total*95:95,`${done} / ${total}`)});
+    textureStatus=`${textureLibrary.loadedCount} local texture maps · stored in this browser`;
+    if(scene.loaded){loading.update(95,t('Applying textures to the ship…'));await nextPaint();}
+    scene.revision++;render();if(scene.loaded)await settleModelBuild(loading);notify(`${count} texture maps loaded.`);
+  }finally{loading.done();}
 }
 const assetActions={openModel:openXmlFile,loadTextures:loadAssetTextures,showWorld:()=>{
   for(const w of state.workspaces)for(const node of leaves(w.root))if(node.editor==='viewport')ensureViewportOptions(node.view).background='WORLD';
@@ -330,7 +371,7 @@ function renderTopbar(){
       null,
       {label:'Save workspace layout',key:shortcut('saveLayout'),disabled:!preferences.value.rememberLayout,disabledReason:'Enable workspace persistence in Preferences > Save & Load to save layouts.',action:()=>{saveNow();notify(storageAvailable?'Layout saved in this browser.':'Browser storage is unavailable.');}},
       null,
-      {label:'Clear scene',action:()=>{releaseGameModel();Object.assign(scene,{loaded:false,selected:false,selectedIds:new Set(),hiddenIds:new Set(),regions:[],paintHistory:null,model:null});commit('Scene cleared.');}}
+      {label:'Clear scene',action:clearScene}
     ],
     Edit:()=>[
       {label:'Undo Paint',key:shortcut('undoPaint'),disabled:!paintAvailability(scene).undo,disabledReason:'Apply a color to blocks first.',action:()=>changePaintHistory(false)},
@@ -541,7 +582,7 @@ document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('di
 
 function render(){
   rememberEditorScroll($('#screen'));
-  assetPersistence.changed();
+  assetPersistence.changed();crashGuard.track();
   if(scene.paintBusy)cancelPaintTask();
   closeViewportPopover();
   renderers.forEach(r=>r.dispose());renderers=[];
@@ -956,8 +997,14 @@ preferences.subscribe(applyPreferences);
 // Load the interface language before the first paint so English does not flash.
 requestedLanguage=preferences.value.language;await setLanguage(requestedLanguage);translateStatic();
 render();save();
-void Promise.resolve(assetPersistence.start()).then(()=>{if(!embedded&&!scene.loaded)welcome.open();});
-window.addEventListener('pagehide',event=>event.persisted?assetPersistence.flush():assetPersistence.stop());
+void Promise.resolve(assetPersistence.start()).then(async()=>{if(crashStorage)forgetCrashRecords(crashStorage,await crashesAtStart);if(!embedded&&!scene.loaded)welcome.open();});
+window.addEventListener('pagehide',event=>{if(event.persisted)assetPersistence.flush();else{assetPersistence.stop();crashGuard.close();}});
+window.addEventListener('pageshow',event=>{if(event.persisted)crashGuard.resume();});
+// Failures visible while they happen: lost graphics context, allocation RangeErrors and
+// worker/render errors that reach the log. Keep the crash record and offer to clear.
+function liveFailure(message){if(embedded||!scene.loaded)return;crashGuard.fail();warnLiveFailure({message,clearScene,translate:t});}
+window.addEventListener('avorion-context-lost',()=>liveFailure('The graphics context was lost, usually because the GPU ran out of memory.'));
+onLog(entries=>{const entry=entries[entries.length-1];if(entry?.level==='error'&&!entry.count&&isMemoryFailure({message:entry.message}))liveFailure('A memory allocation failed: '+entry.message);});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)assetPersistence.flush();});
 
 

@@ -108,6 +108,8 @@ function initialize() {
     // Preserve thin surface separation at close range without moving Clip Start.
     renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,preserveDrawingBuffer:true,logarithmicDepthBuffer:true});
     renderer.outputColorSpace=THREE.LinearSRGBColorSpace;renderer.toneMapping=THREE.NoToneMapping;
+    // three.js handles restoring; the app offers crash recovery (crash-guard.js).
+    renderer.domElement.addEventListener('webglcontextlost',()=>window.dispatchEvent(new Event('avorion-context-lost')));
     world=new THREE.Scene();guides=createWorldGuides();grid=guides.grid;axes=guides.axes;world.add(grid,...axes);
     skybox=createSkybox(()=>window.dispatchEvent(new Event('avorion-sky-ready')));
     shadowTarget=new THREE.WebGLRenderTarget(2048,2048);shadowTarget.depthTexture=new THREE.DepthTexture(2048,2048,THREE.UnsignedIntType);

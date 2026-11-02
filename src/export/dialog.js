@@ -3,6 +3,7 @@ import {EXPORT_FORMATS,captureExport} from './snapshot.js';
 
 import {mountExportPreview} from './preview.js';
 import {reportError} from '../app-log.js';
+import {ringForProgress} from '../loading-indicator.js';
 
 export function openExportDialog(scene,view,onHighlight,context={}){
 
@@ -17,7 +18,7 @@ export function openExportDialog(scene,view,onHighlight,context={}){
  for(const [label,isImage] of [['3D Model Export',false],['Image Export',true]]){const button=document.createElement('button');button.type='button';button.textContent=label;button.setAttribute('aria-pressed',String(!isImage));button.onclick=()=>{if(imageExport.busy||d.querySelector('.export-cancel')?.hidden===false)return;meshSections.forEach(n=>n.hidden=isImage);imageHost.hidden=!isImage;imageExport.setActive(isImage);tabs.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));d.querySelector('h2').textContent=isImage?'Image Export':'3D Model Export';if(!isImage){d.querySelector('.export-cancel').hidden=true;d.querySelector('progress').hidden=true;if(!result)schedule();}};tabs.append(button);}
  d.querySelector('.export-heading').after(tabs);
 
- const controls=d.querySelector('.export-controls'),status=d.querySelector('.export-status'),summary=d.querySelector('.export-summary'),download=d.querySelector('.export-download'),prepare=d.querySelector('.export-prepare'),cancel=d.querySelector('.export-cancel'),progress=d.querySelector('progress');
+ const controls=d.querySelector('.export-controls'),status=d.querySelector('.export-status'),summary=d.querySelector('.export-summary'),download=d.querySelector('.export-download'),prepare=d.querySelector('.export-prepare'),cancel=d.querySelector('.export-cancel'),progress=d.querySelector('progress');ringForProgress(progress,{anchor:status});
 
  const STORE='avorion-viewer.export-settings.v1',SAVED_KEYS=['format','mode','scope','placement','colors','sizing','longest','cleanup','includeTransparent','budget','tolerance','excludeThin','fillCavities'];
  // Goal presets fill the form. A goal stays highlighted only while every value it sets still matches.

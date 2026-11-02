@@ -62,7 +62,9 @@ export function restoreModel(record){
   return {model,loaded:true,preview:!!record.preview,...restoreCoverage(record.coverage)};
 }
 
-export function createSessionPersistence({scene,textures,restored,onError,store=openSessionStore()}){
+// gate(record) runs before a saved model is restored and resolves to
+// {model,textures}: false holds that part back (crash recovery).
+export function createSessionPersistence({scene,textures,restored,onError,gate,store=openSessionStore()}){
   let ready=false,stopped=false,timer,lastModel,lastAppearance,lastLoaded,lastCoverage,lastTextures=null,failed=false;
   const coverageKey=()=>{try{return JSON.stringify(coverageSnapshot(scene));}catch{return null;}};
   const report=error=>{if(!failed)onError(error);failed=true;};
@@ -88,12 +90,19 @@ export function createSessionPersistence({scene,textures,restored,onError,store=
     const initialModel=scene.model,initialGeneration=textures.generation;
     const [modelResult,textureResult]=await Promise.allSettled([store.get('model'),store.get('textures')]);
     if(stopped)return;
+    let plan={model:true,textures:true};
+    if(gate&&modelResult.status==='fulfilled'&&modelResult.value!==undefined&&!modelResult.value?.empty){
+      try{plan={model:true,textures:true,...await gate(modelResult.value)};}catch(error){report(error);}
+      if(stopped)return;
+    }
+    // A held-back texture set stays saved: start from it so the empty library is not written over it.
+    if(!plan.textures&&textureResult.status==='fulfilled'&&Array.isArray(textureResult.value))lastTextures=[];
     if(modelResult.status==='fulfilled'){
-      if(modelResult.value!==undefined&&scene.model===initialModel){try{Object.assign(scene,restoreModel(modelResult.value));lastModel=scene.model;lastLoaded=scene.loaded;lastAppearance=scene.appearanceRevision;lastCoverage=coverageKey();scene.revision++;restored('model');}catch(error){report(error);}}
+      if(plan.model&&modelResult.value!==undefined&&scene.model===initialModel){try{Object.assign(scene,restoreModel(modelResult.value));lastModel=scene.model;lastLoaded=scene.loaded;lastAppearance=scene.appearanceRevision;lastCoverage=coverageKey();scene.revision++;restored('model');}catch(error){report(error);}}
     }else report(modelResult.reason);
     ready=true;textures.subscribe(saveTextures);flush();
     if(textureResult.status==='fulfilled'){
-      if(Array.isArray(textureResult.value)&&textures.generation===initialGeneration&&!picked().length){
+      if(plan.textures&&Array.isArray(textureResult.value)&&textures.generation===initialGeneration&&!picked().length){
         try{await textures.loadFiles(textureResult.value.map(f=>new File([f.blob],f.file,{type:f.blob.type})),{retainUndecoded:true,sources:new Map(textureResult.value.map(f=>[f.file,f.source||'folder']))});restored('textures');}catch(error){report(error);}
       }
     }else report(textureResult.reason);

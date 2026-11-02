@@ -1,0 +1,19 @@
+/* Ring progress: light track, blue arc, percentage centred. */
+.progress-ring{--ring-size:72px;position:relative;display:inline-grid;place-items:center;width:var(--ring-size);height:var(--ring-size);flex-shrink:0;color:#dbe6f5}
+.progress-ring svg{width:100%;height:100%;transform:rotate(-90deg);fill:none;stroke:none}
+.progress-ring circle{fill:none;stroke-width:10}
+.progress-ring-track{stroke:#d6e4f7}
+.progress-ring-arc{stroke:#3d8df5;transition:stroke-dashoffset .25s ease}
+.progress-ring-value{position:absolute;font-size:calc(var(--ring-size) * .22);font-variant-numeric:tabular-nums;letter-spacing:.2px;line-height:1}
+.progress-ring.indeterminate svg{animation:progress-ring-spin 1.1s linear infinite}
+@keyframes progress-ring-spin{from{transform:rotate(-90deg)}to{transform:rotate(270deg)}}
+.progress-ring[hidden]{display:none!important}
+progress[data-ring]{display:none!important}
+.dialog-actions .progress-ring-inline{align-self:center;margin-right:4px}
+.dialog-actions .progress-ring-inline .progress-ring-value{font-size:9px}
+#loading-indicator{position:fixed;inset:0;margin:auto;width:fit-content;height:fit-content;max-width:min(420px,calc(100vw - 32px));z-index:160;display:flex;align-items:center;gap:16px;padding:18px 24px 18px 18px;background:linear-gradient(160deg,#151b30,#0a0e1c);border:1px solid #2a3352;border-radius:12px;box-shadow:0 18px 60px #000a;color:#dbe6f5;pointer-events:none;overflow:hidden}
+#loading-indicator[hidden]{display:none!important}
+.loading-indicator-text{display:flex;flex-direction:column;gap:5px;min-width:0}
+.loading-indicator-text b{font-size:13px;font-weight:500}
+.loading-indicator-text span{font-size:11px;color:#9fb0cc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(prefers-reduced-motion:reduce){.progress-ring-arc{transition:none}.progress-ring.indeterminate svg{animation-duration:3s}}
