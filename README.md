@@ -2,12 +2,12 @@
 
 View, inspect and repaint Avorion ship models in a browser, using a Blender-inspired workspace.
 
-[Open the viewer](https://avorion-viewer.com) · [User guide](docs/USER_GUIDE.md)
+[Open the viewer](https://avorion-viewer.com) · [Getting started](docs/GETTING_STARTED.md) · [User guide](docs/USER_GUIDE.md)
 
 ## Get started
 
-1. Open the viewer and choose Blender, Laptop or Trackpad controls in the **No ship loaded** screen.
-2. Use **Open Avorion XML…** and **Load texture folder…** on that screen, or drop files onto the viewport. **File > Asset folders…** separately manages remembered folders.
+1. Use the welcome screen to choose Blender or Laptop controls, open the Quick Start Guide, or send feedback. Trackpad is temporarily unavailable. Reopen it through **Help > Welcome**.
+2. Use **Open Avorion XML…** and **Load texture folder…** on the welcome screen, or drop files onto the viewport. **File > Asset folders…** separately manages remembered folders.
 3. Select blocks to inspect them, or switch to Paint Mode to recolor them. Use **File > Save preserved XML** to save your edits to a new file.
 
 Models and textures are processed locally. Browser storage restores saved assets on later visits; clearing site data can remove those copies. Keep your original files. If a browser cannot remember a game folder, use the one-time folder picker.
@@ -51,7 +51,7 @@ The build writes the static site to `dist/`. To preview it, stop the development
 | Maximize editor | Ctrl+Space |
 | Preferences | Ctrl+Comma |
 
-Laptop and Trackpad presets are available in **Help > Input style…** and **Preferences > Input**. See the [user guide](docs/USER_GUIDE.md#controls-default-keymap) for the complete controls.
+The Laptop preset is available in **Help > Input style…** and **Preferences > Input**. See the [user guide](docs/USER_GUIDE.md#controls-default-keymap) for the complete controls.
 
 ## Limitations
 
@@ -60,6 +60,8 @@ This is an independent browser application, not Blender or the Avorion game engi
 Imported XML structure and coordinates are preserved when saving paint edits. Mesh exports have separate conversion and repair limits described in the export documentation. Browser storage is not a backup.
 
 ## Documentation
+
+- [Getting started: modes, views, and exports](docs/GETTING_STARTED.md)
 
 - [User guide and design references](docs/USER_GUIDE.md)
 - [Feedback reporting and service deployment](docs/FEEDBACK.md)
