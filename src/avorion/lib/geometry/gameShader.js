@@ -38,8 +38,11 @@ const VERT = /* glsl */ `
 #ifdef BLOCK_INSTANCED
 attribute vec3 aOffset;
 #endif
-attribute vec3 aBary;
-attribute vec3 aEdges;
+// Vertex attributes are capped at 16 by WebGL, and some GPU drivers (ANGLE on
+// Windows) refuse a program that uses all 16. Keep this shader at 14 or fewer
+// in the instanced path (position, normal and aOffset count too): pack new
+// per-block data into the spare components below instead of adding attributes.
+attribute vec4 aEdges; // xyz: wire edge angles; w: triangle corner (0, 1, 2) for barycentrics
 varying vec3 vBary;
 flat out vec3 vEdges;
 #include <common>
@@ -54,9 +57,8 @@ attribute vec4 aSide; // rest-space position and face side, packed to preserve a
 flat out float vSide;
 attribute vec4 aWindow;
 flat out vec4 vWindow;
-attribute vec3 aEmission; // material's default effect color
+attribute vec4 aEmission; // rgb: material's default effect color; w: seam sides touching another block (bit per -X,+X,-Y,+Y,-Z,+Z)
 attribute vec2 aMaterialLayers; // plating accent and glow, independent of decals
-attribute float aSeamSides; // ship-space sides touching another block (bit per -X,+X,-Y,+Y,-Z,+Z)
 flat out float vSeamFace;
 
 varying vec3 vTexturePosition;
@@ -75,7 +77,7 @@ flat out vec3 vEmission;
 flat out vec2 vMaterialLayers;
 
 void main() {
-  vBary=aBary;vEdges=aEdges;
+  vBary=vec3(equal(vec3(floor(aEdges.w+.5)),vec3(0.,1.,2.)));vEdges=aEdges.xyz;
   vec3 blockPosition=position;
   vec3 texturePosition=aSide.xyz;
   #ifdef BLOCK_INSTANCED
@@ -95,12 +97,12 @@ void main() {
   vSurface = aSurface;
   vSide = aSide.w;
   vWindow = aWindow;
-  vEmission = aEmission;
+  vEmission = aEmission.rgb;
   vMaterialLayers = aMaterialLayers;
   // Flag axis-aligned faces pressed against a neighbouring block.
   vec3 axisNormal = abs(normal);
   float seamSide = axisNormal.x > .999 ? (normal.x > 0. ? 1. : 0.) : axisNormal.y > .999 ? (normal.y > 0. ? 3. : 2.) : axisNormal.z > .999 ? (normal.z > 0. ? 5. : 4.) : -1.;
-  vSeamFace = seamSide < 0. ? 0. : mod(floor(aSeamSides / exp2(seamSide) + .001), 2.);
+  vSeamFace = seamSide < 0. ? 0. : mod(floor(aEmission.w / exp2(seamSide) + .001), 2.);
   gl_Position = projectionMatrix * viewMatrix * wp;
   #include <logdepthbuf_vertex>
 }
@@ -609,7 +611,7 @@ export function createGameMaterial(albedo, normal, aux, params, transparent = fa
     });
     // Raw test/preview geometries without functional-face data remain plain hull.
     m.defaultAttributeValues = { ...m.defaultAttributeValues,
-        aFaceUV: [0.5, 0.5], aSurface: [1, 1, 0, 0], aEmission: [1, 1, 1], aMaterialLayers: [0, 0], aSeamSides: [0] };
+        aFaceUV: [0.5, 0.5], aSurface: [1, 1, 0, 0], aEmission: [1, 1, 1, 0], aMaterialLayers: [0, 0] };
     applyGameParams(m, params);
     return m;
 }

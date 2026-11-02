@@ -5,6 +5,9 @@
 //   aParams (glow layer, flags, reflectivity scale, state: selection bit 1,
 //   paint-preview bit 2, region-highlight bit 4, or -1 for hidden).
 //   aMaterialLayers (material accent and material glow, separate from artwork).
+//   aEmission (material effect color; w packs the seam-side bit mask).
+//   aEdges (wire edge angles; w is the triangle corner for barycentrics).
+// Packed to stay well under the GPU vertex attribute limit (see gameShader.js).
 // Geometry is baked to ship space with flat per-triangle normals.
 // ---------------------------------------------------------------------------
 import {blockOpacity,supportsOpacity} from '../../../block-opacity.js';
@@ -112,7 +115,6 @@ function rawSecondaryColor(block) {
     return parseColor(secondaryColor(block), [0, 0, 0, 0]);
 }
 class Builder {
-    bary = [];
     edges = [];
     pos = [];
     nrm = [];
@@ -126,10 +128,10 @@ class Builder {
     side = [];
     windowColor = [];
     materialLayers = [];
-    seam = [];
     ranges = new Map();
     get vertexCount() { return this.pos.length / 3; }
     add(id, geometry, color, secondary, layers, params, surface, normalOverlay, emission, windowColor, materialLayers, seamSides = [0]) {
+        const emissionSeam = [emission[0], emission[1], emission[2], seamSides[0]];
         const { positions, uv, faces } = geometry;
         const angles=edgeAngles(positions);
         const start = this.vertexCount;
@@ -140,8 +142,7 @@ class Builder {
             c.fromArray(positions, i + 6);
             n.subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
             for (let k = 0; k < 3; k++) {
-                this.bary.push(k===0?1:0,k===1?1:0,k===2?1:0);
-                this.edges.push(...angles.subarray(i/3,i/3+3));
+                this.edges.push(...angles.subarray(i/3,i/3+3),k);
                 const vertex = i / 3 + k;
                 this.pos.push(positions[i + k * 3], positions[i + k * 3 + 1], positions[i + k * 3 + 2]);
                 this.nrm.push(n.x, n.y, n.z);
@@ -151,11 +152,10 @@ class Builder {
                 this.par.push(...params);
                 this.faceUv.push(uv[vertex * 2], uv[vertex * 2 + 1]);
                 this.surface.push(faces[vertex * 3], faces[vertex * 3 + 1], surfaceKind(surface, faces[vertex * 3 + 2]), normalOverlay);
-                this.emission.push(...emission);
+                this.emission.push(...emissionSeam);
                 this.side.push(faces[vertex * 3 + 2]);
                 this.windowColor.push(...windowColor);
                 this.materialLayers.push(...materialLayers);
-                this.seam.push(seamSides[0]);
             }
         }
         const list = this.ranges.get(id) ?? [];
@@ -166,8 +166,7 @@ class Builder {
         if (this.pos.length === 0)
             return undefined;
         const g = new THREE.BufferGeometry();
-        g.setAttribute('aBary',new THREE.Float32BufferAttribute(this.bary,3));
-        g.setAttribute('aEdges',new THREE.Float32BufferAttribute(this.edges,3));
+        g.setAttribute('aEdges',new THREE.Float32BufferAttribute(this.edges,4));
         g.setAttribute("position", new THREE.Float32BufferAttribute(this.pos, 3));
         g.setAttribute("normal", new THREE.Float32BufferAttribute(this.nrm, 3));
         g.setAttribute("aColor", new THREE.Float32BufferAttribute(this.col, 4));
@@ -177,9 +176,8 @@ class Builder {
         g.setAttribute("aSurface", new THREE.Float32BufferAttribute(this.surface, 4));
         g.setAttribute("aSide", new THREE.Float32BufferAttribute(this.side.flatMap((side,i)=>[...this.pos.slice(i*3,i*3+3),side]), 4));
         g.setAttribute("aWindow", new THREE.Float32BufferAttribute(this.windowColor, 4));
-        g.setAttribute("aEmission", new THREE.Float32BufferAttribute(this.emission, 3));
+        g.setAttribute("aEmission", new THREE.Float32BufferAttribute(this.emission, 4));
         g.setAttribute("aMaterialLayers", new THREE.Float32BufferAttribute(this.materialLayers, 2));
-        g.setAttribute("aSeamSides", new THREE.Float32BufferAttribute(this.seam, 1));
         const par = new THREE.Float32BufferAttribute(this.par, 4);
         par.setUsage(THREE.DynamicDrawUsage);
         g.setAttribute("aParams", par);
@@ -287,9 +285,9 @@ export function buildTexturedModel(model, profile, params) {
         const chunk=entries.slice(start,start+1024),first=chunk[0],builder=new Builder();
         builder.add(first.b.id,blockSurfaceGeometry({...first.b,position:{x:0,y:0,z:0}},profile),...first.args);
         const base=builder.geometry(),g=new THREE.InstancedBufferGeometry();g.copy(base);g.instanceCount=chunk.length;base.dispose();
-        const attributes={aColor:[0,4],aSecondary:[1,4],aLayers:[2,4],aParams:[3,4],aEmission:[6,3],aWindow:[7,4],aMaterialLayers:[8,2],aSeamSides:[9,1]};
+        const attributes={aColor:[0,4],aSecondary:[1,4],aLayers:[2,4],aParams:[3,4],aEmission:[6,4],aWindow:[7,4],aMaterialLayers:[8,2]};
         for(const [name,[argument,size]] of Object.entries(attributes)){
-          const data=new Float32Array(chunk.length*size);chunk.forEach((entry,i)=>data.set(entry.args[argument],i*size));
+          const data=new Float32Array(chunk.length*size);chunk.forEach((entry,i)=>data.set(name==='aEmission'?[...entry.args[6],entry.args[9][0]]:entry.args[argument],i*size));
           const attr=new THREE.InstancedBufferAttribute(data,size);if(['aParams','aColor','aSecondary','aWindow'].includes(name))attr.setUsage(THREE.DynamicDrawUsage);g.setAttribute(name,attr);
         }
         const offsets=new Float32Array(chunk.length*3);chunk.forEach(({b},i)=>offsets.set([b.position.x,b.position.y,b.position.z],i*3));g.setAttribute('aOffset',new THREE.InstancedBufferAttribute(offsets,3));
