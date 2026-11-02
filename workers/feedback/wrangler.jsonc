@@ -1,0 +1,51 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "avorion-viewer-feedback",
+  "main": "index.js",
+  "compatibility_date": "2026-11-01",
+  "account_id": "6cf1d8221449be71df7a2bf2da303ba9",
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "ENABLED": "true",
+    "ALLOWED_ORIGINS": "https://avorion-viewer.com,https://www.avorion-viewer.com,https://caotcaftermth.github.io",
+    "GITHUB_REPOSITORY": "CaotcAftermth/Avorion-Viewer",
+    "PUBLIC_URL": "https://avorion-viewer-feedback.caotcaftermth.workers.dev",
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAFwF_lhaby_K9EDg"
+  },
+  "r2_buckets": [
+    {
+      "binding": "IMAGES",
+      "bucket_name": "avorion-viewer-feedback"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "REPORTS",
+        "class_name": "FeedbackReports"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "FeedbackReports"
+      ]
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "REQUEST_LIMIT",
+      "namespace_id": "1001",
+      "simple": {
+        "limit": 10,
+        "period": 60
+      }
+    }
+  ],
+  "observability": {
+    "enabled": false
+  }
+}

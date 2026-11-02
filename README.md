@@ -22,7 +22,7 @@ Models and textures are processed locally. Browser storage restores saved assets
 
 ## Run locally
 
-Requires Node.js 20 or newer and a browser with WebGL2.
+Requires Node.js 22 or newer and a browser with WebGL2.
 
 ```sh
 npm ci
@@ -62,6 +62,7 @@ Imported XML structure and coordinates are preserved when saving paint edits. Me
 ## Documentation
 
 - [User guide and design references](docs/USER_GUIDE.md)
+- [Feedback reporting and service deployment](docs/FEEDBACK.md)
 - [Turret Studio: capabilities, limitations and development history](docs/TURRET_STUDIO.md)
 - [Color Editor](docs/COLOR_EDITOR.md) and [paint tools](docs/PAINT_TOOLS.md)
 - [Mesh export](docs/ADVANCED_EXPORT.md) and [image export](docs/IMAGE_EXPORT.md)

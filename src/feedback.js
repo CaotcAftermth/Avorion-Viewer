@@ -1,12 +1,11 @@
-// Help > Send feedback. The app is a static site, so feedback is a prefilled
-// report the user sends themselves: a GitHub issue, an email, or the clipboard.
-// Set a destination in FEEDBACK_TARGETS; with none set, Copy report still works.
+// Help > Send feedback. Anonymous submission uses a separate Cloudflare Worker.
+import { attachAnonymousFeedback } from './feedback-submit.js';
 import { APP_VERSION, FEATURE_AREAS } from './version.js';
 import { recentProblems } from './app-log.js';
 import { t, translateDom } from './i18n.js';
 
 export const FEEDBACK_TARGETS = {
-  issues: '', // e.g. 'https://github.com/OWNER/REPO/issues'
+  issues: 'https://github.com/CaotcAftermth/Avorion-Viewer/issues',
   email: ''   // e.g. 'feedback@example.com'
 };
 export const FEEDBACK_KINDS = [['bug', 'Bug report'], ['idea', 'Idea or request'], ['other', 'Other']];
@@ -87,11 +86,11 @@ export function openFeedback(context = {}, { kind = 'bug', notify = () => {} } =
   const dialog = node('dialog'); dialog.id = 'feedback-dialog'; dialog.className = 'feedback-dialog'; dialog.setAttribute('aria-labelledby', 'feedback-title');
   dialog.innerHTML = `<div class="dialog-heading"><span class="eyebrow">FEEDBACK · v${APP_VERSION}</span><button type="button" class="icon-button" data-close aria-label="Close">×</button></div>
     <h2 id="feedback-title">Send feedback</h2>
-    <p>Tell us what went wrong or what you would like. Nothing is sent from the app: you review the report and send it yourself.</p>
+    <p>Tell us what went wrong or what you would like. Review your report before sharing it. Reports on GitHub are public.</p>
     <div class="feedback-kinds" role="radiogroup" aria-label="Feedback type"></div>
     <label class="feedback-message"><span>Describe it</span><textarea rows="6" maxlength="4000" placeholder="What did you do, what did you expect, and what happened instead?"></textarea></label>
-    <label class="check-row"><input type="checkbox" data-system checked> Include app version, browser and graphics details</label>
-    <label class="check-row"><input type="checkbox" data-errors checked> <span>Include recent errors from the Info editor</span> <span class="feedback-error-count"></span></label>
+    <label class="check-row"><input type="checkbox" data-system> Include app version, browser, graphics details and model name</label>
+    <label class="check-row"><input type="checkbox" data-errors> <span>Include recent errors from the Info editor</span> <span class="feedback-error-count"></span></label>
     <details class="feedback-preview"><summary>Preview report</summary><pre></pre></details>
     <p class="dialog-note feedback-destination"></p>
     <p class="feedback-status" role="status"></p>
@@ -135,7 +134,9 @@ export function openFeedback(context = {}, { kind = 'bug', notify = () => {} } =
   dialog.querySelectorAll('[data-close]').forEach(b => b.onclick = () => dialog.close());
   dialog.addEventListener('close', () => dialog.remove());
   translateDom(dialog); sync();
-  document.body.append(dialog); dialog.showModal(); text.focus();
+  document.body.append(dialog); dialog.showModal();
+  attachAnonymousFeedback(dialog, { report, title, kind: () => chosen, message: () => text.value });
+  text.focus();
   return dialog;
 }
 
