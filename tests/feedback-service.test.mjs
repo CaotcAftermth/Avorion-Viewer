@@ -103,7 +103,3 @@ test('Worker runtime: origin, verification, uploads, concurrent retries, unknown
   ip++;
   assert.equal((await send(form())).status, 429, 'global daily cap enforced across client addresses');
 });
-
-
-
-
