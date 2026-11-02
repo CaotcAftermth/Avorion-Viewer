@@ -23,9 +23,12 @@ test('zero-depth engines retain finite core and particle geometry with state-spe
  effects.dispose();
 });
 
-test('engine exhaust defaults blue independently of hull paint and honors secondary color',()=>{
- const engine=makeBlock({typeIndex:3,color:'ff1e1e1e',secondaryColor:'00000000'});
- assert.deepEqual(effectColor(engine).toArray(),[.03,.42,1]);
+test('engine exhaust defaults to material color independently of hull paint and honors secondary color',()=>{
+ const engine=makeBlock({typeIndex:3,materialIndex:0,color:'ff1e1e1e',secondaryColor:'00000000'});
+ assert.deepEqual(effectColor(engine).toArray(),[1,179/255,128/255]);
+ assert.deepEqual(effectColor({...engine,color:'ff00ff00'}).toArray(),[1,179/255,128/255]);
+ assert.deepEqual(effectColor({...engine,materialIndex:1}).toArray(),[1,1,1]);
+ assert.deepEqual(effectColor({...engine,typeIndex:10}).toArray(),[.02,.42,1]);
  assert.deepEqual(effectColor({...engine,secondaryColor:'ffff0000'}).toArray(),[1,0,0]);
  assert.equal(engine.secondaryColor,'00000000');
 });
