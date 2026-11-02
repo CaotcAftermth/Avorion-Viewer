@@ -10,12 +10,13 @@ const EDITOR_COLOR = /^(.+)(Background|Header|Text|Accent)$/;
 
 export function mountPreferences(host, store, editorState = {}, assets = {}, options = {}) {
   const sections = options.sections || APP_SECTIONS;
-  let category = sections.some(section => section.id === editorState.category) ? editorState.category : sections[0].id, query = editorState.query || '';
+  let category = sections.some(section => section.id === editorState.category) ? editorState.category : sections[0].id, query = options.searchbar===false ? '' : editorState.query || '';
   host.classList.add('preferences-editor');host.classList.toggle('compact', !!options.compact);
   let search, nav, content, status, autoSave, save;
   const controls = new Map(), hexInputs = new Map();
   function shell() {
-    host.innerHTML = `<div class="preferences-searchbar"><span>${t('Preferences')}</span><input type="search" aria-label="${t('Search preferences')}" placeholder="${t('Search preferences')}" maxlength="150"></div>
+    // Hosts with their own search (the Properties editor) leave out the search bar.
+    host.innerHTML = `${options.searchbar===false?'':`<div class="preferences-searchbar"><span>${t('Preferences')}</span><input type="search" aria-label="${t('Search preferences')}" placeholder="${t('Search preferences')}" maxlength="150"></div>`}
     <div class="preferences-main"><nav class="preferences-categories" aria-label="${t('Preference categories')}"></nav><div class="preferences-content" tabindex="-1"></div></div>
     <footer class="preferences-footer"><details class="preferences-management"><summary aria-label="${t('Preferences options')}" title="${t('Preferences options')}">☰</summary><div class="preferences-actions">
       <label><input type="checkbox" data-auto-save> ${t('Auto-Save Preferences')}</label><hr>
@@ -25,8 +26,8 @@ export function mountPreferences(host, store, editorState = {}, assets = {}, opt
     search = host.querySelector('input[type=search]'); nav = host.querySelector('nav');
     content = host.querySelector('.preferences-content'); status = host.querySelector('[role=status]');
     autoSave = host.querySelector('[data-auto-save]'); save = host.querySelector('[data-save]');
-    search.value = query;
-    search.addEventListener('input',()=>{query=search.value;renderContent();});
+    if(search){search.value = query;
+    search.addEventListener('input',()=>{query=search.value;renderContent();});}
     autoSave.onchange=()=>store.set('autoSave',autoSave.checked);
     save.onclick=()=>store.save();
     host.querySelector('[data-revert]').onclick=()=>{store.revert();host.querySelector('details.preferences-management').open=false;};
@@ -67,7 +68,7 @@ export function mountPreferences(host, store, editorState = {}, assets = {}, opt
       const tab = document.createElement('button');tab.type='button';tab.textContent=t(section.label);
       tab.className = `${section.id === category && !searching ? 'active' : ''} ${searching && panels.length ? 'search-match' : ''}`;
       tab.setAttribute('aria-pressed', String(section.id === category && !searching));
-      tab.addEventListener('click', () => { category=section.id;query='';search.value='';renderContent();nav.querySelector('.active')?.focus(); });
+      tab.addEventListener('click', () => { category=section.id;query='';if(search)search.value='';renderContent();nav.querySelector('.active')?.focus(); });
       nav.append(tab);
       if ((!searching && section.id !== category) || !panels.length) continue;
       const heading=document.createElement('h2');heading.textContent=t(section.label);content.append(heading);if(section.id==='keymap'){heading.dataset.preferenceTip=t('Click a binding to record keys, a mouse button, or the wheel. Escape cancels recording. Clear unassigns; Reset restores the default. Text editing and standard control navigation keep their native keys. Input emulation takes priority when enabled.');heading.dataset.uiTooltip=heading.dataset.preferenceTip;}
@@ -161,7 +162,7 @@ export function mountPreferences(host, store, editorState = {}, assets = {}, opt
     editorState.category=category;editorState.query=query;content.scrollTop=0;sync();
   }
   const keys=event=>{
-    if(matchesBinding('searchPreferences',event,store.value)||matchesBinding('clearSearch',event,store.value)){
+    if(search&&(matchesBinding('searchPreferences',event,store.value)||matchesBinding('clearSearch',event,store.value))){
       event.preventDefault();event.stopPropagation();
       if(matchesBinding('clearSearch',event,store.value)){query='';search.value='';renderContent();}search.focus();search.select();
     }
@@ -171,5 +172,5 @@ export function mountPreferences(host, store, editorState = {}, assets = {}, opt
   const unsubscribe=store.subscribe(sync);
   const unlisten=onLanguageChange(()=>{shell();renderContent();});
   shell();renderContent();
-  return { focusSearch(clear=false){if(clear){query='';search.value='';renderContent();}search.focus();search.select();}, dispose(){unsubscribe();unlisten();host.removeEventListener('keydown',keys);} };
+  return { focusSearch(clear=false){if(!search)return;if(clear){query='';search.value='';renderContent();}search.focus();search.select();}, dispose(){unsubscribe();unlisten();host.removeEventListener('keydown',keys);} };
 }

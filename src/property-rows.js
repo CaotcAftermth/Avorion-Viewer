@@ -1,7 +1,7 @@
 // Blender-style Properties rows: right-aligned label column, control column, checkbox text after the box.
 // Panels build rows in several shapes (span + control, bare text + control, checkbox before or after text),
 // so rows are normalized after they are added rather than in every panel module.
-const isControl=n=>n.nodeType===1&&!(n.tagName==='SPAN'&&!n.querySelector('input,select,textarea,button,output'));
+const isControl=n=>n.nodeType===1&&n.tagName!=='MARK'&&!(n.tagName==='SPAN'&&!n.querySelector('input,select,textarea,button,output'));
 
 function layoutRow(row){
   if(row.dataset.layout){

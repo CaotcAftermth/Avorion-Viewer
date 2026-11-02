@@ -39,6 +39,7 @@ import { mountPreferences } from './preferences-editor.js';
 import { setLanguage, onLanguageChange, t, translateDom } from './i18n.js';
 import { ensureCamera, orbit, pan, zoom, dolly, alignView, opposite, frameBounds, navigationKey, viewLabel, REFERENCE_VERTICES } from './navigation.js';
 import { layoutPropertyRows } from './property-rows.js';
+import { applyPropertySearch, searchTerms } from './property-search.js';
 import { addLog, reportError, logEntries, onLog, clearLog, errorCount, installGlobalErrorCapture } from './app-log.js';
 import { APP_VERSION } from './version.js';
 import { openFeedback, openAbout } from './feedback.js';
@@ -580,7 +581,16 @@ function headerFor(node){
     header.querySelector('input').maxLength=1000;
     header.querySelector('input').addEventListener('input',e=>{node.search=e.target.value;renderers.find(r=>r.outlinerId===node.id)?.search();save();});header.querySelector('input').value=node.search||'';
   }else if(node.editor==='properties'){
-    const search=document.createElement('input');search.type='search';search.className='property-search';search.placeholder='Search';search.setAttribute('aria-label','Search properties');search.value=node.propertySearch||'';search.maxLength=200;search.oninput=()=>{node.propertySearch=search.value;const body=areaElement(node.id)?.querySelector('.area-body');if(body)renderProperties(body,node);save();};header.append(search);
+    const field=document.createElement('span');field.className='property-search-field';
+    const search=document.createElement('input');search.type='search';search.className='property-search';search.placeholder='Search properties';search.setAttribute('aria-label','Search properties, values and settings in every Properties tab');search.title='Find labels and values in every Properties tab. Enter jumps to the next match, Shift+Enter to the previous one, Escape clears.';search.value=node.propertySearch||'';search.maxLength=200;search.spellcheck=false;search.autocomplete='off';
+    const count=document.createElement('span');count.className='property-search-count';count.setAttribute('role','status');count.hidden=true;
+    const rerender=()=>{const body=areaElement(node.id)?.querySelector('.area-body');if(body)renderProperties(body,node);};
+    search.oninput=()=>{node.propertySearch=search.value;save();clearTimeout(propertySearchTimer);propertySearchTimer=setTimeout(rerender,120);};
+    search.onkeydown=e=>{
+      if(e.key==='Enter'){e.preventDefault();clearTimeout(propertySearchTimer);if(propertySearchResults.get(node.id)?.query!==search.value)rerender();stepPropertySearch(node,e.shiftKey?-1:1);}
+      else if(e.key==='Escape'&&search.value){e.preventDefault();e.stopPropagation();search.value='';node.propertySearch='';save();clearTimeout(propertySearchTimer);rerender();}
+    };
+    field.append(search,count);header.append(field);
     const spacer=document.createElement('span');spacer.className='spacer';header.append(spacer);
   }else{
     header.insertAdjacentHTML('beforeend',`<span class="header-name">${escape(t(EDITORS[node.editor]))}</span><span class="spacer"></span>`);
@@ -751,19 +761,14 @@ function openCapture(imageType){
  openExportDialog(scene,node.view,ids=>selectStructure(ids),{imageType,preferences:preferences.value,canvas:areaElement(node.id)?.querySelector('canvas')});
 }
 function syncSceneProperties(){document.querySelectorAll('.scene-properties').forEach(el=>el.refresh?.());}
-function renderProperties(body,node){
-  if(assetDraft){mountAssetProperties(body,node,assetDraft,scene,()=>{scene.blockTransforms=assetPoseTransforms(assetDraft);scene.appearanceRevision=(scene.appearanceRevision||0)+1;scene.appearanceDirty=new Set(scene.model.blocks.map(b=>b.id));refreshStructure();});layoutPropertyRows(body.querySelector('.property-content'));return;}
-  const previous=body.querySelector('.property-content'),scroll=previous?{top:previous.scrollTop,left:previous.scrollLeft}:null;
-  body.innerHTML='<div class="property-layout"><nav class="property-tabs" aria-label="Properties categories"></nav><div class="property-content"></div></div>';
-  const tab=node.propertyTab||'object';
-  for(const [name,ico,label] of [['object','cube','Object properties'],['scene','scene','Scene properties'],['world','world','World sky'],['shaders','rendered','Shaders'],['turrets','turret','Turrets'],['workspace','properties','Workspace settings']]){const b=button(label,icon(ico),()=>{node.propertyTab=name;commit();areaElement(node.id)?.querySelector('.property-tabs .active')?.focus();},tab===name?'active':'');b.setAttribute('aria-pressed',String(tab===name));body.querySelector('nav').append(b);}
-  const content=body.querySelector('.property-content');
+const PROPERTY_TABS=[['object','cube','Object properties'],['scene','scene','Scene properties'],['world','world','World sky'],['shaders','rendered','Shaders'],['turrets','turret','Turrets'],['workspace','properties','Workspace settings']];
+function mountPropertyTab(tab,content,node,searching=false){
   if(tab==='object')mountBlockInspector(content,scene,(change)=>{if(change?.appearance){refreshStructure();return;}scene.model={...makeModel(scene.model.blocks,scene.model.fileName),turretMounts:scene.model.turretMounts};scene.revision++;render();},{reveal:revealStructure,preferences});
   if(tab==='turrets')mountTurretProperties(content,scene,refreshStructure,socket=>{const node=leaves(workspace().root).find(n=>n.editor==='viewport');const canvas=node&&areaElement(node.id)?.querySelector('canvas');return !!canvas&&socketExposed(scene,node.view,canvas.clientWidth,canvas.clientHeight,socket,preferences.value);},(direction,bounds)=>{const viewport=captureViewport();if(viewport){if(direction==='coverage'){viewport.view.target=nativeToView(bounds.center);viewport.view.zoom=3/Math.max(.1,bounds.radius);viewport.view.panX=viewport.view.panY=0;save();renderers.find(r=>r.id===viewport.id)?.draw();}else{viewport.view.projection='orthographic';setView(viewport,direction);}}});
-  // World and Shaders edit live preferences beside an unobscured viewport.
+  // World and Shaders edit live preferences beside an unobscured viewport. The Properties search covers them, so they have no search bar of their own.
   if(tab==='world'||tab==='shaders'){
     if(!lookEditors.has(node.id+tab))lookEditors.set(node.id+tab,{});
-    const panel=mountPreferences(content,preferences,lookEditors.get(node.id+tab),assetActions,{sections:[sectionById(tab)],compact:true});
+    const panel=mountPreferences(content,preferences,searching?{}:lookEditors.get(node.id+tab),assetActions,{sections:[sectionById(tab)],compact:true,searchbar:false});
     renderers.push({dispose:()=>panel.dispose()});
   }
   if(tab==='scene')mountSceneProperties(content,scene,{getView:()=>captureViewport()?.view,preferences,capture:openCapture,textureStatus});
@@ -771,12 +776,73 @@ function renderProperties(body,node){
     content.innerHTML=`<div class="property-breadcrumb">${icon('properties')}Workspace</div><details class="panel" open><summary>Window system</summary><div class="field-row"><span>Workspace</span><span>${escape(workspace().name)}</span></div><div class="field-row"><span>Editor areas</span><span>${leaves(workspace().root).length}</span></div><div class="field-row"><span>Storage</span><span>This browser</span></div><p class="panel-note">Drag area borders to resize. Right-click a header or border to split, join, swap, or maximize an editor.</p><button class="setting-button" data-reset>Reset workspace layout</button></details><div class="app-title-panel"><span class="eyebrow" data-no-translate>AVORION VIEWER ${APP_VERSION}</span><h3>${escape(scene.model?.fileName||'No model loaded')}</h3><p>${scene.model?`${scene.model.blocks.length} blocks`:'Open an Avorion XML model from the File menu.'}</p></div>`;
     content.querySelector('[data-reset]').onclick=resetWorkspace;
   }
+}
+// Search mounts every tab as a result group, then filters rows by label, panel title and current value.
+function filterProperties(body,node){
+  const content=body.querySelector('.property-content');if(!content)return;
+  const query=node.propertySearch||'',groups=[...content.querySelectorAll('.property-search-group')];
+  const results=[];content.querySelector('.property-search-empty')?.remove();
+  if(groups.length){
+    for(const group of groups){
+      const matches=applyPropertySearch(group.querySelector('.property-search-body'),query,group.dataset.label);
+      group.hidden=!matches.length;results.push(...matches);
+      const tab=body.querySelector(`.property-tabs [data-tab="${group.dataset.tab}"]`);
+      if(tab){tab.classList.toggle('search-match',matches.length>0);tab.classList.toggle('search-empty',!matches.length);tab.dataset.count=matches.length>99?'99+':String(matches.length);tab.title=`${t(group.dataset.label)} · ${matches.length} ${matches.length===1?'match':'matches'}`;}
+    }
+  }else results.push(...applyPropertySearch(content,query));
+  if(searchTerms(query).length&&!results.length){const empty=document.createElement('p');empty.className='panel-note property-search-empty';empty.textContent=`No properties match “${query.trim()}”.`;content.append(empty);}
+  propertySearchResults.set(node.id,{results,index:-1,query});
+  updatePropertySearchCount(node);
+}
+const propertySearchResults=new Map();
+function updatePropertySearchCount(node){
+  const count=areaElement(node.id)?.querySelector('.property-search-count');if(!count)return;
+  const state=propertySearchResults.get(node.id),searching=searchTerms(node.propertySearch||'').length>0,total=state?.results.length||0;
+  count.hidden=!searching;
+  count.textContent=!total?'No results':state.index<0?`${total} ${total===1?'match':'matches'}`:`${state.index+1} / ${total}`;
+  count.classList.toggle('is-empty',searching&&!total);
+}
+// Enter / Shift+Enter in the search field steps through results and scrolls each into view.
+function stepPropertySearch(node,direction){
+  const state=propertySearchResults.get(node.id);if(!state?.results.length)return;
+  const live=state.results.filter(el=>el.isConnected);if(!live.length)return;state.results=live;
+  state.results[state.index]?.classList.remove('property-search-current');
+  state.index=(state.index+direction+live.length)%live.length;
+  const target=live[state.index];target.classList.add('property-search-current');
+  target.scrollIntoView({block:'center',behavior:'smooth'});
+  updatePropertySearchCount(node);
+}
+let propertySearchTimer=0;
+function renderProperties(body,node){
+  if(assetDraft){mountAssetProperties(body,node,assetDraft,scene,()=>{scene.blockTransforms=assetPoseTransforms(assetDraft);scene.appearanceRevision=(scene.appearanceRevision||0)+1;scene.appearanceDirty=new Set(scene.model.blocks.map(b=>b.id));refreshStructure();});layoutPropertyRows(body.querySelector('.property-content'));filterProperties(body,node);return;}
+  const previous=body.querySelector('.property-content'),scroll=previous?{top:previous.scrollTop,left:previous.scrollLeft}:null;
+  body.innerHTML='<div class="property-layout"><nav class="property-tabs" aria-label="Properties categories"></nav><div class="property-content"></div></div>';
+  const tab=node.propertyTab||'object',searching=searchTerms(node.propertySearch||'').length>0;
+  const content=body.querySelector('.property-content');
+  for(const [name,ico,label] of PROPERTY_TABS){
+    const b=button(label,icon(ico),()=>{
+      // While searching, a tab jumps to its results; otherwise it opens the tab.
+      if(searching){content.querySelector(`.property-search-group[data-tab="${name}"]:not([hidden])`)?.scrollIntoView({block:'start',behavior:'smooth'});return;}
+      node.propertyTab=name;commit();areaElement(node.id)?.querySelector('.property-tabs .active')?.focus();
+    },tab===name&&!searching?'active':'');
+    b.dataset.tab=name;b.setAttribute('aria-pressed',String(tab===name&&!searching));body.querySelector('nav').append(b);
+  }
+  if(searching){
+    content.classList.add('property-search-results');
+    for(const [name,ico,label] of PROPERTY_TABS){
+      const group=document.createElement('section');group.className='property-search-group';group.dataset.tab=name;group.dataset.label=label;
+      const heading=document.createElement('h2');heading.className='property-search-heading';heading.innerHTML=icon(ico);const title=document.createElement('span');title.textContent=t(label);heading.append(title);
+      // Opening a result group leaves search on that tab.
+      const open=document.createElement('button');open.type='button';open.className='property-search-open';open.textContent='Open tab';open.title=`Clear the search and open ${t(label)}`;open.onclick=()=>{node.propertySearch='';node.propertyTab=name;commit();};heading.append(open);
+      const host=document.createElement('div');host.className='property-search-body';group.append(heading,host);content.append(group);
+      try{mountPropertyTab(name,host,node,true);}catch(error){reportError(error,'Properties search');host.replaceChildren();}
+    }
+  }else mountPropertyTab(tab,content,node);
   wireTabs(body.querySelector('.property-tabs'),content);
   layoutPropertyRows(content);
-  const query=(node.propertySearch||'').trim().toLowerCase();
-  wirePanels(content,node,tab+':',!!query);
-  if(query){let matches=0;for(const panel of content.querySelectorAll('details.panel')){const match=panel.textContent.toLowerCase().includes(query);panel.hidden=!match;if(match){panel.open=true;matches++;}}if(!matches){const empty=document.createElement('p');empty.className='panel-note';empty.textContent='No matching properties in this category.';content.append(empty);}}
-  if(scroll){content.scrollTop=scroll.top;content.scrollLeft=scroll.left;}
+  wirePanels(content,node,tab+':',searching);
+  filterProperties(body,node);
+  if(scroll&&!searching){content.scrollTop=scroll.top;content.scrollLeft=scroll.left;}
 }
 
 function siblingOf(node){const p=parentOf(workspace().root,node.id);if(!p)return null;const sibling=p.first.id===node.id?p.second:p.first;return sibling.type==='area'?sibling:null;}
@@ -861,6 +927,12 @@ document.addEventListener('keydown',e=>{
     e.preventDefault();const navigating=renderers.find(r=>r.navigating);
     if(navigating){navigating.cancel();return;}
     cancelOperation();closeMenu();if(maximized){maximized=null;focusMode=false;render();}return;
+  }
+  // Ctrl+F (Search Preferences binding) also finds things in a Properties editor, even from one of its fields.
+  if(match('searchPreferences')||match('clearSearch')){
+    const active=e.target.closest?.('[data-editor=properties]')?find(workspace().root,e.target.closest('[data-editor=properties]').dataset.areaId):currentArea();
+    const search=active?.editor==='properties'&&areaElement(active.id)?.querySelector('.property-search');
+    if(search){e.preventDefault();if(match('clearSearch')&&search.value){search.value='';active.propertySearch='';save();const body=areaElement(active.id)?.querySelector('.area-body');if(body)renderProperties(body,active);}search.focus();search.select();return;}
   }
   if(e.target.closest('input,textarea,select,[contenteditable=true]'))return;
   if(match('undoPaint')||match('redoPaint')){e.preventDefault();const active=currentArea();if(active.view?.interactionMode==='socket'&&active.editor==='viewport'||active.editor==='properties'&&active.propertyTab==='turrets'||active.editor==='outliner'&&scene.selectedTurretId){mountHistory(scene,match('redoPaint'));refreshStructure();}else changePaintHistory(match('redoPaint'));return;}
