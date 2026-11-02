@@ -496,3 +496,4 @@ canvas.paint-mode{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org
 .material-color-swatch{aspect-ratio:1;padding:0;min-width:0;border:1px solid #777;border-radius:2px}
 .material-color-swatch:hover,.material-color-swatch:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .material-color-swatch[aria-pressed="true"]{box-shadow:inset 0 0 0 2px #fff,inset 0 0 0 3px #222}
+.feedback-submit{border-top:1px solid #555;margin-top:12px;padding-top:8px;font-size:12px}.feedback-images{display:flex;flex-wrap:wrap;gap:8px}.feedback-images figure{margin:0;max-width:140px}.feedback-images img{max-width:140px;max-height:100px;object-fit:contain}.feedback-images figcaption{font-size:11px;color:#bbb}.feedback-dialog .dialog-actions{flex-wrap:wrap}.feedback-status{overflow-wrap:anywhere}.feedback-status a{color:#a8cff4}
