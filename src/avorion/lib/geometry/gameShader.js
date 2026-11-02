@@ -351,6 +351,8 @@ void main() {
     if (surface == 6.0) mask = vec4(0.0); // framework mask is not secondary paint
     vec3 secondary = mix(vColor.rgb * uSecondaryFactor, vSecondary.rgb, vSecondary.a);
     col = mix(col, base.rgb * secondary, mask.a);
+    // Vivid Colors hull: in-game, Trinium Vivid measured ~17% brighter than Blank Hull at the same color.
+    if (surface == 29.0) col *= 1.17;
     col = mix(col, materialOverlay.rgb, materialOverlay.a);
     // overlay decal
     vec4 overlay = sampleTri(uAux, vLayers.w, p, w);

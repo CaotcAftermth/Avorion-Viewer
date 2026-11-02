@@ -12,6 +12,7 @@ import {mountSceneProperties} from './scene-properties.js';
 import {openExportDialog} from './export/dialog.js';
 import {renderPaletteRadial} from './palette-radial.js';
 import {mountPaintToolbar} from './paint-toolbar.js';
+import {INTERACTION_MODES,interactionMode,nextInteractionMode} from './interaction-modes.js';
 import {paintOptions,paintScope,samplePaintColor,applyPaintTool,channelColor,mirroredIds} from './paint-tools.js';
 import {blockIndex} from './block-colors.js';
 import {loadPalette} from './color-palette.js';
@@ -412,7 +413,7 @@ function viewportPaint(phase,data,node){
   return {ids,outlineIds:o.tool==='eyedropper'?data:ids.length?ids:data,locked:o.tool!=='eyedropper'&&!ids.length,text:b?`${b.id} · ${value||'No secondary color'} · ${intent} · ${o.tool==='eyedropper'?'':ids.length?targets:'Locked by scope'}`:'Hover a block to preview.'};
  }
  if(phase==='begin'){
-  if(!scene.loaded||!scene.model||!brushPalette||scene.paintBusy)return false;
+  if(o.tool==='select'||!scene.loaded||!scene.model||!brushPalette||scene.paintBusy)return false;
   const allowed=scopedPaintIds(node);
   if(!allowed.size&&o.tool!=='eyedropper'){scene.paintMessage='Paint scope is empty. Select blocks or choose a populated region.';refreshStructure();return false;}
   if(!beginPaintStroke(scene))return false;
@@ -533,7 +534,7 @@ function headerFor(node){
   const header=document.createElement('header');header.className='area-header';
   const picker=button('Editor type',`${icon(editorIcon(node.editor))}<span class="chevron">⌄</span>`,()=>anchorMenu(picker,'Editor type',Object.entries(EDITORS).map(([id,label])=>({label:`${id===node.editor?'✓  ':''}${label}`,action:()=>{node.editor=id;commit(`Editor changed to ${label}.`);}}))),'editor-switch');header.append(picker);
   if(node.editor==='viewport'){
-    const mode=document.createElement('select');mode.className='header-name';mode.setAttribute('aria-label','Interaction mode');mode.add(new Option('Object Mode','object'));mode.add(new Option('Paint Mode','paint'));mode.add(new Option('Select Sockets','socket'));mode.value=['paint','socket'].includes(node.view.interactionMode)?node.view.interactionMode:'object';mode.title='Object: drag to box select, Ctrl-drag to subtract. Paint: drag to paint blocks with the active Color Editor color; Escape cancels the stroke.';mode.onchange=()=>{renderers.find(r=>r.id===node.id)?.cancel();cancelPaintTask();node.view.interactionMode=mode.value;commit();};header.append(mode);
+    const mode=document.createElement('select');mode.className='header-name';mode.setAttribute('aria-label','Interaction mode');for(const [id,label] of INTERACTION_MODES)mode.add(new Option(label,id));mode.value=interactionMode(node.view.interactionMode);mode.title='Tab cycles modes. Object: drag to box select, Ctrl-drag to subtract. Paint: drag to paint blocks with the active Color Editor color; Escape cancels the stroke. Socket: select turret sockets and mounted turrets.';mode.onchange=()=>{renderers.find(r=>r.id===node.id)?.cancel();cancelPaintTask();node.view.interactionMode=mode.value;commit();};header.append(mode);
     const divider=document.createElement('span');divider.className='header-divider';header.append(divider);
     const view=button('View menu','View',()=>anchorMenu(view,'View',[
       {label:'Frame all',key:shortcut('frame'),action:()=>frameArea(node)},
@@ -857,7 +858,7 @@ document.addEventListener('keydown',e=>{
   if(match('saveLayout')){e.preventDefault();saveNow();notify(!preferences.value.rememberLayout?'Layout saving is paused in Preferences.':storageAvailable?'Layout saved in this browser.':'Browser storage is unavailable.');return;}
   if(match('previousWorkspace')||match('nextWorkspace')){e.preventDefault();const i=state.workspaces.findIndex(w=>w.id===state.active);switchWorkspace(state.workspaces[(i+(match('nextWorkspace')?1:-1)+state.workspaces.length)%state.workspaces.length].id);return;}
   if(!$('#menu').hidden||node.editor!=='viewport')return;
-  if(match('toggleMode')&&!e.target.closest('button,[role=dialog]')){e.preventDefault();if(e.repeat)return;renderers.find(r=>r.id===node.id)?.cancel();cancelPaintTask();node.view.interactionMode=node.view.interactionMode==='paint'?'object':'paint';commit();return;}
+  if(match('toggleMode')&&!e.target.closest('button,[role=dialog]')){e.preventDefault();if(e.repeat)return;renderers.find(r=>r.id===node.id)?.cancel();cancelPaintTask();node.view.interactionMode=nextInteractionMode(node.view.interactionMode);commit();return;}
   const command=navigationKey(e,preferences.value);
   if(command){e.preventDefault();navigate(node,command);return;}
   if(match('sidebar')){e.preventDefault();node.sidebar=!node.sidebar;commit();}

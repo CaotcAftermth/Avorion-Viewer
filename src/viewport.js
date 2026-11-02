@@ -217,9 +217,11 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     if (matchesBinding('cancelMouse',event,getPreferences(),'Mouse'+event.button) && (drag||regionMode)) {event.preventDefault();cancel();return;}
     if (drag) return;
     const regionIn=matchesBinding('regionIn',event,getPreferences(),'Mouse'+event.button),regionOut=matchesBinding('regionOut',event,getPreferences(),'Mouse'+event.button);
-    const additiveSelect=scene.model&&view.tool==='select'&&(event.ctrlKey||event.metaKey)&&matchesBinding('selectClick',{...event,ctrlKey:false,metaKey:false,shiftKey:event.shiftKey,altKey:event.altKey},getPreferences(),'Mouse'+event.button);
+    // Paint Mode's Select tool box-selects like Object Mode, so paint scope can target the selection.
+    const paintSelect=view.interactionMode==='paint'&&paintOptions(view).tool==='select';
+    const additiveSelect=scene.model&&(view.tool==='select'||paintSelect)&&(event.ctrlKey||event.metaKey)&&matchesBinding('selectClick',{...event,ctrlKey:false,metaKey:false,shiftKey:event.shiftKey,altKey:event.altKey},getPreferences(),'Mouse'+event.button);
     const plainLeft=event.button===0&&!event.altKey&&!event.shiftKey;
-    const mode=regionMode?(regionIn||regionOut?'region':null):forcedMode||(plainLeft?(view.interactionMode==='paint'?'paint':event.ctrlKey||event.metaKey?'select':dragMode(event,view.tool,getPreferences())):(additiveSelect?'select':dragMode(event,view.tool,getPreferences())));
+    const mode=regionMode?(regionIn||regionOut?'region':null):forcedMode||(plainLeft?(view.interactionMode==='paint'?(paintSelect?'select':'paint'):event.ctrlKey||event.metaKey?'select':dragMode(event,view.tool,getPreferences())):(additiveSelect?'select':dragMode(event,view.tool,getPreferences())));
     if(!mode)return;
     if(mode==='paint'&&!onPaint('begin'))return;
     if(event.button===2)suppressContext=true;
@@ -243,7 +245,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   function paintAt(x,y,batch){if(x<0||y<0||x>width||y>height)return;sampleBrush(x,y,drag.painted,batch);}
   function updatePaintPreview(){
     paintPreview=null;
-    if(view.interactionMode==='paint'&&paintPointer&&scene.model&&(!drag||drag.mode==='paint')){
+    if(view.interactionMode==='paint'&&paintOptions(view).tool!=='select'&&paintPointer&&scene.model&&(!drag||drag.mode==='paint')){
       const point=magnifier?lensPoint(...paintPointer):paintPointer;
       if(point)paintPreview={point,...(onPaint('preview',brushTargets(...point))||{ids:[],text:''})};
     }

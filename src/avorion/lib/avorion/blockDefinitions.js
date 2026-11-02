@@ -10,7 +10,9 @@
 //
 // Display names for functional blocks are community-derived and may drift
 // between game versions; shapes (which drive rendering) are the verified
-// part. Unknown indices render as placeholder boxes, are flagged in
+// part. Hull pattern family names (Alternate Pattern, Vivid Colors, White /
+// Dark Stripes) follow the game's own block-name strings, read in index order
+// from test-results/native-block-types.txt. Unknown indices render as placeholder boxes, are flagged in
 // Diagnostics, and their XML is preserved untouched on export.
 // ---------------------------------------------------------------------------
 const DEFS = new Map();
@@ -39,16 +41,16 @@ family("Glass", "Decorative", [170, 171, 172, 173, 174, 175, 176, 177]);
 family("Reflector", "Decorative", [180, 181, 182, 183, 184, 195, 196, 201]);
 family("Stone", "Asteroid", [4, 185, 186, 187, 188, 197, 198, 202]);
 family("Hologram", "Decorative", [190, 191, 192, 193, 194, 199, 200, 203], { emissive: true });
-family("Hull Alt A", "Structure", [210, 211, 212, 213, 214, 215, 216, 217]);
-family("Hull Alt B", "Structure", [220, 221, 222, 223, 224, 225, 226, 227]);
+family("Hull (Alternate Pattern A)", "Structure", [210, 211, 212, 213, 214, 215, 216, 217]);
+family("Hull (Alternate Pattern B)", "Structure", [220, 221, 222, 223, 224, 225, 226, 227]);
 family("Armor (Camo)", "Defense", [230, 231, 232, 233, 234, 235, 236, 237]);
-family("Hull (Vivid)", "Structure", [240, 241, 242, 243, 244, 245, 246, 247]);
-family("Hull (Stripes A)", "Structure", [250, 251, 252, 253, 254, 255, 256, 257]);
-family("Hull (Stripes B)", "Structure", [260, 261, 262, 263, 264, 265, 266, 267]);
-family("Hull (Stripes C)", "Structure", [270, 271, 272, 273, 274, 275, 276, 277]);
-family("Hull (Dark A)", "Structure", [280, 281, 282, 283, 284, 285, 286, 287]);
-family("Hull (Dark B)", "Structure", [290, 291, 292, 293, 294, 295, 296, 297]);
-family("Hull (Dark C)", "Structure", [300, 301, 302, 303, 304, 305, 306, 307]);
+family("Hull (Vivid Colors)", "Structure", [240, 241, 242, 243, 244, 245, 246, 247]);
+family("Hull (White Stripes A)", "Structure", [250, 251, 252, 253, 254, 255, 256, 257]);
+family("Hull (White Stripes B)", "Structure", [260, 261, 262, 263, 264, 265, 266, 267]);
+family("Hull (White Stripes C)", "Structure", [270, 271, 272, 273, 274, 275, 276, 277]);
+family("Hull (Dark Stripes A)", "Structure", [280, 281, 282, 283, 284, 285, 286, 287]);
+family("Hull (Dark Stripes B)", "Structure", [290, 291, 292, 293, 294, 295, 296, 297]);
+family("Hull (Dark Stripes C)", "Structure", [300, 301, 302, 303, 304, 305, 306, 307]);
 family("Scaffold", "Structure", [310, 311, 312, 313, 314, 315, 316, 317]);
 family("Rich Stone", "Asteroid", [510, 511, 512, 513, 514, 515, 516, 517]);
 family("Super Rich Stone", "Asteroid", [520, 521, 522, 523, 524, 525, 526, 527]);

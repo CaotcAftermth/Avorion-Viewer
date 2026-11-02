@@ -102,7 +102,7 @@ export default {
  "Cancel / Restore Area": "取消 / 还原区域",
  "Search Preferences": "搜索偏好设置",
  "Clear Preference Search": "清除偏好设置搜索",
- "Toggle Object / Paint Mode": "切换对象 / 涂装模式",
+ "Cycle Object / Paint / Socket Mode": "循环切换对象 / 涂装 / 插槽模式",
  "Toggle Toolbar": "切换工具栏",
  "Toggle Sidebar": "切换侧边栏",
  "Select All": "全选",

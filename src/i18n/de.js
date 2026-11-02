@@ -102,7 +102,7 @@ export default {
  "Cancel / Restore Area": "Abbrechen / Bereich wiederherstellen",
  "Search Preferences": "Einstellungen durchsuchen",
  "Clear Preference Search": "Einstellungssuche leeren",
- "Toggle Object / Paint Mode": "Objekt- / Malmodus umschalten",
+ "Cycle Object / Paint / Socket Mode": "Objekt- / Mal- / Sockelmodus wechseln",
  "Toggle Toolbar": "Werkzeugleiste umschalten",
  "Toggle Sidebar": "Seitenleiste umschalten",
  "Select All": "Alles auswählen",

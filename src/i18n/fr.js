@@ -102,7 +102,7 @@ export default {
  "Cancel / Restore Area": "Annuler / restaurer la zone",
  "Search Preferences": "Rechercher dans les préférences",
  "Clear Preference Search": "Effacer la recherche des préférences",
- "Toggle Object / Paint Mode": "Basculer mode Objet / Peinture",
+ "Cycle Object / Paint / Socket Mode": "Alterner mode Objet / Peinture / Emplacements",
  "Toggle Toolbar": "Basculer la barre d’outils",
  "Toggle Sidebar": "Basculer la barre latérale",
  "Select All": "Tout sélectionner",

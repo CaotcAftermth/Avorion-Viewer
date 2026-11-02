@@ -48,7 +48,7 @@ const range8 = (start) => Array.from({ length: 8 }, (_, i) => start + i);
 fam(HULL, 0, 1, 2, 100, 101, 102, 103, 108, 109, 112, 121, 122, 123, 124, 125, 126, 127, 128, 129);
 fam(HULL_A, ...range8(210)); // Hull alternate A
 fam(HULL_B, ...range8(220)); // Hull alternate B
-fam(HULL, ...range8(240)); // Vivid
+fam({ ...HULL, kind: "Hull (vivid colors)", surface: "vivid" }, ...range8(240)); // Vivid Colors: same plating, brighter paint
 ["stripes-a", "stripes-b", "stripes-c", "dark-a", "dark-b", "dark-c"].forEach((surface, i) => fam({ ...STRIPES, surface }, ...range8(250 + i * 10)));
 fam(ARMOR, 8, 104, 105, 106, 107, 110, 111, 113);
 fam(ARMOR_A, ...range8(230));

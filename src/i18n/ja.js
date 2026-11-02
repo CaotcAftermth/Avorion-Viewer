@@ -102,7 +102,7 @@ export default {
  "Cancel / Restore Area": "キャンセル / エリアを元に戻す",
  "Search Preferences": "設定を検索",
  "Clear Preference Search": "設定の検索をクリア",
- "Toggle Object / Paint Mode": "オブジェクト / ペイントモードを切り替え",
+ "Cycle Object / Paint / Socket Mode": "オブジェクト / ペイント / ソケットモードを切り替え",
  "Toggle Toolbar": "ツールバーを切り替え",
  "Toggle Sidebar": "サイドバーを切り替え",
  "Select All": "すべて選択",

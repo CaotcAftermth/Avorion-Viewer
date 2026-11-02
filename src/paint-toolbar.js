@@ -5,7 +5,7 @@ import {setDisabled} from './control-state.js';
 import {icon} from './icons.js';
 import {popover,closeViewportPopover} from './viewport-controls.js';
 
-const tools=[['brush','Brush','paintBrush'],['eyedropper','Eyedropper','eyedropper'],['replace','Replace Color with Selected','replaceColor'],['fill','Connected Fill','fillPaint'],['restore','Restore','restorePaint']];
+const tools=[['select','Select','select'],['brush','Brush','paintBrush'],['eyedropper','Eyedropper','eyedropper'],['replace','Replace Color with Selected','replaceColor'],['fill','Connected Fill','fillPaint'],['restore','Restore','restorePaint']];
 export function mountPaintToolbar(body,area,scene,actions){
  const host=document.createElement('div');host.className='paint-tool-settings';host.setAttribute('role','toolbar');host.setAttribute('aria-label','Paint tools');body.append(host);
  const shelf=document.createElement('div');shelf.className='viewport-toolbar paint-tool-shelf';shelf.setAttribute('role','toolbar');shelf.setAttribute('aria-label','Paint tool shelf');shelf.hidden=!area.toolbar;body.append(shelf);
@@ -79,7 +79,7 @@ export function mountPaintToolbar(body,area,scene,actions){
   scene.paintBrush??={colorId:'Dodger Blue',channel:'color',strength:'preserve'};
   if(!built){built=true;build();}
   for(let i=updates.length-1;i>=0;i--){const entry=updates[i];if(entry.node.isConnected||host.contains(entry.node)||shelf.contains(entry.node))entry.fn();else updates.splice(i,1);}
-  status.textContent=scene.paintBusy?'Calculating targets… Escape cancels.':scene.paintSample||scene.paintMessage||'LMB paint · MMB palette / drag orbit · hold RMB magnifier';status.title=status.textContent;
+  status.textContent=scene.paintBusy?'Calculating targets… Escape cancels.':scene.paintSample||scene.paintMessage||(options().tool==='select'?'LMB select / drag box select · Ctrl-drag subtract · MMB palette / drag orbit':'LMB paint · MMB palette / drag orbit · hold RMB magnifier');status.title=status.textContent;
  }
  sync();return {sync,dispose(){closeViewportPopover();host.remove();shelf.remove();status.remove();}};
 }

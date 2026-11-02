@@ -2,7 +2,7 @@ import {blockIndex,secondaryColor} from './block-colors.js';
 import {originalBlockColors,recordBlockColors,paintPaletteColor} from './color-workshop.js';
 import {liveBlocks} from './ship-structure.js';
 
-export const PAINT_TOOLS=['brush','eyedropper','replace','fill','restore'];
+export const PAINT_TOOLS=['select','brush','eyedropper','replace','fill','restore'];
 export function paintOptions(view){
  if(!view.paint||typeof view.paint!=='object'||Array.isArray(view.paint))view.paint={};
  const o=view.paint??={};

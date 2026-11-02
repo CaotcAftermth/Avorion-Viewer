@@ -24,7 +24,7 @@ export const KEYMAPS = [
 
   key('clearSearch','Clear Preference Search','Preferences','Alt+KeyF'),
 
-  key('toggleMode','Toggle Object / Paint Mode','3D Viewport','Tab'),
+  key('toggleMode','Cycle Object / Paint / Socket Mode','3D Viewport','Tab'),
 
   key('toolbar','Toggle Toolbar','3D Viewport','KeyT'),
 

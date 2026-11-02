@@ -102,7 +102,7 @@ export default {
  "Cancel / Restore Area": "Отмена / восстановить область",
  "Search Preferences": "Поиск по настройкам",
  "Clear Preference Search": "Очистить поиск по настройкам",
- "Toggle Object / Paint Mode": "Переключить режим объекта / покраски",
+ "Cycle Object / Paint / Socket Mode": "Переключить режим объекта / покраски / гнёзд",
  "Toggle Toolbar": "Переключить панель инструментов",
  "Toggle Sidebar": "Переключить боковую панель",
  "Select All": "Выделить всё",

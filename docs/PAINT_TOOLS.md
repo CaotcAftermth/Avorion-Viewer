@@ -1,6 +1,6 @@
 # Paint tools and T&E
 
-Choose **Paint Mode** in the viewport header. The left tool shelf selects Brush, Eyedropper, Replace Color, Connected Fill, or Restore. A single settings row below the viewport header holds the named Avorion color, channel, radius, scope, and undo/redo. Palette, symmetry, and magnifier icons open the same style of popover used by viewport shading and overlays. Recent colors and the active palette are in the palette popover. The settings row scrolls horizontally in narrow editors instead of covering the model. When the tool shelf is hidden, the settings row provides a tool picker. Changing colors in either the toolbar or Color Editor updates the shared brush. Browsing other Color Editor tabs does not reset it.
+Choose **Paint Mode** in the viewport header. The left tool shelf selects Select, Brush, Eyedropper, Replace Color, Connected Fill, or Restore. A single settings row below the viewport header holds the named Avorion color, channel, radius, scope, and undo/redo. Palette, symmetry, and magnifier icons open the same style of popover used by viewport shading and overlays. Recent colors and the active palette are in the palette popover. The settings row scrolls horizontally in narrow editors instead of covering the model. When the tool shelf is hidden, the settings row provides a tool picker. Changing colors in either the toolbar or Color Editor updates the shared brush. Browsing other Color Editor tabs does not reset it.
 
 ## Tools
 
