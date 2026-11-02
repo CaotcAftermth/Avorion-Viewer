@@ -170,9 +170,29 @@ export function harmony(palette,base,mode){
 
 }
 
+// Default material paint swatches supplied in Avorion_Material_Colors.xml.
+// Keep source ARGB for provenance; painting retains the existing channel alpha policy.
+export const MATERIAL_COLORS = [
+  ['Iron', 'FFBFAEA3'], ['Titanium', 'BFBFBFBF'], ['Naonite', 'FFA3BFA3'],
+  ['Trinium', 'FFA3AFBF'], ['Xanion', 'FFBFBFA3'], ['Ogonite', 'FFBFADA3'],
+  ['Avorion', 'FFBC9F9F']
+];
+
+export function addMaterialColors(palette){
+  const materials = MATERIAL_COLORS.map(([name, sourceArgb], index) => {
+    const rgb = [2,4,6].map(offset => parseInt(sourceArgb.slice(offset,offset+2),16));
+    const color = {id:name,name,baseName:name,variant:'Base',rgb,hex:'#'+sourceArgb.slice(2),
+      sourceArgb,source:'Avorion_Material_Colors.xml',materialIndex:index,row:null,
+      category:'Materials',wheel:false,...hsl(rgb),ok:perceptual(rgb)};
+    color.variants=[color];return color;
+  });
+  return {...palette,materials,colors:[...palette.colors,...materials],bases:[...palette.bases,...materials],
+    byId:new Map([...palette.byId,...materials.map(color=>[color.id,color])]),categories:[...palette.categories,'Materials']};
+}
+
 let pending;
 
-export function loadPalette(){return pending??=fetch(new URL('./data/avorion-rgb.txt',import.meta.url)).then(r=>{if(!r.ok)throw Error('Local Avorion palette could not be loaded.');return r.text();}).then(parsePalette).catch(error=>{pending=null;throw error;});}
+export function loadPalette(){return pending??=fetch(new URL('./data/avorion-rgb.txt',import.meta.url)).then(r=>{if(!r.ok)throw Error('Local Avorion palette could not be loaded.');return r.text();}).then(parsePalette).then(addMaterialColors).catch(error=>{pending=null;throw error;});}
 
 
 

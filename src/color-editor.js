@@ -203,8 +203,14 @@ export function mountColorEditor(host,area,scene,actions){
 
     const link=node('label','color-link'),checkbox=node('input');checkbox.type='checkbox';checkbox.checked=!!state.link;checkbox.onchange=()=>{state.link=checkbox.checked;if(state.link)pick(chosen(base()));else{save();render();}};link.append(checkbox,node('span','','Link Variants'));link.title='Follow the primary variant where available. Other families retain their current choice.';legend.append(link);parent.append(legend);
 
-    neutralSlider(parent);paletteRow(parent);
-    if(!base().wheel)parent.append(node('p','color-note','Grayscale has no hue harmony. Combine lighter and darker tones for a tonal palette.'));
+    neutralSlider(parent);
+    const materials=node('div','material-color-swatches');materials.setAttribute('role','group');materials.setAttribute('aria-label','Material colors');
+    for(const color of palette.materials){
+      const choice=button('',()=>pick(color),'material-color-swatch');choice.style.background=color.hex;
+      choice.title=color.name;choice.setAttribute('aria-label',color.name);choice.setAttribute('aria-pressed',String(state.activeId===color.id));materials.append(choice);
+    }
+    parent.append(materials);paletteRow(parent);
+    if(!base().wheel)parent.append(node('p','color-note','Neutral and material swatches have no generated hue harmony. Combine them with other palette colors.'));
 
   }
 
@@ -218,7 +224,7 @@ export function mountColorEditor(host,area,scene,actions){
 
     const label=node('label','color-link'),check=node('input');check.type='checkbox';check.checked=!!state.showVariants;check.onchange=()=>{state.showVariants=check.checked;save();renderList();};label.append(check,node('span','','Include variants'));controls.append(label);parent.append(controls);
 
-    parent.append(node('p','color-note','Names and RGB: Avorion rgb.txt. Row is the source row, not a verified game ID. Categories are viewer groupings.'));
+    parent.append(node('p','color-note','Named colors come from Avorion rgb.txt; material defaults come from Avorion_Material_Colors.xml. Row refers only to rgb.txt. Categories are viewer groupings.'));
 
     browserHost=node('div','color-browser-list');parent.append(browserHost);renderList();
 
@@ -238,9 +244,9 @@ export function mountColorEditor(host,area,scene,actions){
 
       const header=node('div','color-list-row color-list-heading');for(const text of ['Name','RGB','Hex','Row'])header.append(node('span','',text));d.append(header);
 
-      for(const color of members){const b=button('',()=>pick(color),'color-list-row');b.setAttribute('aria-label',color.name+' · '+color.hex);b.title=`${color.name} · RGB ${color.rgb.join(' ')} · ${color.hex} · source row ${color.row}`;b.setAttribute('aria-pressed',String(state.activeId===color.id));
+      for(const color of members){const b=button('',()=>pick(color),'color-list-row');b.setAttribute('aria-label',color.name+' · '+color.hex);b.title=`${color.name} · RGB ${color.rgb.join(' ')} · ${color.hex} · ${color.source||`source row ${color.row}`}`;b.setAttribute('aria-pressed',String(state.activeId===color.id));
 
-        const name=node('span','color-list-name');name.append(swatch(color),node('span','',color.name));b.append(name,node('span','',color.rgb.join(' ')),node('span','',color.hex),node('span','',String(color.row)));d.append(b);}
+        const name=node('span','color-list-name');name.append(swatch(color),node('span','',color.name));b.append(name,node('span','',color.rgb.join(' ')),node('span','',color.hex),node('span','',color.row===null?'—':String(color.row)));d.append(b);}
 
     }
 
