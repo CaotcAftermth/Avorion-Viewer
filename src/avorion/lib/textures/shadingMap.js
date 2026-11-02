@@ -33,7 +33,7 @@ const GLASS = { kind: "Glass", albedo: P, normal: `${P}_n`, surface: "glass", ti
 const GLOW = { kind: "Glow", tint: true, emissiveFlat: true };
 const HOLO = { kind: "Hologram", tint: true, surface: "hologram", emissiveFlat: true, translucent: true, reflect: 0 };
 const REFLECTOR = { ...HULL, kind: "Reflector", surface: "reflector", mask: undefined, materialOverlay: undefined, materialGlow: undefined, reflect: 1 };
-const SCAFFOLD = { kind: "Scaffold", albedo: "scaffold", tint: true, cutout: true };
+const SCAFFOLD = { kind: "Scaffold", albedo: "scaffold", surface: "scaffold", tint: true, cutout: true };
 const FRAMEWORK = { kind: "Framework", albedo: P, mask: "framework", surface: "framework", tint: true, cutout: true };
 const WRECK = { ...PLATING, kind: "Wreckage", albedo: P, normal: `${P}_n`, overlay: "wreckage", tint: true, reflect: 0.3 };
 // Functional markings have their own face-local UVs and optional normal map.

@@ -142,6 +142,7 @@ uniform float uNormalStrength;
 uniform float uSharpness;
 uniform float uSecondaryFactor;
 uniform float uGlowStrength;
+uniform float uHologramGlow;
 uniform float uFogStrength;
 uniform vec3 uSelectColor;
 uniform vec3 uPaintColor;
@@ -321,6 +322,8 @@ void main() {
     base = mix(sampleTriScaled(uAlbedo, vLayers.x, p, w, 0.25), sampleTriScaled(uAlbedo, vLayers.x, p, w, 1.25), detail);
   }
   if (surface != 6.0 && hasFlag(flags, 8.0) && base.a < 0.5) discard;
+  // scaffold.bmp has no alpha: its black bars are the holes, like framework.
+  if (surface == 30.0 && max(base.r, max(base.g, base.b)) < 0.08) discard;
   if((surface==8.0||surface==9.0)&&vColor.a<=0.0)discard;
   if(uMaskPass>.5){gl_FragColor=vec4(mod(vParams.w,2.0)>.5?1.0:0.0,1.0,0.0,1.0);return;}
   // Pass 1 is the shadow map (holograms cast none); pass 2 is the translucent depth map.
@@ -423,7 +426,7 @@ void main() {
             + max( N.z, 0.0) * uAmbient[4] + max(-N.z, 0.0) * uAmbient[5];
   lighting += lightSpill(vModelPos, N);
 
-  vec3 outc = hasFlag(flags, 2.0) ? col * (surface == 9.0 ? (1.0 + uGlowStrength) * (.85 + .15 * max(dot(N, -uLightDir), 0.0)) : 2.0 * uGlowStrength) : col * lighting;
+  vec3 outc = hasFlag(flags, 2.0) ? col * (surface == 9.0 ? (.5 + uHologramGlow * uGlowStrength) * (.8 + .2 * max(dot(N, -uLightDir), 0.0)) : 2.0 * uGlowStrength) : col * lighting;
 
   // reflections (fresnel between min/max, times per-type scale)
   vec3 R = reflect(eyeDir, N);
@@ -588,7 +591,7 @@ export function createGameMaterial(albedo, normal, aux, params, transparent = fa
             uMinRefl: { value: 0 }, uMaxRefl: { value: 0 },
             uGloss: { value: 1 }, uSpecular: { value: 0 },
             uNormalStrength: { value: 1 }, uSharpness: { value: 8 },
-            uSecondaryFactor: { value: 0.6 }, uGlowStrength: { value: 1 }, uFogStrength: { value: 0 },
+            uSecondaryFactor: { value: 0.6 }, uGlowStrength: { value: 1 }, uHologramGlow: { value: 1.5 }, uFogStrength: { value: 0 },
             uSelectColor: { value: new THREE.Color().setStyle("#4fd8eb", THREE.LinearSRGBColorSpace) },
             uMirrorOrigin: { value: new THREE.Vector3() },
             uMirrorVisible: { value: new THREE.Vector3() },
@@ -639,6 +642,7 @@ export function applyGameParams(m, p) {
     u.uSharpness.value = Math.max(1, p.triplanarSharpness);
     u.uSecondaryFactor.value = p.secondaryFactor;
     u.uGlowStrength.value = p.glowStrength;
+    u.uHologramGlow.value = p.hologramGlow ?? 1.5;
     u.uFogStrength.value = p.fogStrength;
     u.uSpillStrength.value = p.spillStrength ?? 0;
 }

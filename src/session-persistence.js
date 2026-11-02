@@ -1,5 +1,6 @@
 import {makeModel,parseAvorionXml,placeImportedModel} from './block-model.js';
 import {exportPaintedXml} from './color-workshop.js';
+import {upgradeGalleryColors} from './block-gallery.js';
 
 // Keep large models and original texture blobs out of synchronous localStorage.
 export function openSessionStore(factory=globalThis.indexedDB){
@@ -54,6 +55,7 @@ export function restoreModel(record){
   }else{
     if(!Array.isArray(record.blocks)||!record.blocks.length||record.blocks.some(b=>!['x','y','z'].every(a=>Number.isFinite(b.position?.[a])&&Number.isFinite(b.size?.[a]))))throw new Error('Saved model data is invalid.');
     model=makeModel(record.blocks,record.fileName);
+    if(record.preview)upgradeGalleryColors(model);
   }
   for(const block of model.blocks){const opacity=record.opacityOverrides?.[block.id];if(Number.isFinite(opacity))block.opacity=Math.max(0,Math.min(1,opacity));}
   if(Array.isArray(record.turretMounts))model.turretMounts=record.turretMounts;

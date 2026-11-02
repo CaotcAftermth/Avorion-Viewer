@@ -99,7 +99,7 @@ export function editorTheme(preferences,id) {
 
 PREFERENCE_SECTIONS.push({id:'shaders',label:'Shaders',scope:'render',panels:[
   {label:'Surface',fields:[
-    {key:'shaderColor',label:'Preview Color',type:'color',default:'#a0a0a0',description:'Primary color of the single-block preview. Imported XML colors stay intact.'},
+    {key:'shaderColor',label:'Preview Color',type:'color',default:'#a0a0a0',description:'Primary color of Block Gallery blocks. Imported XML colors stay intact.'},
     {key:'shaderSpecular',label:'Specular Strength',type:'number',min:0,max:2,step:.05,default:.25,suffix:'×',description:'Intensity of the directional light reflection on solid faces.'},
     {key:'shaderRoughness',label:'Roughness',type:'number',min:.05,max:1,step:.05,default:.5,description:'Higher values broaden reflections; lower values produce tighter highlights.'}
   ]},
@@ -130,6 +130,7 @@ PREFERENCE_SECTIONS.find(s=>s.id==='shaders').panels.push(
     {key:'shaderWindowColor',label:'Window Color',type:'color',default:'#ffdba8',description:'Viewer default for crew windows without secondary color. Native runtime default remains uncalibrated.'},
     {key:'shaderWindows',label:'Window Emission',type:'number',min:0,max:3,step:.05,default:1,suffix:'×',description:'Independent crew-window emission, applied after lighting. Explicit XML secondary alpha controls window tint.'},
     {key:'shaderGlow',label:'Glow Strength',type:'number',min:0,max:3,step:.05,default:1,suffix:'×',description:'Surface and effect emission strength.'},
+    {key:'shaderHologramGlow',label:'Hologram Glow',type:'number',min:0,max:2,step:.05,default:1.5,suffix:'×',description:'How much hologram blocks glow. Low values keep their translucent hologram look.'},
     {key:'shaderBloom',label:'Bloom',type:'number',min:0,max:3,step:.05,default:1,suffix:'×',description:'Rendered-mode glow around bright emission, using the game\'s bloom passes. 0 turns it off. Native strength is uncalibrated.'},
     {key:'shaderSpill',label:'Light Spill',type:'number',min:0,max:3,step:.05,default:1,suffix:'×',description:'Rendered-mode light that light blocks and engines cast on nearby hull. 0 turns it off. Native radius and intensity are uncalibrated.'},
     {key:'shaderSpillRadius',label:'Light Spill Radius',type:'number',min:1,max:50,step:.5,default:5,suffix:'u',description:'Distance in native units that spilled light reaches. Light passes through blocks; there are no spill shadows.'},
@@ -208,6 +209,8 @@ export function parsePreferences(raw) {
     if (!validPreference(key, parsed[key])) throw new Error(`Invalid preference: ${key}`);
     result[key] = parsed[key];
   }
+  // 0.1 was the old Hologram Glow default; saved copies of it move to the new default.
+  if (parsed.shaderHologramGlow === .1) result.shaderHologramGlow = FACTORY_PREFERENCES.shaderHologramGlow;
   if(result.clipStart>=result.clipEnd)throw new Error('Clip Start must be less than Clip End');
   return result;
 }

@@ -26,14 +26,14 @@ export function surfaceKind(surface, side) {
     const extra = {
         solar: 7, glass: 8, hologram: 9, "rich-stone": 10, "super-rich-stone": 11,
         "rich-rift": 12, "super-rich-rift": 13, pods: 14, hangar: 15, reflector: 19,
-        "stripes-a": 20, "stripes-b": 21, "stripes-c": 22, "dark-a": 23, "dark-b": 24, "dark-c": 25, vivid: 29,
+        "stripes-a": 20, "stripes-b": 21, "stripes-c": 22, "dark-a": 23, "dark-b": 24, "dark-c": 25, vivid: 29, scaffold: 30,
     };
     // The name faces away from the block's look axis (local -X): Avorion ships
     // point look inward from the hull, so the name reads from outside.
     if (surface === "ship-name")
         return side === 0 ? 16 : 18;
     if (surface === "emblem")
-        return side === 5 ? 17 : 18;
+        return side === 0 ? 17 : 18;
     if (surface && extra[surface])
         return extra[surface];
     return SURFACE_PLAIN;

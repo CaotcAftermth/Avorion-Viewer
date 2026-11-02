@@ -96,7 +96,7 @@ export function gameParams(p) {
     glossyness:2/(p.shaderRoughness*p.shaderRoughness),lightColor:p.shaderLightColor,
     ambientFillColor:p.shaderAmbientColor,ambientIntensity:p.shaderSkyEnabled===false?0:p.shaderSkyAmbient,
     minReflectivity:p.shaderMinReflection,maxReflectivity:Math.max(p.shaderMinReflection,p.shaderMaxReflection),
-    normalStrength:p.shaderNormal,glowStrength:p.shaderGlow,tileScale:p.shaderTileScale,
+    normalStrength:p.shaderNormal,glowStrength:p.shaderGlow,hologramGlow:p.shaderHologramGlow??1.5,tileScale:p.shaderTileScale,
     engineState:p.shaderEngineState??0,thrustPreview:p.shaderThrust,plumeLength:[0,p.shaderCruiseLength??4,p.shaderBoostLength??8.25][p.shaderEngineState??0]??0,barrierStrength:p.shaderBarrier,shadowStrength:0,bloomStrength:0,
     spillStrength:p.shaderSpill??0,spillRadius:p.shaderSpillRadius??5};
 }

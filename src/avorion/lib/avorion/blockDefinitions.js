@@ -24,8 +24,11 @@ const SHAPE_SUFFIX = [
     [" Corner 3", "corner3"], [" Twisted Corner 1", "twisted1"], [" Twisted Corner 2", "twisted2"],
     [" Flat Corner", "flatcorner"],
 ];
+/** Every 8-shape family, in definition order. Indices follow SHAPE_SUFFIX. */
+export const BLOCK_FAMILIES = [];
 /** A full 8-shape family: indices in order cube, edge, c1, c2, c3, tc1, tc2, flat. */
 function family(name, category, idx, extra = {}) {
+    BLOCK_FAMILIES.push({ name, category, indices: [...idx] });
     idx.forEach((i, s) => D(i, name + SHAPE_SUFFIX[s][0], category, SHAPE_SUFFIX[s][1], extra));
 }
 // --- Shape families (verified) ---------------------------------------------
@@ -120,14 +123,15 @@ export function getBlockDefinition(typeIndex) {
 export function isKnownType(typeIndex) {
     return DEFS.has(typeIndex);
 }
+// color: vivid UI/engine-glow color. paint: default hull paint, matched to the in-game material look.
 export const MATERIALS = [
-    { index: 0, name: "Iron", color: "#ffb380" },
-    { index: 1, name: "Titanium", color: "#ffffff" },
-    { index: 2, name: "Naonite", color: "#4dff4d" },
-    { index: 3, name: "Trinium", color: "#4d9aff" },
-    { index: 4, name: "Xanion", color: "#ffff4d" },
-    { index: 5, name: "Ogonite", color: "#ff8133" },
-    { index: 6, name: "Avorion", color: "#ff2626" },
+    { index: 0, name: "Iron", color: "#ffb380", paint: "#ffe9de" },
+    { index: 1, name: "Titanium", color: "#ffffff", paint: "#fbfbff" },
+    { index: 2, name: "Naonite", color: "#4dff4d", paint: "#d9ffdd" },
+    { index: 3, name: "Trinium", color: "#4d9aff", paint: "#dceaff" },
+    { index: 4, name: "Xanion", color: "#ffff4d", paint: "#fffdd6" },
+    { index: 5, name: "Ogonite", color: "#ff8133", paint: "#ffe8d6" },
+    { index: 6, name: "Avorion", color: "#ff2626", paint: "#ffdad9" },
 ];
 export function getMaterial(index) {
     return MATERIALS[index] ?? { index, name: `Material ${index}`, color: "#888888" };

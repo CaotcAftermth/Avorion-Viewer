@@ -17,9 +17,13 @@ export function modelCorners(model) {
   const {min,max}=model.bounds;
   return [min.x,max.x].flatMap(x=>[min.y,max.y].flatMap(y=>[min.z,max.z].map(z=>nativeToView([x,y,z]))));
 }
+// Plain Hull shapes whose silhouette changes with rotation (the cube is skipped):
+// edge, corner 1–3, twisted corner 1–2, flat corner. 2 × 2 × 2 with 1-unit gaps,
+// one row per orientation.
+export const ORIENTATION_GALLERY_TYPES=[123,124,125,126,128,129,127];
 export function orientationGallery() {
-  const types=[2,100,101,102,103,108,109,112];
-  return makeModel(ORIENTATIONS.flatMap((o,row)=>types.map((typeIndex,column)=>makeBlock({...o,typeIndex,id:`b${row*8+column}`,size:{x:2,y:4,z:8},position:{x:(column-3.5)*4+(Math.floor(row/6)-1.5)*36,y:2,z:(row%6-2.5)*10},color:['ffb4c4d4','ffcf997b','ff82b09c'][row%3]}))),'8 shapes × 24 orientations');
+  const types=ORIENTATION_GALLERY_TYPES,pitch=3,columns=types.length,rows=ORIENTATIONS.length;
+  return makeModel(ORIENTATIONS.flatMap((o,row)=>types.map((typeIndex,column)=>makeBlock({...o,typeIndex,id:`b${row*columns+column}`,size:{x:2,y:2,z:2},position:{x:(column-(columns-1)/2)*pitch,y:1,z:(row-(rows-1)/2)*pitch},color:'ff'+MATERIALS[0].paint.slice(1).toLowerCase()}))),`${types.length} shapes × ${rows} orientations`);
 }
 export function repaintRGB(argb,rgb) {
   return (/^[0-9a-f]{8}$/i.test(argb)?argb.slice(0,2):'ff')+rgb.replace(/^#/,'').toLowerCase();

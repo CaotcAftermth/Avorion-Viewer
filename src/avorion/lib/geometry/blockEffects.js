@@ -4,13 +4,16 @@ import { localScaleFor, resolveOrientation } from "../avorion/orientation.js";
 import { thrusterPorts } from "./thrusterPorts.js";
 import { createPortObstruction } from "./portObstruction.js";
 import {secondaryColor} from '../../../block-colors.js';
+import { getMaterial } from "../avorion/blockDefinitions.js";
 // Effects are viewer state. The archive supplies the barrier formula. Engine
 // plume lengths come from in-game observation (fixed per engine state, not
 // scaled by engine size); thruster jets and emitter spacing remain defaults.
 export const HANGAR_TRAVEL_SECONDS = .25;
 export function effectColor(block) {
     if(block.typeIndex===3||block.typeIndex===10){
-        const base=block.typeIndex===10?[.02,.42,1.0]:[.03,.42,1.0],raw=secondaryColor(block);
+        // Engine plumes default to the engine's material color; hangar barriers stay blue.
+        // An explicit secondary color overrides either, weighted by its alpha.
+        const material=getMaterial(block.materialIndex).color,base=block.typeIndex===10?[.02,.42,1.0]:[1,3,5].map(i=>parseInt(material.slice(i,i+2),16)/255),raw=secondaryColor(block);
         const weight=/^[0-9a-f]{8}$/i.test(raw||'')?parseInt(raw.slice(0,2),16)/255:0;
         return new THREE.Color(...base.map((value,i)=>value*(1-weight)+(weight?parseInt(raw.slice(2+i*2,4+i*2),16)/255*weight:0)));
     }
@@ -238,8 +241,8 @@ export function buildBlockEffects(blocks, profile, params) {
           float edge=min(1.0-abs(vUV.x),2.0*min(vUV.y,1.0-vUV.y));
           float rim=1.0-smoothstep(.015,.16,edge);
           float core=1.0-smoothstep(.0,.045,edge);
-          c=mix(vColor*(.78+.22*band),vec3(.15,.9,1.0),rim);
-          c=mix(c,vec3(1.0),core);
+          c=mix(vColor*(.6+.17*band),vec3(.3,.72,1.0),rim);
+          c=mix(c,vec3(.75,.9,1.0),core*.7);
           a=clamp(uBarrier*(.28+.12*band+rim*.6),0.0,1.0);
         }else{vec2 q=vec2(vUV.x,vUV.y*2.0-1.0);float r=length(q);if(r>1.0)discard;
           float flash=1.0;if(vData.x>=6.0){float period=vData.x==8.0?4.0:2.0;

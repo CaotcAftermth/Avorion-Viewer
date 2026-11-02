@@ -26,6 +26,8 @@ import { wireTabs, wirePanels } from './editor-panels.js';
 import { mountShipStructure, liveBlocks, blockIds, blockLabel, simplified, reconcileStructure, selectBlocks, setBlockVisibility, viewportHiddenIds, isThinBlock } from './ship-structure.js';
 import { nativeToView, makeBlock, makeModel, modelCorners, blockFramePoints, orientationGallery, parseAvorionXml, placeImportedModel } from './block-model.js';
 import { mountBlockInspector } from './block-inspector.js';
+import { blockGallery, isBlockGallery, applyGalleryEdit, BLOCK_GALLERY_NAME } from './block-gallery.js';
+import { openBlockWorkspace } from './block-workspace.js';
 import { textureLibrary, releaseGameModel, socketExposed } from './game-renderer.js';
 import { matchesBinding, modifierActive, bindingFor, shortcutLabel, KEYMAPS } from './keymaps.js';
 import { mountViewCube, selectCubeView, homeCubeView, rotatePoleView } from './view-cube.js';
@@ -44,28 +46,29 @@ import { currentLanguage } from './i18n.js';
 
 const $ = selector => document.querySelector(selector);
 const escape = text => String(text).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const embeddedAsset = new URLSearchParams(location.search).get('editor')==='turret';
+const editorParam = new URLSearchParams(location.search).get('editor');
+const embeddedAsset = editorParam==='turret', embeddedBlock = editorParam==='block', embedded = embeddedAsset||embeddedBlock;
 let assetDraft=null;
 const STORAGE = 'avorion-viewer.window-system.v1';
 const preferences=createPreferencesStore({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)});
 const preferenceEditors=new Map(),lookEditors=new Map(),preferencesWindowState={};
 let preferencesWindow=null;
 let state = defaults(), storageAvailable = true;
-try { const raw = !embeddedAsset&&preferences.value.rememberLayout?localStorage.getItem(STORAGE):null; if(raw){const parsed=JSON.parse(raw);if(validateState(parsed))state=parsed;} } catch { storageAvailable=false; }
+try { const raw = !embedded&&preferences.value.rememberLayout?localStorage.getItem(STORAGE):null; if(raw){const parsed=JSON.parse(raw);if(validateState(parsed))state=parsed;} } catch { storageAvailable=false; }
 let lastViewportId=null;
 let hovered = null, maximized = null, focusMode = false, operation = null, renderers = [], toastTimer, saveTimer;
 const scene = { loaded: false, visible: true, selected: false, selectedId:null, selectedIds:new Set(), hiddenIds:new Set(), preview:false, revision:0, model:null };
 let textureStatus='Neutral texture fallback · Load a local texture folder from File';
 installGlobalErrorCapture(window);
 addLog(`Avorion Viewer ${APP_VERSION} ready. Layout changes are saved in this browser.`,'SYSTEM');addLog('No model loaded. Drop an Avorion .xml or use File > Import Avorion XML.','SCENE');
-const assetPersistence=embeddedAsset?{changed(){},start(){},flush(){},stop(){}}:createSessionPersistence({scene,textures:textureLibrary,restored:kind=>{if(kind==='textures'){textureStatus=`${textureLibrary.loadedCount} texture maps - restored locally`;if(textureLibrary.loadedCount)notify(`${textureLibrary.loadedCount} saved texture maps restored.`);}render();log(`${kind==='model'?'Model':'Textures'} restored from this browser.`,'STORAGE');},onError:error=>{notify('Model/texture persistence unavailable. Current session still works.');reportError(error,'STORAGE');}});
+const assetPersistence=embedded?{changed(){},start(){},flush(){},stop(){}}:createSessionPersistence({scene,textures:textureLibrary,restored:kind=>{if(kind==='textures'){scene.revision++;/* rebuild: the restored model was built before its textures finished loading */textureStatus=`${textureLibrary.loadedCount} texture maps - restored locally`;if(textureLibrary.loadedCount)notify(`${textureLibrary.loadedCount} saved texture maps restored.`);}render();log(`${kind==='model'?'Model':'Textures'} restored from this browser.`,'STORAGE');},onError:error=>{notify('Model/texture persistence unavailable. Current session still works.');reportError(error,'STORAGE');}});
 const workspace = () => state.workspaces.find(w => w.id === state.active);
 const currentArea = () => find(workspace().root, hovered) || leaves(workspace().root)[0];
 const areaElement = id => document.querySelector(`[data-area-id="${id}"]`);
 const editorIcon = editor => editor === 'viewport' ? 'cube' : editor;
 function notify(message) { $('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,3200); }
 function saveNow() {
-  if(embeddedAsset)return;
+  if(embedded)return;
   if(!preferences.value.rememberLayout){updateLayoutSaveStatus();return;}
   try { localStorage.setItem(STORAGE,JSON.stringify(state));storageAvailable=true; } catch { storageAvailable=false; }
   updateLayoutSaveStatus();
@@ -176,6 +179,17 @@ function revealStructure(ids,{focus=true,kind}={}){
   if(kind){const first=liveBlocks(scene).find(b=>b.id===ids[0]);notify(ids.length===1?`${kind==='children'?'Child':'Parent'}: ${blockLabel(first)}`:`${ids.length} ${kind==='children'?'child':'parent'} blocks shown and selected.`);}
 }
 
+// Double-clicking a Block Gallery block opens it alone in a workspace window.
+function openGalleryBlock(node){
+  if(embedded||!isBlockGallery(scene)||interactionMode(node.view.interactionMode)!=='object')return;
+  const block=scene.model.blocks.find(b=>b.id===scene.selectedId);if(!block)return;
+  openBlockWorkspace(block,edited=>{
+    applyGalleryEdit(block,edited);
+    scene.model={...makeModel(scene.model.blocks,scene.model.fileName),turretMounts:scene.model.turretMounts};
+    scene.revision++;scene.appearanceRevision=(scene.appearanceRevision||0)+1;
+    commit(`${block.type} updated in the Block Gallery.`);
+  });
+}
 function loadModel(model,preview=false){
   cancelPaintTask();scopeCache=null;scene.paintSample=null;scene.paintMessage='';
   if(!preview)placeImportedModel(model,preferences.value.importPlacement);
@@ -255,7 +269,7 @@ function applyPreferences(){
   const p=preferences.value,theme=THEMES[p.theme];
   if(p.language!==requestedLanguage){requestedLanguage=p.language;void setLanguage(p.language);}
   if(scene.preview&&scene.model&&scene.lastPreviewColor!==p.shaderColor){
-    if(scene.lastPreviewColor!==undefined){scene.model.blocks[0].color=scene.model.blocks[0].color.slice(0,2)+p.shaderColor.slice(1);scene.revision++;}
+    if(scene.lastPreviewColor!==undefined&&!embeddedBlock){for(const b of scene.model.blocks)b.color=b.color.slice(0,2)+p.shaderColor.slice(1);scene.revision++;}
     scene.lastPreviewColor=p.shaderColor;
   }
   document.body.dataset.theme=p.theme;
@@ -302,7 +316,7 @@ function renderTopbar(){
       {label:'Import Avorion XML…',action:importXml},
       {label:'Asset folders…',action:openAssetFolders},
       null,{section:'Save & Export'},
-      {label:'Save preserved XML…',disabled:!scene.model?.doc,disabledReason:'Import an Avorion XML model first. Generated block previews have no original XML to save.',action:saveXml},
+      {label:'Save preserved XML…',disabled:!scene.model?.doc,disabledReason:'Import an Avorion XML model first. The Block Gallery has no original XML to save.',action:saveXml},
       {label:'Advanced Export…',disabled:!scene.loaded||!scene.model,disabledReason:'Load a model first.',action:()=>{renderers.forEach(r=>r.cancel?.());cancelPaintTask();const view=currentArea().editor==='viewport'?currentArea().view:leaves(workspace().root).find(n=>n.editor==='viewport')?.view;openExportDialog(scene,view,ids=>selectStructure(ids),{preferences:preferences.value,canvas:[...document.querySelectorAll('.area[data-editor="viewport"]')].find(el=>find(workspace().root,el.dataset.areaId)?.view===view)?.querySelector('canvas')});}},
       null,{section:'Textures'},
       {label:'Load local texture folder…',action:loadTextures},
@@ -332,8 +346,8 @@ function renderTopbar(){
       {label:'Send feedback…',action:showFeedback},
       {label:'About Avorion Viewer',action:showAbout},
       null,{section:'Developer'},
-      {label:'Load block preview',action:()=>loadModel(makeModel([makeBlock({color:'ff'+preferences.value.shaderColor.slice(1)})]),true)},
-      {label:'Load orientation gallery · 8 × 24',action:()=>loadModel(orientationGallery())}
+      {label:'Load Block Gallery',action:()=>loadModel(blockGallery(),true)},
+      {label:'Load orientation gallery · 7 × 24',action:()=>loadModel(orientationGallery())}
     ]
   };
   Object.entries(menus).forEach(([name,items])=>{
@@ -499,7 +513,7 @@ async function droppedFiles(transfer){
   return files;
 }
 let dragDepth=0;
-const carriesFiles=e=>!embeddedAsset&&[...e.dataTransfer?.types||[]].includes('Files')&&!document.querySelector('dialog[open]');
+const carriesFiles=e=>!embedded&&[...e.dataTransfer?.types||[]].includes('Files')&&!document.querySelector('dialog[open]');
 document.addEventListener('dragenter',e=>{if(!carriesFiles(e))return;e.preventDefault();dragDepth++;$('#drop-overlay').hidden=false;});
 document.addEventListener('dragover',e=>{if(!carriesFiles(e))return;e.preventDefault();e.dataTransfer.dropEffect='copy';});
 document.addEventListener('dragleave',e=>{if(!carriesFiles(e))return;dragDepth=Math.max(0,dragDepth-1);if(!dragDepth)$('#drop-overlay').hidden=true;});
@@ -526,7 +540,7 @@ function render(){
   const root=maximized?find(workspace().root,maximized):workspace().root;
   if(!root){maximized=null;focusMode=false;return render();}
   const tree=renderNode(root);const size=minimum(root);tree.style.minWidth=`${size.width}px`;tree.style.minHeight=`${size.height}px`;screen.append(tree);
-  for(const canvas of screen.querySelectorAll('[data-editor=viewport] canvas')){const node=find(workspace().root,canvas.closest('.area').dataset.areaId);renderers.push(mountViewport(canvas,node,scene,save,(selected,additive,meta)=>regionPick(selected,meta)||selected&&typeof selected==='object'&&!Array.isArray(selected)?refreshStructure():selectStructure(Array.isArray(selected)?selected:typeof selected==='string'?[selected]:selected?liveBlocks(scene).map(b=>b.id):[],additive,true),()=>preferences.value,event=>viewportPie(event,node),(phase,data)=>viewportPaint(phase,data,node)));}
+  for(const canvas of screen.querySelectorAll('[data-editor=viewport] canvas')){const node=find(workspace().root,canvas.closest('.area').dataset.areaId);renderers.push(mountViewport(canvas,node,scene,save,(selected,additive,meta)=>regionPick(selected,meta)||selected&&typeof selected==='object'&&!Array.isArray(selected)?refreshStructure():selectStructure(Array.isArray(selected)?selected:typeof selected==='string'?[selected]:selected?liveBlocks(scene).map(b=>b.id):[],additive,true),()=>preferences.value,event=>viewportPie(event,node),(phase,data)=>viewportPaint(phase,data,node)));canvas.addEventListener('dblclick',()=>openGalleryBlock(node));}
   updateLogs();applyPreferences();restoreEditorScrollAfterLayout(screen);
 }
 function renderNode(node){return renderWorkspaceNode(node,{renderArea,renderers,gesture,save,resizeDirection,modifierActive,preferences,areaMenu});}
@@ -553,7 +567,7 @@ function headerFor(node){
       {label:'Maximize area',key:shortcut('maximize'),action:()=>toggleMaximize(node.id)}
     ]));header.append(view);
     const select=button('Select menu','Select',()=>anchorMenu(select,'Select',[
-      {label:'Select model',key:shortcut('selectAll'),disabled:!scene.loaded,disabledReason:'Load a model or block preview before selecting it.',action:()=>selectStructure(liveBlocks(scene).map(b=>b.id))},
+      {label:'Select model',key:shortcut('selectAll'),disabled:!scene.loaded,disabledReason:'Load a model or the Block Gallery before selecting it.',action:()=>selectStructure(liveBlocks(scene).map(b=>b.id))},
       {label:'Deselect all',key:shortcut('deselectAll'),action:()=>selectStructure([])}
     ]));select.className='header-optional';header.append(select);
     const spacer=document.createElement('span');spacer.className='spacer';header.append(spacer);
@@ -635,7 +649,7 @@ function renderViewport(body,node){
   ensureViewportOptions(node.view);
   body.classList.add('viewport');if(!node.toolbar)body.classList.add('collapse-toolbar');if(node.sidebar)body.classList.add('sidebar-visible');body.style.setProperty('--sidebar-width',`${node.sidebarWidth}px`);
   ensureCamera(node.view);
-  body.innerHTML=`<canvas aria-label="3D Avorion viewport" tabindex="0"></canvas><div class="viewport-meta"><div class="view-label">${viewLabel(node.view)}</div><div>${scene.loaded?`(1) Collection | <strong>${escape(scene.model?.fileName||'Block preview')}</strong>`:'Collection | Empty scene'}</div></div><div class="viewport-statistics"></div><div class="viewport-footer"><span class="demo-badge">AVORION</span><span>${scene.model?.blocks.length||0} blocks · ${textureLibrary.loadedCount} texture maps</span></div><div class="region-zoom-hint">Zoom region · LMB in / MMB out · Esc cancel</div>`;
+  body.innerHTML=`<canvas aria-label="3D Avorion viewport" tabindex="0"></canvas><div class="viewport-meta"><div class="view-label">${viewLabel(node.view)}</div><div>${scene.loaded?`(1) Collection | <strong>${escape(scene.model?.fileName||BLOCK_GALLERY_NAME)}</strong>`:'Collection | Empty scene'}</div></div><div class="viewport-statistics"></div><div class="viewport-footer"><span class="demo-badge">AVORION</span><span>${scene.model?.blocks.length||0} blocks · ${textureLibrary.loadedCount} texture maps</span></div><div class="region-zoom-hint">Zoom region · LMB in / MMB out · Esc cancel</div>`;
   if(!scene.loaded)body.append(emptyState());
   else{const badge=textureBadge();body.append(badge);}
   if(node.view.interactionMode==='paint'){body.classList.add('painting-tools');renderers.push(mountPaintToolbar(body,node,scene,{palette:()=>brushPalette,color:chooseBrushColor,undo:changePaintHistory,cancel:()=>{renderers.find(r=>r.id===node.id)?.cancel();if(scene.paintBusy)cancelPaintTask();},change:()=>{save();refreshStructure();}}));}
@@ -744,7 +758,7 @@ function renderProperties(body,node){
   const tab=node.propertyTab||'object';
   for(const [name,ico,label] of [['object','cube','Object properties'],['scene','scene','Scene properties'],['world','world','World sky'],['shaders','rendered','Shaders'],['turrets','turret','Turrets'],['workspace','properties','Workspace settings']]){const b=button(label,icon(ico),()=>{node.propertyTab=name;commit();areaElement(node.id)?.querySelector('.property-tabs .active')?.focus();},tab===name?'active':'');b.setAttribute('aria-pressed',String(tab===name));body.querySelector('nav').append(b);}
   const content=body.querySelector('.property-content');
-  if(tab==='object')mountBlockInspector(content,scene,(change)=>{if(change?.appearance){refreshStructure();return;}scene.model={...makeModel(scene.model.blocks),turretMounts:scene.model.turretMounts};scene.revision++;render();},{reveal:revealStructure});
+  if(tab==='object')mountBlockInspector(content,scene,(change)=>{if(change?.appearance){refreshStructure();return;}scene.model={...makeModel(scene.model.blocks,scene.model.fileName),turretMounts:scene.model.turretMounts};scene.revision++;render();},{reveal:revealStructure,preferences});
   if(tab==='turrets')mountTurretProperties(content,scene,refreshStructure,socket=>{const node=leaves(workspace().root).find(n=>n.editor==='viewport');const canvas=node&&areaElement(node.id)?.querySelector('canvas');return !!canvas&&socketExposed(scene,node.view,canvas.clientWidth,canvas.clientHeight,socket,preferences.value);},(direction,bounds)=>{const viewport=captureViewport();if(viewport){if(direction==='coverage'){viewport.view.target=nativeToView(bounds.center);viewport.view.zoom=3/Math.max(.1,bounds.radius);viewport.view.panX=viewport.view.panY=0;save();renderers.find(r=>r.id===viewport.id)?.draw();}else{viewport.view.projection='orthographic';setView(viewport,direction);}}});
   // World and Shaders edit live preferences beside an unobscured viewport.
   if(tab==='world'||tab==='shaders'){
@@ -898,3 +912,23 @@ export async function configureAssetWorkspace(asset, textureFiles=[], sharedText
 }
 
 if(embeddedAsset)window.assetWorkspace={configure:configureAssetWorkspace};
+
+// Block Gallery close-up: one block, its own viewport, outliner and properties.
+export async function configureBlockWorkspace(block, textureFiles=[], sharedTextures=null, onRename=()=>{}){
+ if(!embeddedBlock)throw Error('Block workspace requires an isolated editor document.');
+ releaseGameModel();
+ if(!textureLibrary.adopt(sharedTextures)&&textureFiles.length)await textureLibrary.loadFiles(textureFiles,{retainUndecoded:true});
+ if(textureLibrary.loadedCount)textureStatus=`${textureLibrary.loadedCount} texture maps · shared from the viewer`;
+ const draft={...structuredClone(block),id:'b0'};draft.position={x:0,y:draft.size.y/2,z:0};
+ const viewport=area();ensureViewportOptions(viewport.view).shading='RENDERED';
+ state={version:1,active:'block',workspaces:[{id:'block',name:'Block',root:split('x',.72,viewport,split('y',.3,area('outliner'),area('properties')))}]};
+ maximized=null;hovered=null;document.body.classList.add('embedded-asset-workspace');
+ scene.lastPreviewColor=preferences.value.shaderColor;
+ loadModel(makeModel([draft],BLOCK_GALLERY_NAME),true);
+ for(const node of leaves(workspace().root))if(node.editor==='viewport')navigate(node,{action:'frame',interrupt:false});
+ renderers.forEach(r=>r.draw?.());
+ let lastType=draft.type;
+ const watch=setInterval(()=>{const type=scene.model?.blocks[0]?.type;if(type&&type!==lastType){lastType=type;onRename(type);}},250);
+ return {snapshot(){const {el,itemEl,...edited}=scene.model.blocks[0];return structuredClone(edited);},dispose(){clearInterval(watch);renderers.forEach(r=>r.dispose());renderers=[];releaseGameModel();}};
+}
+if(embeddedBlock)window.blockWorkspace={configure:configureBlockWorkspace};

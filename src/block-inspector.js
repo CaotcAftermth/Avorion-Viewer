@@ -1,9 +1,11 @@
 import {blockOpacity,supportsOpacity} from './block-opacity.js';
+import {getShadingSpec} from './avorion/lib/textures/shadingMap.js';
 import {icon} from './icons.js';
 import {secondaryColor} from './block-colors.js';
 import {recordBlockColors as applyBlockColors} from './color-workshop.js';
 import { BLOCK_DEFINITIONS, MATERIALS, ORIENTATIONS, AXES, getBlockDefinition, repaintRGB } from './block-model.js';
 import { liveBlocks, blockIds, blockChildIds, blockLabel } from './ship-structure.js';
+import { blockVariants, isBlockGallery, isDefaultPaint } from './block-gallery.js';
 const LINKED_CHILDREN=8;
 const BOUNDS=[['Lower bound',[['lx','lowerX'],['ly','lowerY'],['lz','lowerZ']]],['Upper bound',[['ux','upperX'],['uy','upperY'],['uz','upperZ']]]];
 const BLOCK_ATTRS=new Set(['index','material','look','up','color','secondaryColor',...BOUNDS.flatMap(([,axes])=>axes.flat())]);
@@ -29,7 +31,7 @@ function mountNativeData(panel,b,scene,reveal){
     row.append(caption,input);parent.append(row);return row;
   };
   if(!el){
-    const note=document.createElement('p');note.className='panel-note';note.textContent='Block previews have no XML source. Values below are the preview settings.';panel.append(note);
+    const note=document.createElement('p');note.className='panel-note';note.textContent='Block Gallery blocks have no XML source. Values below are the gallery settings.';panel.append(note);
     field('index',`${b.typeIndex} · ${b.type}`);field('material',`${b.materialIndex} · ${b.material}`);field('look',`${b.look} · ${AXES[b.look]??'invalid'}`);field('up',`${b.up} · ${AXES[b.up]??'invalid'}`);field('color',b.color.toUpperCase(),{swatch:b.color});
     return;
   }
@@ -78,34 +80,30 @@ function mountNativeData(panel,b,scene,reveal){
   const pre=document.createElement('pre');pre.className='native-xml';pre.title='Current XML for this block, including any repaints. Saved as-is by File › Save XML.';const code=document.createElement('code');code.textContent=xml;pre.append(code);
   panel.append(head,pre);
 }
-export function mountBlockInspector(host,scene,onChange,{reveal=()=>{}}={}) {
+export function mountBlockInspector(host,scene,onChange,{reveal=()=>{},preferences=null}={}) {
   const model=scene.model,b=model?.blocks.find(b=>b.id===scene.selectedId)||model?.blocks[0];
-  if(!b){host.textContent='No blocks loaded. Use File to load XML or a block preview.';return;}
-  const breadcrumb=document.createElement('div');breadcrumb.className='property-breadcrumb';breadcrumb.innerHTML=icon('cube');const name=document.createElement('span');name.textContent=scene.preview?'Block Preview':`${b.type} · ${b.id}`;breadcrumb.append(name);host.append(breadcrumb);
+  if(!b){host.textContent='No blocks loaded. Use File to load XML, or Help › Developer › Load Block Gallery.';return;}
+  const breadcrumb=document.createElement('div');breadcrumb.className='property-breadcrumb';breadcrumb.innerHTML=icon('cube');const name=document.createElement('span');name.textContent=scene.preview?`Block Gallery · ${b.type}`:`${b.type} · ${b.id}`;breadcrumb.append(name);host.append(breadcrumb);
   const identity=document.createElement('div');identity.className='property-datablock';identity.innerHTML=icon('cube');const identityName=document.createElement('span');identityName.textContent=scene.preview?b.type:model.fileName;identity.append(identityName);host.append(identity);
   const panel=document.createElement('details');panel.className='panel block-inspector';panel.open=true;
-  const summary=document.createElement('summary');summary.textContent=scene.preview?'Block Preview':'Block Inspection';panel.append(summary);host.append(panel);
-  const row=(title,control)=>{const label=document.createElement('label');label.className='field-row';const text=document.createElement('span');text.textContent=title;if(control.disabled){const reason='Imported values are read-only here. Use Color Editor to repaint selected blocks; load a block preview to edit geometry.';label.title=control.title=reason;control.setAttribute('aria-description',reason);}label.append(text,control);panel.append(label);return control;};
+  const summary=document.createElement('summary');summary.textContent=scene.preview?'Block Gallery':'Block Inspection';panel.append(summary);host.append(panel);
+  const row=(title,control)=>{const label=document.createElement('label');label.className='field-row';const text=document.createElement('span');text.textContent=title;if(control.disabled){const reason='Imported values are read-only here. Use Color Editor to repaint selected blocks; load the Block Gallery to edit geometry.';label.title=control.title=reason;control.setAttribute('aria-description',reason);}label.append(text,control);panel.append(label);return control;};
   const select=(title,options,value,change)=>{const el=document.createElement('select');el.setAttribute('aria-label',title);for(const [value,label] of options)el.add(new Option(label,String(value)));el.value=String(value);el.disabled=!scene.preview;el.onchange=()=>{change(el.value);onChange();};return row(title,el);};
   const showArgb=(input,argb)=>{
     const field=document.createElement('div');field.className='property-color-field';
     input.replaceWith(field);field.append(input);
     const value=document.createElement('output');value.className='property-argb';value.textContent=argb.toUpperCase();value.title='ARGB · Alpha, Red, Green, Blue';value.setAttribute('aria-label',input.getAttribute('aria-label')+' ARGB');field.append(value);
   };
-  const definitions=[...BLOCK_DEFINITIONS,...(BLOCK_DEFINITIONS.some(d=>d.typeIndex===b.typeIndex)?[]:[getBlockDefinition(b.typeIndex)])].sort((a,b)=>a.typeIndex-b.typeIndex);
-  const search=document.createElement('input');search.type='search';search.placeholder='Name or numerical ID';search.setAttribute('aria-label','Search block types');search.disabled=!scene.preview;row('Search Block Types',search);
-  const blockType=select('Block Type',definitions.map(d=>[d.typeIndex,`${d.typeIndex} · ${d.displayName}`]),b.typeIndex,value=>{b.typeIndex=Number(value);b.type=getBlockDefinition(b.typeIndex).displayName;});
-  search.oninput=()=>{
-    const terms=search.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    const matches=definitions.filter(d=>terms.every(term=>`${d.typeIndex} ${d.displayName}`.toLowerCase().includes(term)));
-    blockType.replaceChildren(...matches.map(d=>new Option(`${d.typeIndex} · ${d.displayName}`,String(d.typeIndex))));
-    // Filtering never changes the preview; the user must choose a result.
-    if(!matches.some(d=>d.typeIndex===b.typeIndex))blockType.insertBefore(new Option(matches.length?'Choose block type':'No matching block types',''),blockType.firstChild);
-    blockType.value=matches.some(d=>d.typeIndex===b.typeIndex)?String(b.typeIndex):'';
-    if(blockType.options[0]?.value==='')blockType.options[0].disabled=true;
-    blockType.disabled=!scene.preview||!matches.length;
-  };
-  select('Material',MATERIALS.map(m=>[m.index,m.name]),b.materialIndex,value=>{b.materialIndex=Number(value);b.material=MATERIALS[b.materialIndex].name;});
+  // Gallery blocks switch between the shapes of their own family (Edge, Corner 2, ...).
+  if(isBlockGallery(scene)){
+    const variants=blockVariants(b.typeIndex);
+    const variant=select('Variant',variants.map(v=>[v.typeIndex,`${v.label} · ${v.typeIndex}`]),b.typeIndex,value=>{b.typeIndex=Number(value);b.type=getBlockDefinition(b.typeIndex).displayName;});
+    variant.title=variants.length>1?'Shape variant of this block. Double-click the block in the viewport for a close-up workspace.':'This block has no other shapes.';
+    variant.disabled=variants.length<2;
+  }
+  select('Material',MATERIALS.map(m=>[m.index,m.name]),b.materialIndex,value=>{const before=isDefaultPaint(b.color);b.materialIndex=Number(value);b.material=MATERIALS[b.materialIndex].name;
+    // Gallery blocks still wearing their material's color follow the new material.
+    if(isBlockGallery(scene)&&before)b.color=repaintRGB(b.color,MATERIALS[b.materialIndex].paint);});
   select('Orientation',ORIENTATIONS.map(o=>[`${o.look},${o.up}`,`Look ${AXES[o.look]} · Up ${AXES[o.up]}`]),`${b.look},${b.up}`,value=>{[b.look,b.up]=value.split(',').map(Number);});
   for(const axis of ['x','y','z']){const el=document.createElement('input');el.type='number';el.min=.01;el.max=1000;el.step=.1;el.value=b.size[axis];el.setAttribute('aria-label',`Block Size ${axis.toUpperCase()}`);el.disabled=!scene.preview;el.onchange=()=>{const value=Number(el.value);if(Number.isFinite(value)&&value>=.01&&value<=1000){b.size[axis]=value;if(axis==='y')b.position.y=value/2;onChange();}else el.value=b.size[axis];};row(`Size ${axis.toUpperCase()}`,el);}
   const color=document.createElement('input');color.type='color';color.value='#'+b.color.slice(-6);color.disabled=!scene.preview;color.setAttribute('aria-label','Block Primary Color');color.onchange=()=>{applyBlockColors(scene,[{id:b.id,color:repaintRGB(b.color,color.value)}]);onChange({appearance:true});};row('Primary Color',color);showArgb(color,b.color);
@@ -115,6 +113,13 @@ export function mountBlockInspector(host,scene,onChange,{reveal=()=>{}}={}) {
     opacity.onchange=()=>{if(opacity.value!==''&&opacity.checkValidity())changeOpacity(Number(opacity.value)/100);};row('Opacity (%)',opacity);
     const reset=document.createElement('button');reset.type='button';reset.textContent='Reset opacity';reset.disabled=b.opacity===undefined;reset.onclick=()=>changeOpacity(undefined);row('Opacity default',reset);
     opacity.title='Viewer opacity override. Original XML color alpha remains unchanged.';
+    // Hologram glow is a shader setting shared by every hologram (also under Shaders › Emission).
+    if(preferences&&getShadingSpec(b.typeIndex).surface==='hologram'){
+      const glow=document.createElement('input');glow.type='range';glow.min=0;glow.max=2;glow.step=.05;glow.value=preferences.value.shaderHologramGlow??1.5;glow.setAttribute('aria-label','Hologram Glow');glow.title='Glow of all hologram blocks. Low values keep the translucent hologram look.';
+      const field=row('Hologram Glow',glow),value=document.createElement('output');value.className='property-argb';value.textContent=Number(glow.value).toFixed(2)+'×';
+      const wrap=document.createElement('div');wrap.className='property-color-field';field.replaceWith(wrap);wrap.append(field,value);
+      glow.oninput=()=>{preferences.set('shaderHologramGlow',Number(glow.value));value.textContent=Number(glow.value).toFixed(2)+'×';};
+    }
   }
   const raw=secondaryColor(b);
   const secondaryOn=document.createElement('input');secondaryOn.type='checkbox';secondaryOn.checked=!!raw;secondaryOn.disabled=!scene.preview;secondaryOn.setAttribute('aria-label','Override Secondary Color');
@@ -137,7 +142,7 @@ export function mountBlockInspector(host,scene,onChange,{reveal=()=>{}}={}) {
     const title=field.firstElementChild.textContent;
     if(title.startsWith('Size ')){if(title!=='Size X')field.firstElementChild.textContent=title.slice(-1);size.append(field);}
     else if(title==='Orientation')transform.append(field);
-    else if(title==='Search Block Types'||title==='Block Type'||title==='Material')blockPanel.append(field);
+    else if(title==='Variant'||title==='Material')blockPanel.append(field);
     else appearance.append(field);
   }
   transform.append(size);
