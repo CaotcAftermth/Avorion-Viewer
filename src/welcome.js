@@ -7,8 +7,8 @@ export function createWelcome({preferences,wireInputStyles,openModel,openTexture
     <div class="dialog-heading"><span class="eyebrow">AVORION VIEWER <span data-version></span></span><button type="button" class="icon-button" aria-label="Close welcome">×</button></div>
     <section data-welcome-home>
       <span class="welcome-beta">Beta release</span>
-      <h1 id="welcome-title">Your ship. A new perspective.</h1>
-      <p class="welcome-intro">Explore your ships. Try new colors. Preview turret coverage. Export your creations.</p>
+      <h1 id="welcome-title">A Project of Love for a Fantastic Community</h1>
+      <p class="welcome-intro">Avorion Viewer is a lightweight 3D viewer that runs in your browser and is built for Avorion ship designs. From your game XML, you can inspect any block, browse the ship's structure in a Blender-style outliner, repaint it with the game's color palette, check turret sockets/coverage, and more!</p>
       <div class="welcome-load"><button type="button" class="primary" data-open>Open Avorion XML…</button><button type="button" data-textures>Load texture folder…</button></div>
       <p class="welcome-note">Drop a ship XML onto the viewport anytime. Textures are optional.</p>
       <section class="welcome-input" aria-labelledby="welcome-input-title">
