@@ -115,10 +115,11 @@ export function mountPreferences(host, store, editorState = {}, assets = {}, opt
           }
           const input=document.createElement(field.type==='paths'?'textarea':field.type==='select'?'select':'input');input.setAttribute('aria-label',fieldLabel);input.setAttribute('aria-description',fieldTip);
           if (field.type==='select') {
-            for(const [value,text] of field.options){const option=document.createElement('option');option.value=value;option.textContent=t(text);input.append(option);}
+            for(const [value,text] of field.options){const option=document.createElement('option');option.value=value;option.textContent=t(text);if(field.key==='inputStyle'&&value==='trackpad')option.disabled=true;input.append(option);}
           } else if(field.type==='paths'){input.rows=3;input.maxLength=16000;input.placeholder=t('One folder path per line');} else input.type=field.type;
           if(field.type==='number'){input.min=field.min;input.max=field.max;input.step=field.step;}
           input.dataset.preference=field.key;
+          if(field.key==='trackpadNavigation'){input.disabled=true;input.title='Trackpad support is being fixed.';}
           const update=()=>{
             const value=field.type==='checkbox'?input.checked:field.type==='number'||field.numeric?Number(input.value):input.value;
             if(!store.set(field.key,value))sync();

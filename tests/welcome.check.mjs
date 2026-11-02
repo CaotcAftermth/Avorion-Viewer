@@ -1,0 +1,36 @@
+import {chromium} from 'file:///C:/Users/joshu/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import assert from 'node:assert/strict';
+import {APP_VERSION} from '../src/version.js';
+import http from 'node:http';
+import {mkdir} from 'node:fs/promises';
+import {viewerHandler} from '../scripts/serve.mjs';
+const handler=viewerHandler(process.env.WELCOME_TEST_DIST ? process.cwd()+'/dist' : process.cwd());
+const server=http.createServer((req,res)=>{req.headers.host='127.0.0.1:5173';if(req.headers.origin)req.headers.origin='http://127.0.0.1:5173';handler(req,res);});
+await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+const base=`http://127.0.0.1:${server.address().port}`;
+const browser=await chromium.launch({headless:true,channel:'msedge',args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+try {
+ const context=await browser.newContext({viewport:{width:1280,height:900}}),page=await context.newPage(),errors=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(base);
+ const splash=page.locator('#welcome-dialog');await splash.waitFor({state:'visible'});
+ assert.ok((await splash.innerText()).includes('v'+APP_VERSION));assert.match(await splash.innerText(),/Beta release/i);
+ assert.ok(await splash.locator('[data-style="trackpad"]').isDisabled());
+ await splash.locator('[data-style="laptop"]').click();assert.match(await splash.locator('.welcome-controls').innerText(),/Alt/);
+ assert.equal(await splash.locator('.coffee-button').getAttribute('href'),'https://www.buymeacoffee.com/CaotcAftermth');
+ await mkdir('test-results',{recursive:true});await page.screenshot({path:'test-results/welcome-desktop.png'});
+ await splash.locator('[data-guide]').click();await splash.locator('article table').first().waitFor();assert.match(await splash.locator('article').innerText(),/Spherical Heatmap/);assert.match(await splash.locator('article').innerText(),/3MF/);
+ await splash.locator('[data-back]').click();assert.equal(await splash.locator('[data-style="laptop"]').getAttribute('aria-pressed'),'true');
+ await splash.locator('[data-feedback]').click();await page.locator('#feedback-dialog').waitFor({state:'visible'});await page.locator('#feedback-dialog [data-close]').first().click();assert.ok(await splash.isVisible());
+ const picker=page.waitForEvent('filechooser');await splash.locator('[data-textures]').click();await mkdir('test-results/empty-textures',{recursive:true});await (await picker).setFiles(process.cwd()+'/test-results/empty-textures');assert.ok(await splash.isVisible());
+ await page.setViewportSize({width:390,height:844});await page.screenshot({path:'test-results/welcome-mobile.png'});
+ assert.ok(await splash.evaluate(el=>el.scrollWidth<=el.clientWidth+1));
+ await page.keyboard.press('Escape');assert.ok(await splash.isHidden());
+ await page.setViewportSize({width:1280,height:900});await page.getByRole('button',{name:'Help',exact:true}).click();await page.getByRole('menuitem',{name:'Welcome',exact:true}).click();assert.ok(await splash.isVisible());
+ const xml='<ship><plan><item index="0" parent="-1"><block lx="0" ly="0" lz="0" ux="2" uy="4" uz="8" index="122" material="0" look="1" up="3" color="ff336699" secondaryColor="00000000"/></item></plan></ship>';
+ const file=page.waitForEvent('filechooser');await splash.locator('[data-open]').click();await (await file).setFiles({name:'welcome-test.xml',mimeType:'text/xml',buffer:Buffer.from(xml)});
+ await splash.waitFor({state:'hidden'});await page.waitForTimeout(700);await page.reload();await page.locator('.ship-root .ship-name').filter({hasText:'welcome-test'}).waitFor();assert.ok(await splash.isHidden());
+ const fresh=await browser.newContext();const fallback=await fresh.newPage();await fallback.addInitScript(()=>localStorage.setItem('avorion-viewer.preferences.v1',JSON.stringify({version:1,inputStyle:'trackpad',trackpadNavigation:true})));await fallback.goto(base);await fallback.locator('#welcome-dialog').waitFor({state:'visible'});assert.ok(await fallback.locator('.welcome-fallback').isVisible());assert.equal(await fallback.locator('#welcome-dialog [data-style="laptop"]').getAttribute('aria-pressed'),'true');
+ const embedded=await context.newPage();await embedded.goto(base+'/?editor=block');await embedded.waitForTimeout(500);assert.equal(await embedded.locator('#welcome-dialog').count(),0);
+ assert.deepEqual(errors,[]);console.log('Welcome browser checks passed: startup, inputs, guide, feedback, pickers, import, restore, fallback, embedded editor, responsive layout.');
+} finally {await browser.close();await new Promise(resolve=>server.close(resolve));}
