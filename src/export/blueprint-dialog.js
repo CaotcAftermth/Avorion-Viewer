@@ -19,7 +19,7 @@ export function openBlueprintDialog(options,{renderPreview,sourceView,preference
   const sheetTools=el('div'),modelTools=el('div');
   for(const [group,label] of [[sheetTools,'Sheet tools'],[modelTools,'Model tools']]){group.className='blueprint-tool-group';group.setAttribute('role','group');group.setAttribute('aria-label',label);group.append(el('span',label));toolbar.append(group);}
   const stage=el('div');stage.className='blueprint-stage';stage.tabIndex=0;stage.setAttribute('role','region');stage.setAttribute('aria-label','Interactive blueprint preview');
-  const image=el('img');image.alt='Blueprint customization preview';image.hidden=true;image.draggable=false;
+  const image=el('canvas');image.setAttribute('aria-label','Blueprint customization preview');image.hidden=true;
   const selection=el('div');selection.className='blueprint-panel-selection';
   const cube=el('div');cube.className='view-cube blueprint-cube';stage.append(image,selection,cube);
   const status=el('p','Preparing preview...');status.setAttribute('role','status');
@@ -55,7 +55,7 @@ export function openBlueprintDialog(options,{renderPreview,sourceView,preference
     if(closed)return;const size=stageFrame.clientWidth+','+stageFrame.clientHeight;
     if(size!==lastFrameSize){lastFrameSize=size;fitStage();update();}
   });resizeObserver.observe(stageFrame);
-  let timer,controller,url,closed=false,revision=0,renderedRevision=-1,rendering=false,active=0,tool='orbit',drag,viewFields=[];
+  let timer,controller,closed=false,revision=0,renderedRevision=-1,rendering=false,active=0,tool='orbit',drag,viewFields=[];
   const multi=()=>draft.blueprintLayout==='multi';
   const current=()=>multi()?settings.views[active]:settings.single;
   const camera=()=>multi()?current().camera:draft.camera;
@@ -168,29 +168,30 @@ export function openBlueprintDialog(options,{renderPreview,sourceView,preference
   stage.addEventListener('contextmenu',event=>event.preventDefault());
   const actions=el('div');actions.className='dialog-actions';const cancel=el('button','Cancel'),apply=el('button','Apply blueprint');cancel.type='button';apply.type='submit';actions.append(cancel,apply);
   body.append(controls,preview);form.append(body,actions);dialog.append(heading,form);
-  const close=()=>{if(closed)return;closed=true;resizeObserver.disconnect();clearTimeout(timer);controller?.abort();if(url)URL.revokeObjectURL(url);dialog.close();dialog.remove();onClose();};
+  const close=()=>{if(closed)return;closed=true;resizeObserver.disconnect();clearTimeout(timer);controller?.abort();dialog.close();dialog.remove();onClose();};
   cancel.onclick=close;dialog.addEventListener('cancel',event=>{event.preventDefault();if(fullscreen)setFullscreen(false);else close();});dialog.addEventListener('close',close);
   form.onsubmit=event=>{event.preventDefault();try{validateBlueprintSettings(draft);if(multi())blueprintPanels(draft);onApply(structuredClone(draft));close();}catch(error){status.textContent=error.message;}};
   function update(interactive=false){
-    clearTimeout(timer);revision++;
+    if(!interactive){clearTimeout(timer);timer=null;}revision++;
     stage.dataset.width=draft.width;stage.dataset.height=draft.height;
     fitStage();
     try{
       updateCube(blueprintCamera(camera(),current(),source));
       const p=panels()[active];Object.assign(selection.style,{left:`${p.x/draft.width*100}%`,top:`${p.y/draft.height*100}%`,width:`${p.width/draft.width*100}%`,height:`${p.height/draft.height*100}%`});selection.hidden=!multi();
       annotations.refresh();
-      status.textContent='Updating preview...';timer=setTimeout(render,interactive?35:180);
+      status.textContent='Updating preview...';if(timer==null&&!rendering)timer=setTimeout(render,interactive?0:180);
     }catch(error){status.textContent=error.message;}
   }
   async function render(){
-    if(closed||rendering||renderedRevision===revision)return;
+    timer=null;if(closed||rendering||renderedRevision===revision)return;
     rendering=true;const version=revision;controller=new AbortController();
     try{
-      const density=Math.min(2,window.devicePixelRatio||1);
-      const previewSize={width:Math.min(2048,Math.ceil(stage.clientWidth*density)),height:Math.min(1536,Math.ceil(stage.clientHeight*density))};
-      const result=await renderPreview({...structuredClone(draft),blueprintEditing:true},controller.signal,previewSize);result.canvas.width=result.canvas.height=1;
+      const density=drag?1:Math.min(2,window.devicePixelRatio||1);
+      const previewSize={width:Math.min(drag?900:2048,Math.ceil(stage.clientWidth*density)),height:Math.min(drag?650:1536,Math.ceil(stage.clientHeight*density))};
+      const result=await renderPreview({...structuredClone(draft),blueprintEditing:true},controller.signal,previewSize);
+      if(!closed&&(version===revision||drag)){image.width=result.canvas.width;image.height=result.canvas.height;image.getContext('2d').drawImage(result.canvas,0,0);image.hidden=false;}
+      result.canvas.width=result.canvas.height=1;
       if(closed)return;
-      if(version===revision||drag){if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(result.blob);image.src=url;image.hidden=false;}
       if(version===revision)status.textContent='Preview updated.';
     }catch(error){if(!closed&&version===revision&&error.name!=='AbortError')status.textContent=error.message;}
     finally{rendering=false;renderedRevision=version;if(!closed&&version!==revision){clearTimeout(timer);timer=setTimeout(render,0);}}

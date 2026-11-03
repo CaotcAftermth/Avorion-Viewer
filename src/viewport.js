@@ -1,3 +1,4 @@
+import {drawComponentSockets} from './components/overlay.js';
 import {visibleTurretBlocks} from './turrets/posed-blocks.js';
 import {drawCoverageLegend} from './turrets/coverage-render.js';
 import {coverageOptions} from './turrets/coverage-sampling.js';
@@ -31,7 +32,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   const hoverLabel=globalThis.document?.createElement('div');if(hoverLabel){hoverLabel.className='paint-hover-label';hoverLabel.hidden=true;body.append?.(hoverLabel);}
   let statsKey=[],width = 1, height = 1, frame = 0, drag = null, regionMode = false, projectedFaces = [];
   const dimensionCache={};
-  let socketHits=[];
+  let socketHits=[],componentSocketHits=[];
   const events = new AbortController();
   const listen = (target, type, handler, options = {}) => target.addEventListener(type, handler, { ...options, signal: events.signal });
   const invalidate = () => { if (!frame) frame = requestAnimationFrame(draw); };
@@ -100,6 +101,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     drawSymmetryPlanes(ctx,scene,view,width,height);
     drawDimensions(ctx,scene,view,width,height,preferences,dimensionCache);
     socketHits=drawSockets(ctx,scene,view,width,height,editorTheme(preferences,'viewport').accent,s=>socketExposed(scene,view,width,height,s,preferences));
+    componentSocketHits=drawComponentSockets(ctx,scene,view,width,height,s=>socketExposed(scene,view,width,height,s,preferences));
     drawCoverageLegend(ctx,scene,view,width,height);
     drawMagnifier();
     drawPaintPreview();
@@ -313,6 +315,8 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
       const [x,y]=position(event);
       const coverage=scene.showFireCoverage&&!['paint','socket'].includes(view.interactionMode)?pickWeaponCoverage(scene,view,width,height,x,y,getPreferences()):null;
       if(coverage){scene.coverageInspection=coverage;scene.coverageHover=null;release();invalidate();onSelect({coverage:true});onChange();return;}
+      const componentSocket=view.interactionMode==='socket'&&componentSocketHits.find(s=>Math.hypot(s.screen[0]-x,s.screen[1]-y)<=12);
+      if(componentSocket){scene.selectedComponentSocketId=componentSocket.id;release();invalidate();onSelect({componentSocketId:componentSocket.id});onChange();return;}
       const socket=socketHits.find(s=>Math.hypot(s.screen[0]-x,s.screen[1]-y)<=12);
       const turret=pickTurret(scene,view,width,height,x,y,getPreferences());selectTurrets(scene,turret?.mountId||null,drag.additive);
       if(turret){scene.turretSockets??={};scene.turretSockets.selectedId=turret.socketId;selection={socketId:turret.socketId};}

@@ -18,6 +18,7 @@ Models and textures are processed locally. Browser storage restores saved assets
 - Native Avorion block rendering, local textures, lighting and generated skies.
 - Color palettes, paint tools, named regions and paint undo.
 - Turret libraries, placement, tracking, firing previews and animation export.
+- A separate [Components library](docs/COMPONENTS.md), configurable mounting blocks, and saved manual attachment points.
 - Mesh export to GLB, glTF, OBJ, STL and 3MF; image and animation export.
 
 ## Run locally

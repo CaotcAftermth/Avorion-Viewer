@@ -388,6 +388,7 @@ export function socketExposed(scene,view,width,height,socket,p=FACTORY_PREFERENC
   const hidden=viewportHiddenIds(scene,view);
   const hit=raycaster.intersectObjects(rendered.group.children.filter(c=>c.userData.textured),false).find(h=>!hidden.has(h.blockId));
   const tolerance=Math.max(1e-4,point.length()*1e-6);
+  if(socket.type==='component')return !hit||hit.distance>=raycaster.ray.origin.distanceTo(point)-tolerance;
   // Thin-block filtering hides the body, not its attachment surface. Other visible
   // hull geometry must still occlude the socket; manual hiding remains authoritative.
   if(hidden.has(socket.blockId)&&!scene.hiddenIds?.has(socket.blockId))return !hit||hit.distance>=raycaster.ray.origin.distanceTo(point)-tolerance;

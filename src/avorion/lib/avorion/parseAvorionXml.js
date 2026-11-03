@@ -110,7 +110,7 @@ export function parseAvorionXml(xmlText, fileName, fileSize) {
         });
     }
     if (turretBlocks > 0) {
-        warnings.push({ level: "info", message: `${turretBlocks} turret-design blocks skipped (turret assembly transforms are not reconstructed). Preserved on export.` });
+        warnings.push({ level: "info", message: `${turretBlocks} embedded turret-design blocks kept separate from the hull. Preserved on export.` });
     }
     if (degenerateBounds > 0) {
         warnings.push({ level: "warn", message: `${degenerateBounds} blocks have zero or negative extents.` });

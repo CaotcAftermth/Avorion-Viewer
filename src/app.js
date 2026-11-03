@@ -1,3 +1,5 @@
+import {restoreEmbeddedTurrets} from './turrets/embedded.js';
+import {loadTurretLibrary,addTurretAsset} from './turrets/library.js';
 import {createWelcome} from './welcome.js';
 import {createStudio} from './turrets/studio.js';
 import {attachSubmenu} from './submenu.js';
@@ -6,7 +8,8 @@ import {renderWorkspaceNode} from './workspace-tree.js';
 import {rememberEditorScroll,restoreEditorScrollAfterLayout} from './editor-scroll.js';
 import {mountTurretOutliner} from './turrets/editors.js';
 import {mountHistory} from './turrets/mounts.js';
-import {mountTurretLibrary} from './turrets/library.js';
+import {mountAttachmentLibrary} from './attachment-library.js';
+import {restoreComponentSetup} from './components/storage.js';
 import {mountTurretProperties} from './turrets/properties.js';
 import {createSessionPersistence} from './session-persistence.js';
 import {createCrashGuard,findCrashRecords,forgetCrashRecords,askCrashRecovery,warnLiveFailure,isMemoryFailure} from './crash-guard.js';
@@ -246,6 +249,8 @@ async function openXmlFile(file){
     await nextPaint();const text=await file.text();
     loading.update(25,t('Reading blocks…'));await nextPaint();
     model=parseAvorionXml(text,file.name,file.size);
+    await restoreEmbeddedTurrets(model,{load:loadTurretLibrary,add:addTurretAsset});
+    await restoreComponentSetup(model);
   }catch(error){loading.done();showImportError(file.name,error);return false;}
   try{
     loading.update(55,`${model.blocks.length.toLocaleString()} ${t('blocks')} · ${t('building geometry…')}`);await nextPaint();
@@ -669,7 +674,7 @@ function renderArea(node){
     const controller=mountPreferences(body,preferences,preferenceEditors.get(node.id),assetActions);controller.preferenceAreaId=node.id;renderers.push(controller);
   }
   if(node.editor==='color')renderers.push(mountColorEditor(body,node,scene,{save,changed:refreshStructure,brushChanged:()=>{if(scene.paintBrush)rememberPaintColor(scene.paintBrush.colorId);refreshStructure();},select:ids=>selectStructure(ids),focus:ids=>focusStructure(ids),isolate:ids=>visibilityStructure(ids,'isolate'),addRegion:name=>{const region=addRegion(scene,name,[...scene.selectedIds]);refreshStructure();return region;},apply:(...args)=>{const count=paintPaletteColor(scene,...args);refreshStructure();return count;},undo:changePaintHistory}));
-  if(node.editor==='assets')renderers.push(mountTurretLibrary(body,refreshStructure));
+  if(node.editor==='assets')renderers.push(mountAttachmentLibrary(body,node,scene,refreshStructure));
   if(node.editor==='info')body.classList.add('info-body');
   const paintSettings=body.querySelector('.paint-tool-settings');if(paintSettings)el.append(paintSettings);
   el.append(body);

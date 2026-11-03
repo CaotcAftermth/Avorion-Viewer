@@ -21,7 +21,7 @@
 .blueprint-layout-map{position:relative;max-height:22vh;background:#10283f;border:1px solid #6da1c0;margin:auto;overflow:hidden;}
 .blueprint-layout-map>button{position:absolute;box-sizing:border-box;border:1px solid #6da1c0;display:flex;align-items:center;justify-content:center;text-align:center;color:#b8e0ff;font:11px monospace;overflow:hidden;padding:3px;background:transparent;white-space:normal;}
 .blueprint-stage{position:relative;margin:auto;touch-action:none;background:#10283f;overflow:hidden;}
-.blueprint-stage img{display:block;width:100%;height:100%;max-height:none;pointer-events:none;}
+.blueprint-stage canvas{display:block;width:100%;height:100%;max-height:none;pointer-events:none;}
 .blueprint-stage .blueprint-cube{display:block;position:absolute;right:4px;top:4px;width:100px;height:100px;opacity:0;pointer-events:none;transition:opacity .15s;background:#182432cc;border-radius:6px;}
 .blueprint-stage:hover .blueprint-cube,.blueprint-stage:focus-within .blueprint-cube{opacity:1;pointer-events:auto;}
 .blueprint-panel-selection{position:absolute;box-sizing:border-box;border:1px dashed #f3ca6a;pointer-events:none;}
@@ -43,7 +43,7 @@
 .blueprint-fullscreen .blueprint-preview{position:static;display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:100%;}
 .blueprint-fullscreen .blueprint-stage-frame{min-height:0;min-width:0;display:grid;place-items:center;overflow:hidden;}
 .blueprint-fullscreen .blueprint-stage{margin:0;flex-shrink:0;}
-.blueprint-fullscreen .blueprint-stage img{max-height:none;}
+.blueprint-fullscreen .blueprint-stage canvas{max-height:none;}
 .blueprint-fullscreen .blueprint-preview>[role=status]{margin:5px 0 0;}
 /* Keep the drawing surface fixed while the inspector scrolls independently. */
 .blueprint-dialog{width:min(1500px,96vw);height:94dvh;max-height:94dvh;}
@@ -54,7 +54,7 @@
 .blueprint-stage-frame{min-height:0;min-width:0;overflow:auto;position:relative;background:#20252b;scrollbar-gutter:stable;}
 .blueprint-sheet-surface{position:relative;min-width:100%;min-height:100%;}
 .blueprint-stage,.blueprint-fullscreen .blueprint-stage{position:absolute;margin:0;}
-.blueprint-stage img{max-height:none;}
+.blueprint-stage canvas{max-height:none;}
 .blueprint-tools{font-size:12px;}.blueprint-tools label{display:flex;align-items:center;gap:4px;}.blueprint-tools input{width:64px;}
 .blueprint-sheet-controls,.blueprint-layout-details{border:1px solid #505050;border-radius:5px;padding:0 10px 10px;margin-bottom:8px;background:#383838;}
 .blueprint-sheet-controls>summary,.blueprint-layout-details>summary,.blueprint-subsection>summary{cursor:pointer;padding:9px 0;font-size:12px;}

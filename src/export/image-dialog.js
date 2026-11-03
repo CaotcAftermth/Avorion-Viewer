@@ -95,7 +95,7 @@ export function mountImageExport(host,scene,sourceView,context={}){
       renderPreview:async(draft,signal,previewSize)=>{
         const factor=Math.min(previewSize?Infinity:1,(previewSize?.width||900)/draft.width,(previewSize?.height||650)/draft.height);
         blueprintSnapshot??=captureImage(scene,view,context.preferences||FACTORY_PREFERENCES,size);
-        return exportImage(blueprintSnapshot,{...draft,width:Math.max(1,Math.round(draft.width*factor)),height:Math.max(1,Math.round(draft.height*factor)),supersampling:1,format:'png'},{signal});
+        return exportImage(blueprintSnapshot,{...draft,width:Math.max(1,Math.round(draft.width*factor)),height:Math.max(1,Math.round(draft.height*factor)),supersampling:1,format:'png'},{signal,encode:false});
       },
       onApply:draft=>{options=draft;invalidate();sync();},
       onClose:()=>{blueprintDialog=null;if(!disposed)schedulePreview();}

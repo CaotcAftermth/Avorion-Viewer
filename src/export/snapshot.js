@@ -1,4 +1,4 @@
-import {posedTurretBlocks} from '../turrets/posed-blocks.js';
+import {posedTurretBlocks,posedComponentBlocks} from '../turrets/posed-blocks.js';
 import {liveBlocks,viewportHiddenIds,isThinBlock} from '../ship-structure.js';
 import {secondaryColor} from '../block-colors.js';
 export const EXPORT_FORMATS={stl:'Binary triangle mesh · millimeters by convention', '3mf':'Print package · explicit millimeters and base materials',glb:'Single editable scene · basic PBR colors',gltf:'ZIP of glTF scene, buffer, and metadata',obj:'ZIP of OBJ, MTL, and metadata'};
@@ -19,6 +19,10 @@ export function captureExport(scene,view,{scope='all',regionId='',placement='cen
  });
  for(const b of posedTurretBlocks(scene,(m,s)=>(!wanted||wanted.has(s.blockId)||scope==='selected'&&scene.selectedTurretIds?.has(m.id))&&!excluded.has(s.blockId)&&(scope!=='visible'||scene.visible&&!m.hidden&&!scene.hiddenIds?.has(s.blockId)))){
   if(placement==='native')for(const a of ['x','y','z'])b.position[a]-=scene.model.placementOffset?.[a]||0;
+  blocks.push({...b,regions:members.get(b.parentId)||[]});
+ }
+ for(const b of posedComponentBlocks(scene,(m,s)=>(!wanted||wanted.has(s.blockId))&&!excluded.has(s.blockId)&&(scope!=='visible'||scene.visible&&!m.hidden&&!scene.hiddenIds?.has(s.blockId)))){
+  if(placement==='native')for(const axis of ['x','y','z'])b.position[axis]-=scene.model.placementOffset?.[axis]||0;
   blocks.push({...b,regions:members.get(b.parentId)||[]});
  }
  if(!blocks.length)throw Error('The export scope contains no blocks after scope and exclusion filters.');

@@ -1,3 +1,4 @@
+import {validateSetup} from './components/core.js';
 import {makeModel,parseAvorionXml,placeImportedModel} from './block-model.js';
 import {exportPaintedXml} from './color-workshop.js';
 import {upgradeGalleryColors} from './block-gallery.js';
@@ -37,7 +38,7 @@ export function snapshotModel(scene){
   if(!scene.loaded||!scene.model)return {version:1,empty:true};
   const model=scene.model;
   return {version:1,preview:!!scene.preview,fileName:model.fileName,fileSize:model.fileSize,
-    opacityOverrides:Object.fromEntries(model.blocks.filter(b=>Number.isFinite(b.opacity)).map(b=>[b.id,b.opacity])),turretMounts:model.turretMounts,placement:model.placement,xml:model.doc?exportPaintedXml(model):undefined,
+    opacityOverrides:Object.fromEntries(model.blocks.filter(b=>Number.isFinite(b.opacity)).map(b=>[b.id,b.opacity])),turretMounts:model.turretMounts,componentSetup:model.componentSetup,placementOffset:model.placementOffset,placement:model.placement,xml:model.doc?exportPaintedXml(model):undefined,
     blocks:model.doc?undefined:model.blocks.map(({el,itemEl,...block})=>block),coverage:coverageSnapshot(scene)};
 }
 function restoreCoverage(saved){
@@ -59,6 +60,8 @@ export function restoreModel(record){
   }
   for(const block of model.blocks){const opacity=record.opacityOverrides?.[block.id];if(Number.isFinite(opacity))block.opacity=Math.max(0,Math.min(1,opacity));}
   if(Array.isArray(record.turretMounts))model.turretMounts=record.turretMounts;
+  if(record.componentSetup)model.componentSetup=validateSetup(record.componentSetup);
+  if(!model.doc&&record.placementOffset)model.placementOffset=record.placementOffset;
   return {model,loaded:true,preview:!!record.preview,...restoreCoverage(record.coverage)};
 }
 

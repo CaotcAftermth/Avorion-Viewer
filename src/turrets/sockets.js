@@ -9,8 +9,8 @@ import {projectPoint} from '../navigation.js';
 import {createSocketClearance} from './socket-clearance.js';
 const types=new Set([20,21,24,25]);
 export const isTurretBlock=block=>types.has(block.typeIndex);
-export function blockSockets(block){
-  if(!isTurretBlock(block))return [];
+export function blockSockets(block){return isTurretBlock(block)?surfaceSockets(block):[];}
+export function surfaceSockets(block){
   const {positions}=blockSurfaceGeometry(block,defaultOrientationProfile()),groups=new Map();
   for(let i=0;i<positions.length;i+=9){
     const a=new THREE.Vector3().fromArray(positions,i),b=new THREE.Vector3().fromArray(positions,i+3),c=new THREE.Vector3().fromArray(positions,i+6);

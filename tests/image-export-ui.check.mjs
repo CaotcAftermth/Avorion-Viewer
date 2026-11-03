@@ -107,7 +107,7 @@ try{
  const annotationHandle=overlay.getByRole('button',{name:'Move annotation 1 in view 1',exact:true});await annotationHandle.click();
  assert.ok(await cards.nth(0).getByLabel('View 1 annotation text',{exact:true}).isVisible());assert.equal(await cards.nth(0).getByLabel('View 1 annotations',{exact:true}).inputValue(),'0');
  await customize.getByRole('button',{name:'Full screen',exact:true}).click();await ready();
- await page.waitForFunction(()=>document.querySelector('.blueprint-stage img').naturalWidth>640);
+ await page.waitForFunction(()=>document.querySelector('.blueprint-stage canvas').width>640);
  const fullSize=await stage.boundingBox();assert.ok(fullSize.width>normalSize.width*1.3,'full screen enlarges the editing surface');
  assert.ok(await customize.getByLabel('View 1 Name',{exact:true}).isHidden());
  assert.ok(await customize.getByRole('button',{name:'Orbit',exact:true}).isVisible());

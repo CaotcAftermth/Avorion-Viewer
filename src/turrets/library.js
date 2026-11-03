@@ -1,12 +1,27 @@
 import {openTurretWorkspace} from './workspace.js';
 import {thumbnail} from './thumbnail.js';
 import {importTurretXml} from './core.js';
+import {turretContentKey} from './embedded.js';
 const listeners=new Set();
 export const turretLibrary={assets:[],selectedId:null};
 let database;
 function db(){return database??=new Promise((resolve,reject)=>{const r=indexedDB.open('avorion-viewer.turret-assets.v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('assets',{keyPath:'id'});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.onblocked=()=>reject(Error('Turret storage is blocked by another tab.'));});}
 async function records(asset,remove=false){const database=await db();return new Promise((resolve,reject)=>{const tx=database.transaction('assets',asset?'readwrite':'readonly'),store=tx.objectStore('assets'),r=asset?(remove?store.delete(asset.id):store.put(asset)):store.getAll();tx.oncomplete=()=>resolve(r.result);tx.onabort=()=>reject(tx.error||Error('Turret storage failed.'));tx.onerror=()=>{};});}
 let ready;
+export async function loadTurretLibrary(){
+  await (ready??=records().then(assets=>{turretLibrary.assets=assets;emit();}).catch(error=>{ready=null;throw error;}));
+  return turretLibrary.assets;
+}
+let additions=Promise.resolve();
+export function addTurretAsset(asset){
+  const operation=additions.then(async()=>{
+    await loadTurretLibrary();
+    const key=turretContentKey(asset),existing=turretLibrary.assets.find(item=>turretContentKey(item)===key);
+    if(existing)return existing;
+    await records(asset);turretLibrary.assets.push(asset);emit();return asset;
+  });
+  additions=operation.catch(()=>{});return operation;
+}
 const emit=(selectionOnly=false)=>listeners.forEach(fn=>fn(selectionOnly));
 export function mountTurretLibrary(host,changed){
   host.classList.add('turret-library');let error='',busy=false,disposed=false;
@@ -49,9 +64,9 @@ export function mountTurretLibrary(host,changed){
     }
     const add=document.createElement('button');add.className='turret-asset-tile turret-import';add.textContent='+';add.title='Import turret XML';add.setAttribute('aria-label','Import turret XML');add.disabled=busy;grid.append(add);
     const input=document.createElement('input');input.type='file';input.accept='.xml';input.hidden=true;host.append(input);add.onclick=()=>input.click();
-    input.onchange=async()=>{const file=input.files[0];if(!file)return;busy=true;error='';draw();try{await ready;const asset=importTurretXml(await file.text(),file.name,crypto.randomUUID());const duplicate=turretLibrary.assets.find(a=>a.sourceXml===asset.sourceXml);if(duplicate){turretLibrary.selectedId=duplicate.id;error='Already imported: '+duplicate.name;changed();return;}await records(asset);turretLibrary.assets.push(asset);turretLibrary.selectedId=asset.id;changed();}catch(e){error=e.message;}finally{busy=false;emit();}};
+    input.onchange=async()=>{const file=input.files[0];if(!file)return;busy=true;error='';draw();try{const asset=importTurretXml(await file.text(),file.name,crypto.randomUUID());const saved=await addTurretAsset(asset);turretLibrary.selectedId=saved.id;if(saved.id!==asset.id)error='Already imported: '+saved.name;changed();}catch(e){error=e.message;}finally{busy=false;emit();}};
     const status=document.createElement('p');status.className='panel-note';status.setAttribute('role','status');status.textContent=error||(busy?'Importing turretâ€¦':'Turret assets Â· Saved in this browser');host.append(status);host.scrollTop=scrollTop;host.scrollLeft=scrollLeft;
   };
-  listeners.add(draw);draw();(ready??=records().then(assets=>{turretLibrary.assets=assets;emit();})).catch(e=>{error=e.message;draw();});
+  listeners.add(draw);draw();loadTurretLibrary().catch(e=>{error=e.message;draw();});
   return {dispose(){disposed=true;listeners.delete(draw);}};
 }

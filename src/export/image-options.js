@@ -71,7 +71,7 @@ export function captureImage(scene,view,preferences,size){
   if(!scene.loaded||!scene.model)throw Error('Load a ship before exporting an image.');
   const blocks=liveBlocks(scene).map(b=>({...b,el:undefined,itemEl:undefined,position:{...b.position},size:{...b.size},unknownAttrs:{...b.unknownAttrs},secondaryColor:secondaryColor(b)}));
   if(!blocks.length)throw Error('The ship contains no live blocks.');
-  const model=makeModel(blocks,scene.model.fileName);model.turretMounts=structuredClone(scene.model.turretMounts||[]);model.imageShipName=scene.model.doc?.documentElement.getAttribute('name');
+  const model=makeModel(blocks,scene.model.fileName);model.turretMounts=structuredClone(scene.model.turretMounts||[]);model.componentSetup=structuredClone(scene.model.componentSetup);model.placementOffset=structuredClone(scene.model.placementOffset);model.imageShipName=scene.model.doc?.documentElement.getAttribute('name');
   return {scene:{model,imageSourceModel:scene.model,imageSourceRevision:scene.revision,imageSourceAppearanceRevision:scene.appearanceRevision,imageSourceDirty:!!scene.appearanceDirty?.size,loaded:true,visible:scene.visible,revision:0,appearanceRevision:0,selected:scene.selected,selectedIds:new Set(scene.selectedIds),hiddenIds:new Set(scene.hiddenIds)},
     view:structuredClone(view),preferences:{...preferences},size:{...size},time:viewportFrameTime(view)??performance.now()/1000,
     shipName:scene.model.doc?.documentElement.getAttribute('name')||scene.model.fileName?.replace(/\.xml$/i,'')||'Ship'};
