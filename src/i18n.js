@@ -7,6 +7,7 @@ export const LANGUAGES = [
   ['es', 'Español'],
   ['fr', 'Français'],
   ['ja', '日本語'],
+  ['pl', 'Polski'],
   ['pt-BR', 'Português (Brasil)'],
   ['ru', 'Русский'],
   ['zh', '中文（简体）']

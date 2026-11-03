@@ -12,6 +12,7 @@ test('browser language resolves to a supported interface language', () => {
   assert.equal(resolveLanguage('auto', ['pt-PT']), 'pt-BR');
   assert.equal(resolveLanguage('auto', ['zh-CN']), 'zh');
   assert.equal(resolveLanguage('auto', ['ja-JP']), 'ja');
+  assert.equal(resolveLanguage('auto', ['pl-PL']), 'pl');
   assert.equal(resolveLanguage('auto', ['ko-KR']), 'en');
   assert.equal(resolveLanguage('fr'), 'fr');
   assert.equal(resolveLanguage('xx'), 'en');
