@@ -47,8 +47,9 @@ test('workspace duplication has unique IDs and no shared mutable view state', ()
   const original = defaults().workspaces[0].root, copy = cloneTree(original);
   const originalIds = new Set(leaves(original).map(n=>n.id));
   assert.ok(leaves(copy).every(n=>!originalIds.has(n.id)));
+  const zoom = leaves(original)[0].view.zoom;
   leaves(copy)[0].view.zoom = 2;
-  assert.equal(leaves(original)[0].view.zoom,1);
+  assert.equal(leaves(original)[0].view.zoom,zoom);
 });
 test('recursive minimum sizes protect children in nested splits', () => {
   const root=split('x',.5,split('x',.5,area(),area()),split('y',.5,area(),area()));

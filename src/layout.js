@@ -4,11 +4,44 @@ export const uid = () => globalThis.crypto.randomUUID();
 export const clamp = (n, low, high) => Math.max(low, Math.min(high, n));
 export const area = (editor = 'viewport') => ({ id: uid(), type: 'area', editor, toolbar: true, sidebar: false, sidebarWidth: 220, headerBottom: false, view: { yaw: Math.PI/4, pitch: Math.atan(1/Math.sqrt(2)), zoom: 1, panX: 0, panY: 0, grid: true, showThinBlocks: true, wire: false, tool: 'select', target: [0,0,1], roll: 0, projection: 'perspective' } });
 export const split = (axis, ratio, first, second) => ({ id: uid(), type: 'split', axis, ratio, first, second });
+// Shipped default workspaces. Display settings list only what differs from
+// VIEWPORT_DEFAULTS; ensureViewportOptions fills in the rest.
+const view = (yaw, pitch, zoom, panX, panY, projection, extra = {}) => ({ ...area().view, yaw, pitch, zoom, panX, panY, grid: false, target: [0, 0, 0], projection, ...extra });
+const editorArea = (editor, extra = {}) => Object.assign(area(editor), extra);
+const viewportPanels = () => ({ 'viewport:object:Native Transform': true, 'viewport:object:View': true });
+const viewportArea = (v, extra = {}) => editorArea('viewport', { view: v, panels: viewportPanels(), ...extra });
+const multiView = (yaw, pitch, zoom, panX, panY, display = {}, distance = 176.16) => viewportArea(view(yaw, pitch, zoom, panX, panY, 'orthographic', { showThinBlocks: false, orthographicDistance: distance, display: { showOverlays: false, background: 'THEME', ...display } }), { toolbar: false });
+const propertyPanels = (tab, open) => ({ propertyTab: tab, panelOpen: { ...open }, panels: Object.fromEntries(Object.entries(open).map(([key, value]) => ['properties:' + key, value])) });
 export function defaults() {
+  const generalProperties = { 'object:Block Preview': true, 'object:Block Inspection': true, 'object:Transform': true, 'object:Block': true, 'object:Appearance': true, 'object:Native Data': false, 'scene:Avorion Model': true, 'scene:Engine State': true, 'scene:Model Summary': true, 'scene:Capture': true, 'turrets:Turret sockets': true, 'turrets:Weapon Coverage': true, 'workspace:Window system': true, 'world:World': false, 'shaders:Surface': false, 'shaders:Lighting': false, 'shaders:Game Surface': false, 'shaders:Environment': false, 'shaders:Emission': true };
+  const armamentProperties = { 'object:Transform': true, 'object:Block': true, 'object:Appearance': true, 'object:Native Data': true, 'scene:Engine State': true, 'scene:Model Summary': true, 'scene:Capture': true, 'turrets:Turret sockets': true, 'turrets:Library asset': false, 'turrets:Turret pose and size': true, 'turrets:Directional fields of fire': true, 'turrets:Weapon Coverage': true, 'turrets:Analysis settings and assumptions': true, 'workspace:Window system': true, 'world:World': true, 'shaders:Surface': true, 'shaders:Lighting': true, 'shaders:Game Surface': true, 'shaders:Environment': true, 'shaders:Emission': true };
+  const general = split('x', 0.77,
+    split('y', 0.82,
+      viewportArea(view(0.88, 0.4828, 0.0701, 2.815, 18.829, 'perspective', { orthographicDistance: 174.12, interactionMode: 'object', display: { axisX: false, axisY: false, axisZ: false, gridScale: 2, shading: 'RENDERED', backgroundColor: '#000000', specular: false, clipEnd: 10000, axisLength: 500, axisWidth: 1.5, axisBrightness: 2, ambientStrength: 1.5, ambientDetail: 0.7 } })),
+      editorArea('info', { infoNewestFirst: true })),
+    split('y', 0.3926, editorArea('outliner', { shipGrouping: 'type' }), editorArea('properties', propertyPanels('object', generalProperties))));
+  const multi = split('y', 0.4718,
+    split('x', 0.3175,
+      multiView(0, 0, 0.05677, 0, 0, { showModelDimensions: true }),
+      split('x', 0.5325,
+        multiView(1.0147, 0.6155, 0.06065, -1.628, 12.737, { showGizmo: false }, 164.89),
+        multiView(Math.PI, 0, 0.05677, 0, 0))),
+    split('x', 0.5,
+      Object.assign(multiView(Math.PI / 2, 0, 0.05677, 0, 0, { showModelDimensions: true }), { headerBottom: true }),
+      Object.assign(multiView(Math.PI / 2, Math.PI / 2, 0.11304, 0, 0, { showModelDimensions: true }, 88.47), { headerBottom: true })));
+  const painting = split('x', 0.8019,
+    viewportArea(view(0.5463, 0.2481, 0.05509, 2.206, 6.841, 'orthographic', { showThinBlocks: false, orthographicDistance: 181.54, interactionMode: 'paint', paint: { tool: 'brush', scope: 'all', radius: 0, lensZoom: 2, lensSize: 200, symmetry: { x: false, y: false, z: false }, origin: { x: 0, y: 0, z: 0 }, fillRule: 'color', lensQuality: 'detail', planeVisible: { x: true, y: true, z: true } }, display: { axisX: false, axisY: false, axisZ: false, showText: false, showStats: false, wireOverlay: true, background: 'THEME', ambientOnly: true, ambientStrength: 2, ambientDetail: 0.7 } })),
+    editorArea('color', { colorEditor: { tab: 'wheel', mode: 'Analogous' } }));
+  const armament = split('x', 0.77,
+    split('y', 0.7,
+      viewportArea(view(0.8067, 0.4501, 0.05679, 2.953, 13.856, 'perspective', { orthographicDistance: 176.09, interactionMode: 'socket', display: { shading: 'RENDERED', background: 'THEME', objectOutline: false } })),
+      editorArea('assets', { assetKind: 'turrets', panels: { 'assets:object:Components': true, 'assets:object:Ship component sockets': true } })),
+    split('y', 0.36, editorArea('outliner', { shipGrouping: 'type' }), editorArea('properties', propertyPanels('turrets', armamentProperties))));
   return { version: 1, active: 'layout', workspaces: [
-    { id: 'layout', name: 'Layout', root: split('x', 0.77, split('y', 0.82, area(), area('info')), split('y', 0.36, area('outliner'), area('properties'))) },
-    { id: 'inspection', name: 'Inspection', root: split('x', 0.74, area(), split('y', 0.4, area('outliner'), area('properties'))) },
-    { id: 'compare', name: 'Compare', root: split('x', 0.5, area(), area()) }
+    { id: 'layout', name: 'General', root: general },
+    { id: 'inspection', name: 'Multi-View', root: multi },
+    { id: 'compare', name: 'Painting & Regions', root: painting },
+    { id: 'armament', name: 'Armament', root: armament }
   ] };
 }
 export function leaves(node) { return node.type === 'area' ? [node] : [...leaves(node.first), ...leaves(node.second)]; }

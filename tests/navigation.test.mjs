@@ -116,7 +116,7 @@ test('numpad modifiers map before generic Ctrl filtering', () => {
   assert.deepEqual(navigationKey({code:'Numpad4',ctrlKey:true}),{action:'pan',x:40,y:0});
   assert.deepEqual(navigationKey({code:'Numpad6',shiftKey:true}),{action:'roll',value:STEP});
   assert.deepEqual(navigationKey({code:'Numpad5'}),{action:'projection'});
-  assert.deepEqual(navigationKey({code:'NumpadDecimal'}),{action:'selected'});
+  assert.deepEqual(navigationKey({code:'KeyF'}),{action:'selected'});
   assert.deepEqual(navigationKey({code:'KeyB',shiftKey:true}),{action:'region'});
   assert.equal(navigationKey({code:'Numpad4',metaKey:true}),null);
   assert.equal(navigationKey({code:'Digit4'}),null);

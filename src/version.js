@@ -18,5 +18,5 @@ export const FEATURE_AREAS = [
   ['0.11', 'Preferences and languages', 'Preferences, keymaps, input styles and 8 interface languages'],
 ];
 // Smaller features and fixes shipped since the last feature area.
-export const PATCH = 0;
+export const PATCH = 63;
 export const APP_VERSION = `${FEATURE_AREAS.at(-1)[0]}.${PATCH}`;

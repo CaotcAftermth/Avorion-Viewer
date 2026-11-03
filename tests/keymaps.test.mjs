@@ -35,11 +35,11 @@ test('conflicts respect context and global shortcuts',()=>{
 });
 test('old saved preferences migrate with defaults; edited bindings and colors round-trip',()=>{
   const migrated=parsePreferences(JSON.stringify({version:1,theme:'graphite'}));
-  assert.equal(migrated.navigationWidget,'gizmo');assert.equal(migrated.keymap_front,'Numpad1');
+  assert.equal(migrated.navigationWidget,'cube');assert.equal(migrated.keymap_front,'Numpad1');
   let raw=null;const storage={getItem:()=>raw,setItem:(_,value)=>raw=value};const store=createPreferencesStore(storage);
-  store.set('keymap_front','KeyF');store.set('outlinerCustomColors',true);store.set('outlinerBackground','#123456');store.set('navigationWidget','cube');
+  store.set('keymap_front','KeyF');store.set('outlinerCustomColors',true);store.set('outlinerBackground','#123456');store.set('navigationWidget','gizmo');
   const restored=createPreferencesStore(storage).value;
-  assert.equal(restored.keymap_front,'KeyF');assert.equal(restored.navigationWidget,'cube');assert.equal(editorTheme(restored,'outliner').background,'#123456');
+  assert.equal(restored.keymap_front,'KeyF');assert.equal(restored.navigationWidget,'gizmo');assert.equal(editorTheme(restored,'outliner').background,'#123456');
 });
 test('editor overrides do not bleed into other editors or erase preset selection',()=>{
   const p={...FACTORY_PREFERENCES,theme:'graphite',viewportCustomColors:true,viewportBackground:'#112233',viewportAccent:'#abcdef'};

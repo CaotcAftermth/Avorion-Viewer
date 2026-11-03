@@ -18,7 +18,7 @@ export const PREFERENCE_SECTIONS = [
   { id: 'viewport', label: '3D Viewport', panels: [
     { label: 'Overlays', fields: [
       { key: 'viewCubeSize', label: 'Navigation View Cube Size', type: 'number', min: 80, max: 240, step: 10, default: 120, suffix: 'px', description: 'Size of the view cube and its surrounding controls.' },
-      { key: 'navigationWidget', label: 'Navigation Widget', type: 'select', options: [['gizmo','Navigation Gizmo'],['cube','Navigation View Cube']], default: 'gizmo', description: 'Choose an axis gizmo or a rotating cube with clickable view faces.' },
+      { key: 'navigationWidget', label: 'Navigation Widget', type: 'select', options: [['gizmo','Navigation Gizmo'],['cube','Navigation View Cube']], default: 'cube', description: 'Choose an axis gizmo or a rotating cube with clickable view faces.' },
       { key: 'showGizmo', label: 'Navigation Gizmos', type: 'checkbox', default: true, description: 'Show axis alignment, pan, zoom, and projection controls.' },
       { key: 'showViewText', label: 'View Information', type: 'checkbox', default: true, description: 'Show the view name and active object in the viewport.' },
       { key: 'showStats', label: 'Statistics', type: 'checkbox', default: false, description: 'Show visible object, vertex, and face counts.' }
@@ -28,13 +28,13 @@ export const PREFERENCE_SECTIONS = [
       { key: 'dimensionAxisColors', label: 'Match Axis Colors', type: 'checkbox', default: false, description: 'Color width red, height blue, and length green to match the displayed axes (native X, Y, Z respectively).' }
     ] },
     { label: 'Painting', fields: [
-      { key: 'paletteMenuSize', label: 'Radial Palette Size', type: 'number', min: 280, max: 720, step: 20, default: 420, suffix: 'px', description: 'Diameter of the paint palette radial menu. Automatically fits within the browser window.' }
+      { key: 'paletteMenuSize', label: 'Radial Palette Size', type: 'number', min: 280, max: 720, step: 20, default: 340, suffix: 'px', description: 'Diameter of the paint palette radial menu. Automatically fits within the browser window.' }
     ] },
     { label: 'Paint Magnifier', fields: [
       { key: 'paintLensZoom', label: 'Magnifier Zoom', type: 'number', min: 2, max: 8, step: 1, default: 4, suffix: '×', description: 'Zoom when holding RMB in Paint mode.' },
       { key: 'paintLensSize', label: 'Magnifier Size', type: 'number', min: 120, max: 360, step: 20, default: 200, suffix: 'px', description: 'Diameter of the paint magnifier.' },
-      { key: 'paintLensQuality', label: 'Magnifier Quality', type: 'select', options: [['smooth','Smooth pixels'],['detail','Render detail']], default: 'smooth', description: 'Render detail redraws the magnified model. Show Wireframe also uses detail rendering.' },
-      { key: 'paintLensWireframe', label: 'Show Wireframe', type: 'checkbox', default: false, description: 'Overlay model edges inside the magnifier using the viewport wireframe styling. Uses detail rendering without changing the main viewport.' }
+      { key: 'paintLensQuality', label: 'Magnifier Quality', type: 'select', options: [['smooth','Smooth pixels'],['detail','Render detail']], default: 'detail', description: 'Render detail redraws the magnified model. Show Wireframe also uses detail rendering.' },
+      { key: 'paintLensWireframe', label: 'Show Wireframe', type: 'checkbox', default: true, description: 'Overlay model edges inside the magnifier using the viewport wireframe styling. Uses detail rendering without changing the main viewport.' }
     ] },
     { label: 'Selection', fields: [
       { key: 'outlineWidth', label: 'Outline Width', type: 'number', min: 1, max: 4, step: 0.1, default: 1.4, suffix: 'px', description: 'Width of selected geometry edges.' }
@@ -71,7 +71,7 @@ export const PREFERENCE_SECTIONS = [
   ] },
   { id: 'system', label: 'System', panels: [
     { label: 'Viewport Rendering', fields: [
-      { key: 'simplifyThreshold', label: 'Simplified Rendering Threshold', type: 'number', min: 1, max: 1000000, step: 1, default: 30000, suffix: 'blocks', description: 'Above this live block count, disable animated block effects. Block selection and focus remain available. Textures, shader settings, and visibility controls remain available.' },
+      { key: 'simplifyThreshold', label: 'Simplified Rendering Threshold', type: 'number', min: 1, max: 1000000, step: 1, default: 50000, suffix: 'blocks', description: 'Above this live block count, disable animated block effects. Block selection and focus remain available. Textures, shader settings, and visibility controls remain available.' },
       { key: 'pixelRatio', label: 'Resolution Limit', type: 'select', numeric: true, options: [[1,'1× · Performance'],[1.5,'1.5× · Balanced'],[2,'2× · Quality']], default: 2, description: 'Maximum canvas pixels per display pixel, limited by your screen. Higher values use more memory.' }
     ] }
   ] },
@@ -136,10 +136,10 @@ PREFERENCE_SECTIONS.find(s=>s.id==='shaders').panels.push(
     {key:'shaderSpillRadius',label:'Light Spill Radius',type:'number',min:1,max:50,step:.5,default:5,suffix:'u',description:'Distance in native units that spilled light reaches. Light passes through blocks; there are no spill shadows.'},
     {key:'shaderBloomThreshold',label:'Bloom Threshold',type:'number',min:0,max:2,step:.05,default:.8,description:'Brightness above which surfaces and effects bloom. Native threshold is uncalibrated.'},
     {key:'shaderThinEnginePlumes',label:'Plumes from Hidden Thin Engines',type:'checkbox',default:true,description:'Keep engine plumes when zero-thickness or thin engine bodies are hidden by Show Thin Blocks. Manually hidden engines remain hidden.'},
-    {key:'shaderEngineState',label:'Engine State',type:'select',numeric:true,default:0,options:[[0,'Idle'],[1,'Cruise'],[2,'Boost']],description:'Engine plumes as in game: none when idle, fixed lengths when cruising or boosting. Length does not depend on engine size.'},
-    {key:'shaderCruiseLength',label:'Cruise Plume Length',type:'number',min:0,max:30,step:.25,default:4,suffix:'u',description:'Engine plume length in native units while cruising. Observed in game: 4 blocks.'},
+    {key:'shaderEngineState',label:'Engine State',type:'select',numeric:true,default:1,options:[[0,'Idle'],[1,'Cruise'],[2,'Boost']],description:'Engine plumes as in game: none when idle, fixed lengths when cruising or boosting. Length does not depend on engine size.'},
+    {key:'shaderCruiseLength',label:'Cruise Plume Length',type:'number',min:0,max:30,step:.25,default:5,suffix:'u',description:'Engine plume length in native units while cruising. Observed in game: 4 blocks.'},
     {key:'shaderBoostLength',label:'Boost Plume Length',type:'number',min:0,max:30,step:.25,default:8.25,suffix:'u',description:'Engine plume length in native units while boosting. Observed in game: about 8 to 8.5 blocks.'},
-    {key:'shaderThrust',label:'Thruster Preview',type:'number',min:0,max:1,step:.05,default:0,description:'Viewer-only animated thruster jet intensity. Jet length and spacing remain approximations.'},
+    {key:'shaderThrust',label:'Thruster Preview',type:'number',min:0,max:1,step:.05,default:.2,description:'Viewer-only animated thruster jet intensity. Jet length and spacing remain approximations.'},
     {key:'shaderBarrier',label:'Hangar Barrier',type:'number',min:0,max:1,step:.05,default:1,description:'Hangar barrier visibility in the viewer preview.'}
   ]}
 );
@@ -152,7 +152,7 @@ PREFERENCE_SECTIONS.find(s=>s.id==='shaders').panels.find(p=>p.label==='Lighting
 PREFERENCE_SECTIONS.find(s=>s.id==='viewport').panels.push(
   {label:'Vignette',fields:[
     {key:'vignetteEnabled',label:'Enable Vignette',type:'checkbox',default:false,description:'Darken viewport edges without affecting interface controls.'},
-    {key:'vignetteStrength',label:'Vignette Strength',type:'number',min:0,max:1,step:.05,default:.35,suffix:'×',description:'Edge darkening strength, from none to black.'}
+    {key:'vignetteStrength',label:'Vignette Strength',type:'number',min:0,max:1,step:.05,default:.5,suffix:'×',description:'Edge darkening strength, from none to black.'}
   ]},
   {label:'Clipping',fields:[
     {key:'clipStart',label:'Clip Start',type:'number',min:.0001,max:9999999,step:.0001,default:.05,suffix:'u',description:'Nearest visible camera depth in native model units. Must be less than Clip End.'},

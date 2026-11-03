@@ -10,7 +10,7 @@ export const KEYMAPS = [
 
   key('maximize','Maximize Area','Window','Ctrl+Space'),
 
-  key('focus','Focus Mode','Window','Ctrl+Alt+Space'),
+  key('focus','Focus Mode','Window','Ctrl+Shift+Space'),
 
   key('saveLayout','Save Workspace Layout','Window','Ctrl+KeyS'),
 
@@ -48,7 +48,7 @@ export const KEYMAPS = [
 
   key('rollRight','Roll Right','3D Viewport','Shift+Numpad6',{command:{action:'roll',value:1}}),
 
-  ...[['projection','Toggle Projection','Numpad5'],['opposite','Opposite View','Numpad9'],['frame','Frame All','Home'],['selected','Frame Selected','NumpadDecimal'],['region','Zoom Region','Shift+KeyB']].map(([id,label,binding])=>key(id,label,'3D Viewport',binding,{command:{action:id}})),
+  ...[['projection','Toggle Projection','Numpad5'],['opposite','Opposite View','Numpad9'],['frame','Frame All','Home'],['selected','Frame Selected','KeyF'],['region','Zoom Region','Shift+KeyB']].map(([id,label,binding])=>key(id,label,'3D Viewport',binding,{command:{action:id}})),
 
   key('zoomIn','Zoom In','3D Viewport','NumpadAdd',{command:{action:'zoom',value:1.2}}),
 

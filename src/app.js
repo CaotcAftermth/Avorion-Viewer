@@ -421,8 +421,7 @@ function renderTopbar(){
   }
   const add=button('Add workspace','+',()=>anchorMenu(add,'Add workspace',[
     {label:'Single viewport',action:()=>addWorkspace('Viewport',area())},
-    {label:'Layout',action:()=>addWorkspace('Layout',defaults().workspaces[0].root)},
-    {label:'Comparison',action:()=>addWorkspace('Compare',defaults().workspaces[2].root)}
+    ...defaults().workspaces.map(w=>({label:w.name,action:()=>addWorkspace(w.name,w.root)}))
   ]),'add-workspace');tabs.append(add);
 }
 $('#workspaces').addEventListener('keydown',e=>{
