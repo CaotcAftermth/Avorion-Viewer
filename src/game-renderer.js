@@ -1,7 +1,7 @@
 import {presentation} from './turrets/showcase.js';
 import {WeaponEffectsRenderer} from './turrets/effect-renderer.js';
 import {syncAssetGuides,releaseAssetGuides} from './turrets/asset-guides.js';
-import {syncTurrets,pickMountedTurret} from './turrets/render.js';
+import {syncTurrets,pickMountedTurret,pickMountedComponent} from './turrets/render.js';
 import {syncCoverage,pickCoverage,releaseCoverage} from './turrets/coverage-render.js';
 import {coverageOptions} from './turrets/coverage-sampling.js';
 import * as THREE from './vendor/three.module.js';
@@ -395,6 +395,26 @@ export function socketExposed(scene,view,width,height,socket,p=FACTORY_PREFERENC
   return !!hit&&hit.blockId===socket.blockId&&hit.point.distanceTo(point)<tolerance;
 }
 
+// A mounted component under the cursor, unless the hull is in front of it.
+export function pickComponent(scene,view,width,height,x,y,p){
+ if(!scene.visible||!scene.loaded)return null;
+ const camera=cameraFor(view,width,height,p);raycaster.setFromCamera(new THREE.Vector2(x/width*2-1,1-y/height*2),camera);
+ const hit=pickMountedComponent(raycaster);if(!hit)return null;
+ const hidden=viewportHiddenIds(scene,view),ship=rendered&&raycaster.intersectObjects(rendered.group.children.filter(c=>c.userData.textured),false).find(h=>!hidden.has(h.blockId));
+ if(ship&&ship.distance<hit.distance-1e-4)return null;
+ return hit.object.parent.userData;
+}
+// The block and world-space point under the cursor (for picking a face).
+export function pickGamePoint(scene,view,width,height,x,y,p=FACTORY_PREFERENCES){
+ if(exportOwner||!rendered||!scene.visible||!scene.loaded)return null;
+ const camera=cameraFor(view,width,height,p),hiddenIds=viewportHiddenIds(scene,view);
+ raycaster.setFromCamera(new THREE.Vector2(x/width*2-1,1-y/height*2),camera);
+ for(const hit of raycaster.intersectObjects(rendered.group.children.filter(c=>c.userData.textured),false)){
+  const depth=-hit.point.clone().applyMatrix4(camera.matrixWorldInverse).z;if(depth<camera.near||depth>camera.far)continue;
+  if(hit.blockId&&!hiddenIds.has(hit.blockId))return {blockId:hit.blockId,point:hit.point.toArray(),direction:raycaster.ray.direction.toArray()};
+ }
+ return null;
+}
 export function pickTurret(scene,view,width,height,x,y,p){
  if(!scene.visible||!scene.loaded)return null;
  const camera=cameraFor(view,width,height,p);raycaster.setFromCamera(new THREE.Vector2(x/width*2-1,1-y/height*2),camera);

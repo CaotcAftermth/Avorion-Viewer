@@ -13,6 +13,9 @@ export function validateFrame(value){
 export function validateComponent(asset){
   if(typeof asset?.id!=='string'||typeof asset.name!=='string'||!Array.isArray(asset.blocks)||!asset.blocks.length||asset.blocks.length>100000)throw Error('Invalid component asset.');
   validateFrame(asset.attachment);
+  // Library organisation: optional folder and tags.
+  if(asset.folder!==undefined&&(typeof asset.folder!=='string'||asset.folder.length>100))throw Error('Invalid component folder.');
+  if(asset.tags!==undefined&&(!Array.isArray(asset.tags)||asset.tags.length>50||asset.tags.some(tag=>typeof tag!=='string'||tag.length>50)))throw Error('Invalid component tags.');
   for(const block of asset.blocks)if(!['x','y','z'].every(axis=>Number.isFinite(block.position?.[axis])&&Number.isFinite(block.size?.[axis])&&block.size[axis]>0)||!Number.isInteger(block.typeIndex)||![block.look,block.up].every(n=>Number.isInteger(n)&&n>=0&&n<=5)||Math.floor(block.look/2)===Math.floor(block.up/2)||!Number.isInteger(block.materialIndex)||!/^([0-9a-f]{8})$/i.test(block.color))throw Error('Invalid component block.');
   return asset;
 }
@@ -25,7 +28,7 @@ export function validateSetup(setup){
   const ids=new Set();
   for(const socket of setup.sockets){validateFrame(socket);if(typeof socket.id!=='string'||ids.has(socket.id)||typeof socket.name!=='string'||(socket.blockId!==undefined&&typeof socket.blockId!=='string'))throw Error('Invalid or duplicate component socket.');ids.add(socket.id);}
   const occupied=new Set();
-  for(const mount of setup.mounts){validateComponent(mount.asset);if(typeof mount.id!=='string'||typeof mount.socketId!=='string'||occupied.has(mount.socketId)||!Number.isFinite(mount.scale)||mount.scale<=0||mount.scale>1000||!Number.isFinite(mount.twist))throw Error('Invalid component mount.');occupied.add(mount.socketId);}
+  for(const mount of setup.mounts){validateComponent(mount.asset);if(typeof mount.id!=='string'||typeof mount.socketId!=='string'||occupied.has(mount.socketId)||(mount.name!==undefined&&(typeof mount.name!=='string'||mount.name.length>100))||(mount.hidden!==undefined&&typeof mount.hidden!=='boolean')||!Number.isFinite(mount.scale)||mount.scale<=0||mount.scale>1000||!Number.isFinite(mount.twist))throw Error('Invalid component mount.');occupied.add(mount.socketId);}
   return setup;
 }
 const socketCache=new WeakMap();

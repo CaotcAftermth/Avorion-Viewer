@@ -33,6 +33,8 @@ const paths = {
   eyeClosed: '<path d="M1 6s3 5 7 5 7-5 7-5M3 9l-1 2M6 11l-.5 2M10 11l.5 2M13 9l1 2"/>',
   isolate: '<circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="2" fill="currentColor" stroke="none"/>',
   showAll: '<circle cx="8" cy="8" r="5.5"/><path d="M4 8h8M8 4v8"/>',
+  // A module with a mounting plate: Properties › Components.
+  component: '<path d="M4 2h8v7H4Z"/><path d="M6 9v3M10 9v3M3 12h10v2H3Z"/><path d="M6 5h4"/>',
   collection: '<path d="M2 3h5l2 2h5v9H2Z"/><path d="M2 7h12"/>',
   scene: '<path d="m2 13 4-8 4 8Zm6 0 3-5 3 5Z"/><circle cx="11" cy="3" r="1.5"/>',
   solid: '<circle cx="8" cy="8" r="6" fill="currentColor" stroke="none"/>',

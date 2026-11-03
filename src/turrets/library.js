@@ -65,7 +65,7 @@ export function mountTurretLibrary(host,changed){
     const add=document.createElement('button');add.className='turret-asset-tile turret-import';add.textContent='+';add.title='Import turret XML';add.setAttribute('aria-label','Import turret XML');add.disabled=busy;grid.append(add);
     const input=document.createElement('input');input.type='file';input.accept='.xml';input.hidden=true;host.append(input);add.onclick=()=>input.click();
     input.onchange=async()=>{const file=input.files[0];if(!file)return;busy=true;error='';draw();try{const asset=importTurretXml(await file.text(),file.name,crypto.randomUUID());const saved=await addTurretAsset(asset);turretLibrary.selectedId=saved.id;if(saved.id!==asset.id)error='Already imported: '+saved.name;changed();}catch(e){error=e.message;}finally{busy=false;emit();}};
-    const status=document.createElement('p');status.className='panel-note';status.setAttribute('role','status');status.textContent=error||(busy?'Importing turretâ€¦':'Turret assets Â· Saved in this browser');host.append(status);host.scrollTop=scrollTop;host.scrollLeft=scrollLeft;
+    const status=document.createElement('p');status.className='panel-note';status.setAttribute('role','status');status.textContent=error||(busy?'Importing turret…':'Turret assets · Saved in this browser');host.append(status);host.scrollTop=scrollTop;host.scrollLeft=scrollLeft;
   };
   listeners.add(draw);draw();loadTurretLibrary().catch(e=>{error=e.message;draw();});
   return {dispose(){disposed=true;listeners.delete(draw);}};

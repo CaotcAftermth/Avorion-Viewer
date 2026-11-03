@@ -8,8 +8,13 @@ import {renderWorkspaceNode} from './workspace-tree.js';
 import {rememberEditorScroll,restoreEditorScrollAfterLayout} from './editor-scroll.js';
 import {mountTurretOutliner} from './turrets/editors.js';
 import {mountHistory} from './turrets/mounts.js';
-import {mountAttachmentLibrary} from './attachment-library.js';
+import {mountAttachmentLibrary,ASSET_KINDS} from './attachment-library.js';
 import {restoreComponentSetup} from './components/storage.js';
+import {mountComponentProperties} from './components/properties.js';
+import {mountComponentOutliner} from './components/outliner.js';
+import {componentHistory,detachComponent,changeSetup} from './components/mounting.js';
+import {componentSetup} from './components/core.js';
+import {validateComponent} from './components/core.js';
 import {mountTurretProperties} from './turrets/properties.js';
 import {createSessionPersistence} from './session-persistence.js';
 import {createCrashGuard,findCrashRecords,forgetCrashRecords,askCrashRecovery,warnLiveFailure,isMemoryFailure} from './crash-guard.js';
@@ -54,7 +59,7 @@ import { startLoading, nextPaint } from './loading-indicator.js';
 const $ = selector => document.querySelector(selector);
 const escape = text => String(text).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const editorParam = new URLSearchParams(location.search).get('editor');
-const embeddedAsset = editorParam==='turret', embeddedBlock = editorParam==='block', embedded = embeddedAsset||embeddedBlock;
+const embeddedAsset = editorParam==='turret', embeddedBlock = editorParam==='block', embeddedComponent = editorParam==='component', embedded = embeddedAsset||embeddedBlock||embeddedComponent;
 let assetDraft=null;
 const STORAGE = 'avorion-viewer.window-system.v1';
 const preferences=createPreferencesStore({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)});
@@ -655,6 +660,16 @@ function headerFor(node){
       header.append(filter,order,button('Copy activity log','Copy',()=>copyLog(node.infoFilter==='problems')),button('Clear activity log','Clear',()=>clearLog()));
     }
   }
+  if(node.editor==='assets'){
+    // Asset kind switch sits beside Area options, like the Info editor's header buttons.
+    const kinds=document.createElement('span');kinds.className='asset-kind-switch';kinds.setAttribute('role','group');kinds.setAttribute('aria-label','Asset type');
+    const current=node.assetKind==='components'?'components':'turrets';
+    for(const [kind,label] of ASSET_KINDS){
+      const choice=button(`Show ${label.toLowerCase()} in the Asset Library`,escape(t(label)),()=>{node.assetKind=kind;for(const b of kinds.children){b.classList.toggle('active',b.dataset.kind===kind);b.setAttribute('aria-pressed',String(b.dataset.kind===kind));}renderers.find(r=>r.assetAreaId===node.id)?.show(kind);save();});
+      choice.dataset.kind=kind;choice.classList.toggle('active',kind===current);choice.setAttribute('aria-pressed',String(kind===current));kinds.append(choice);
+    }
+    header.append(kinds);
+  }
   const options=button('Area options','⋮',e=>areaMenu(e,node),'icon-button');header.append(options);
   header.addEventListener('contextmenu',e=>{e.preventDefault();areaMenu(e,node);});
   return header;
@@ -799,6 +814,7 @@ function navigationItems(node){
 function renderOutliner(body,node){
   renderers.push(mountShipStructure(body,node,scene,{getPreferences:()=>preferences.value,getView:structureView,select:selectStructure,visibility:visibilityStructure,focus:focusStructure,menu,save,reveal:(ids,kind)=>revealStructure(ids,{kind})}));
   renderers.push(mountTurretOutliner(body,scene,refreshStructure));
+  renderers.push(mountComponentOutliner(body,scene,refreshStructure));
 }
 function captureViewport(){return leaves(workspace().root).find(n=>n.id===lastViewportId&&n.editor==='viewport')||leaves(workspace().root).find(n=>n.editor==='viewport');}
 function openCapture(imageType){
@@ -807,10 +823,11 @@ function openCapture(imageType){
  openExportDialog(scene,node.view,ids=>selectStructure(ids),{imageType,preferences:preferences.value,canvas:areaElement(node.id)?.querySelector('canvas')});
 }
 function syncSceneProperties(){document.querySelectorAll('.scene-properties').forEach(el=>el.refresh?.());}
-const PROPERTY_TABS=[['object','cube','Object properties'],['scene','scene','Scene properties'],['world','world','World sky'],['shaders','rendered','Shaders'],['turrets','turret','Turrets'],['workspace','properties','Workspace settings']];
+const PROPERTY_TABS=[['object','cube','Object properties'],['scene','scene','Scene properties'],['world','world','World sky'],['shaders','rendered','Shaders'],['turrets','turret','Turrets'],['components','component','Components'],['workspace','properties','Workspace settings']];
 function mountPropertyTab(tab,content,node,searching=false){
   if(tab==='object')mountBlockInspector(content,scene,(change)=>{if(change?.appearance){refreshStructure();return;}scene.model={...makeModel(scene.model.blocks,scene.model.fileName),turretMounts:scene.model.turretMounts};scene.revision++;render();},{reveal:revealStructure,preferences});
   if(tab==='turrets')mountTurretProperties(content,scene,refreshStructure,socket=>{const node=leaves(workspace().root).find(n=>n.editor==='viewport');const canvas=node&&areaElement(node.id)?.querySelector('canvas');return !!canvas&&socketExposed(scene,node.view,canvas.clientWidth,canvas.clientHeight,socket,preferences.value);},(direction,bounds)=>{const viewport=captureViewport();if(viewport){if(direction==='coverage'){viewport.view.target=nativeToView(bounds.center);viewport.view.zoom=3/Math.max(.1,bounds.radius);viewport.view.panX=viewport.view.panY=0;save();renderers.find(r=>r.id===viewport.id)?.draw();}else{viewport.view.projection='orthographic';setView(viewport,direction);}}});
+  if(tab==='components')mountComponentProperties(content,scene,refreshStructure);
   // World and Shaders edit live preferences beside an unobscured viewport. The Properties search covers them, so they have no search bar of their own.
   if(tab==='world'||tab==='shaders'){
     if(!lookEditors.has(node.id+tab))lookEditors.set(node.id+tab,{});
@@ -981,10 +998,17 @@ document.addEventListener('keydown',e=>{
     if(search){e.preventDefault();if(match('clearSearch')&&search.value){search.value='';active.propertySearch='';save();const body=areaElement(active.id)?.querySelector('.area-body');if(body)renderProperties(body,active);}search.focus();search.select();return;}
   }
   if(e.target.closest('input,textarea,select,[contenteditable=true]'))return;
-  if(match('undoPaint')||match('redoPaint')){e.preventDefault();const active=currentArea();if(active.view?.interactionMode==='socket'&&active.editor==='viewport'||active.editor==='properties'&&active.propertyTab==='turrets'||active.editor==='outliner'&&scene.selectedTurretId){mountHistory(scene,match('redoPaint'));refreshStructure();}else changePaintHistory(match('redoPaint'));return;}
+  if(match('undoPaint')||match('redoPaint')){e.preventDefault();const active=currentArea();
+    // Component edits have their own history while component work is in focus.
+    if(!embedded&&(active.editor==='properties'&&active.propertyTab==='components'||active.editor==='assets'&&active.assetKind==='components'||scene.selectedComponentMountId&&['viewport','outliner'].includes(active.editor)||active.editor==='viewport'&&active.view?.interactionMode==='socket'&&scene.selectedComponentSocketId)){componentHistory(scene,match('redoPaint')).catch(error=>{scene.componentMessage=error.message;}).finally(refreshStructure);return;}
+    if(active.view?.interactionMode==='socket'&&active.editor==='viewport'||active.editor==='properties'&&active.propertyTab==='turrets'||active.editor==='outliner'&&scene.selectedTurretId){mountHistory(scene,match('redoPaint'));refreshStructure();}else changePaintHistory(match('redoPaint'));return;}
   if(match('preferences')){e.preventDefault();openPreferences();return;}
   if(operation)return;
   const node=currentArea();
+  if(e.key==='Delete'&&!embedded&&scene.selectedComponentMountId&&['viewport','outliner'].includes(node.editor)&&scene.model){
+    const mount=componentSetup(scene.model).mounts.find(m=>m.id===scene.selectedComponentMountId);
+    if(mount){e.preventDefault();changeSetup(scene,detachComponent(scene,mount)).then(()=>log(`${mount.name||mount.asset.name} detached.`)).catch(error=>{scene.componentMessage=error.message;}).finally(refreshStructure);return;}
+  }
   if(node.editor==='preferences'&&(match('searchPreferences')||match('clearSearch'))){e.preventDefault();renderers.find(r=>r.preferenceAreaId===node.id)?.focusSearch(match('clearSearch'));return;}
   if(match('maximize')||match('focus')){e.preventDefault();closeMenu();toggleMaximize(node.id,match('focus'));return;}
   if(match('saveLayout')){e.preventDefault();saveNow();notify(!preferences.value.rememberLayout?'Layout saving is paused in Preferences.':storageAvailable?'Layout saved in this browser.':'Browser storage is unavailable.');return;}
@@ -1056,3 +1080,23 @@ export async function configureBlockWorkspace(block, textureFiles=[], sharedText
  return {snapshot(){const {el,itemEl,...edited}=scene.model.blocks[0];return structuredClone(edited);},dispose(){clearInterval(watch);renderers.forEach(r=>r.dispose());renderers=[];releaseGameModel();}};
 }
 if(embeddedBlock)window.blockWorkspace={configure:configureBlockWorkspace};
+
+// Component close-up from the Asset Library: the component's own viewport, outliner and properties.
+export async function configureComponentWorkspace(asset, textureFiles=[], sharedTextures=null){
+ if(!embeddedComponent)throw Error('Component workspace requires an isolated editor document.');
+ releaseGameModel();
+ if(!textureLibrary.adopt(sharedTextures)&&textureFiles.length)await textureLibrary.loadFiles(textureFiles,{retainUndecoded:true});
+ if(textureLibrary.loadedCount)textureStatus=`${textureLibrary.loadedCount} texture maps · shared from the viewer`;
+ const draft=structuredClone(asset),viewport=area(),properties=area('properties');ensureViewportOptions(viewport.view).shading='RENDERED';properties.propertyTab='components';
+ // The window's Properties › Components edits this draft's attachment point.
+ scene.componentAttachmentDraft=draft;scene.showAttachmentMarker=true;scene.pickAttachment=false;
+ state={version:1,active:'component',workspaces:[{id:'component',name:'Component',root:split('x',.72,viewport,split('y',.36,area('outliner'),properties))}]};
+ maximized=null;hovered=null;document.body.classList.add('embedded-asset-workspace');
+ // Keep the component's own coordinates so its attachment point stays valid.
+ scene.model=makeModel(draft.blocks,draft.name);Object.assign(scene,{preview:false,loaded:true,visible:true,selected:false,selectedId:null,selectedIds:new Set(),hiddenIds:new Set(),revision:scene.revision+1});
+ render();
+ for(const node of leaves(workspace().root))if(node.editor==='viewport')navigate(node,{action:'frame',interrupt:false});
+ renderers.forEach(r=>r.draw?.());
+ return {snapshot(){return validateComponent({...draft,blocks:scene.model.blocks.filter(b=>!b.deleted).map(({el,itemEl,...b})=>structuredClone(b))});},dispose(){renderers.forEach(r=>r.dispose());renderers=[];releaseGameModel();}};
+}
+if(embeddedComponent)window.componentWorkspace={configure:configureComponentWorkspace};

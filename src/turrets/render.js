@@ -1,4 +1,4 @@
-import {componentEntries} from '../components/core.js';
+import {componentEntries,componentMatrix} from '../components/core.js';
 import * as THREE from '../vendor/three.module.js';
 import {blockSurfaceGeometry} from '../avorion/lib/geometry/blockSurface.js';
 import {defaultOrientationProfile} from '../avorion/lib/avorion/orientationProfile.js';
@@ -7,17 +7,19 @@ import {sceneSockets} from './sockets.js';
 import {mounts} from './mounts.js';
 export const TURRET_HIGHLIGHT=[.55,1,.04];
 const geometryCache=new Map();
-let group,model,items,preview,revision,components;
+let group,model,items,preview,revision,components,componentPreview;
 export function syncTurrets(world,scene,view,configureDepth){
-  const next=mounts(scene),ghost=scene.turretPreview;
-  if(components!==scene.model?.componentSetup||revision!==scene.revision||model!==scene.model||items!==next||preview!==ghost){
+  const next=mounts(scene),ghost=scene.turretPreview,componentGhost=scene.componentPreview;
+  if(componentPreview!==componentGhost||components!==scene.model?.componentSetup||revision!==scene.revision||model!==scene.model||items!==next||preview!==ghost){
     if(group){world.remove(group);group.traverse(o=>{o.material?.dispose();});}
-    group=new THREE.Group();world.add(group);model=scene.model;revision=scene.revision;items=next;preview=ghost;components=scene.model?.componentSetup;
+    group=new THREE.Group();world.add(group);model=scene.model;revision=scene.revision;items=next;preview=ghost;componentPreview=componentGhost;components=scene.model?.componentSetup;
     const used=new Set();
     const sockets=sceneSockets(scene),entries=next.map(m=>({asset:m.asset,socket:sockets.find(s=>s.id===m.socketId),instance:m}));
     entries.push(...componentEntries(scene));
     if(ghost)entries.push({...ghost,instance:{...createInstance(ghost.asset.id,ghost.socket.id,'preview'),turretSize:ghost.size},ghost:true});
-    for(const e of entries){if(!e.socket)continue;const matrices=e.component?{base:e.matrix,body:e.matrix,barrel:e.matrix}:partMatrices(e.asset,e.socket,e.instance),holder=new THREE.Group();holder.userData.blockId=e.socket.blockId;holder.userData.mountId=e.ghost||e.component?null:e.instance.id;holder.userData.socketId=e.socket.id;group.add(holder);
+    // Component being dragged from the Asset Library, shown at the socket under the cursor.
+    if(componentGhost){const instance={id:'component-preview',scale:componentGhost.scale??1,twist:componentGhost.twist??0};entries.push({asset:componentGhost.asset,socket:componentGhost.socket,instance,component:true,ghost:true,matrix:componentMatrix(componentGhost.asset,componentGhost.socket,instance)});}
+    for(const e of entries){if(!e.socket)continue;const matrices=e.component?{base:e.matrix,body:e.matrix,barrel:e.matrix}:partMatrices(e.asset,e.socket,e.instance),holder=new THREE.Group();holder.userData.blockId=e.socket.blockId;holder.userData.mountId=e.ghost||e.component?null:e.instance.id;holder.userData.socketId=e.socket.id;holder.userData.componentMountId=e.component&&!e.ghost?e.instance.id:null;group.add(holder);
       const key=(e.component?'component:':'turret:')+e.asset.id+':'+(e.asset.sourceXml||JSON.stringify([e.asset.blocks,e.asset.parts]))+JSON.stringify(e.asset.blocks.map(b=>b.color));used.add(key);
       let parts=geometryCache.get(key);if(!parts){parts=new Map();for(const part of ['base','body','barrel']){
         const positions=[],colors=[],edges=[];for(const b of e.asset.blocks.filter(b=>(e.asset.parts?.[b.id]||'base')===part)){
@@ -60,9 +62,14 @@ export function syncTurrets(world,scene,view,configureDepth){
     material.polygonOffset=blueprint;material.polygonOffsetFactor=1;material.polygonOffsetUnits=1;
   });
   if(!group.userData.bounds)group.userData.bounds=new THREE.Box3().setFromObject(group);
-  group.visible=!!scene.loaded&&scene.visible;const hidden=scene.hiddenIds||new Set();for(const child of group.children)child.visible=!child.userData.hidden&&!hidden.has(child.userData.blockId);group.traverse(o=>{if(o.material?.userData.highlight)o.material.userData.highlight.value=!blueprint&&o.parent.userData.mountId&&(scene.selectedTurretIds?.has(o.parent.userData.mountId)||o.parent.userData.mountId===scene.selectedTurretId)?1:0;});return group;
+  group.visible=!!scene.loaded&&scene.visible;const hidden=scene.hiddenIds||new Set();for(const child of group.children)child.visible=!child.userData.hidden&&!hidden.has(child.userData.blockId);group.traverse(o=>{if(o.material?.userData.highlight)o.material.userData.highlight.value=!blueprint&&(o.parent.userData.mountId&&(scene.selectedTurretIds?.has(o.parent.userData.mountId)||o.parent.userData.mountId===scene.selectedTurretId)||o.parent.userData.componentMountId&&o.parent.userData.componentMountId===scene.selectedComponentMountId)?1:0;});return group;
 }
 
+export function pickMountedComponent(raycaster){
+ if(!group?.visible)return null;
+ const hits=raycaster.intersectObjects(group.children.filter(c=>c.visible&&c.userData.componentMountId),true);
+ return hits.find(hit=>hit.object.isMesh)||null;
+}
 export function pickMountedTurret(raycaster){
  if(!group?.visible)return null;
  const hits=raycaster.intersectObjects(group.children.filter(c=>c.visible&&c.userData.mountId),true);

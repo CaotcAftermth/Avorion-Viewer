@@ -8,14 +8,19 @@ try{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.addStyleTag({content:'.turret-asset-grid{display:flex}canvas{width:150px}label{display:block}button,select{margin:5px}'});
  await page.evaluate(async xml=>{
-  const {parseAvorionXml}=await import('/src/block-model.js');const {mountAttachmentLibrary}=await import('/src/attachment-library.js');
+  const {parseAvorionXml}=await import('/src/block-model.js');const {mountAttachmentLibrary}=await import('/src/attachment-library.js');const {mountComponentProperties}=await import('/src/components/properties.js');
   window.scene={model:parseAvorionXml(xml,'Ship.xml',xml.length),loaded:true,visible:true,selectedIds:new Set(['b0']),hiddenIds:new Set(),revision:1};
-  const host=document.createElement('div');document.body.replaceChildren(host);window.controller=mountAttachmentLibrary(host,{assetKind:'components'},scene,()=>window.controller?.sync());
+  // Asset Library grid and Properties › Components, rendered side by side as in the app.
+  const library=document.createElement('div'),properties=document.createElement('div');document.body.replaceChildren(library,properties);
+  const changed=()=>{window.controller?.sync();mountComponentProperties(properties.replaceChildren()||properties,scene,changed);};
+  window.controller=mountAttachmentLibrary(library,{assetKind:'components'},scene,changed);changed();
  },xml);
  await page.getByRole('button',{name:'Import component XML',exact:true}).waitFor();
  const chooser=page.waitForEvent('filechooser');await page.getByRole('button',{name:'Import component XML',exact:true}).click();
  await (await chooser).setFiles({name:'Engine.xml',mimeType:'application/xml',buffer:Buffer.from(xml)});
+ await page.getByRole('button',{name:'Engine',exact:true}).click();
  await page.getByLabel('Component name',{exact:true}).waitFor();await page.getByLabel('Component name',{exact:true}).fill('Engine module');await page.getByLabel('Component name',{exact:true}).press('Tab');
+ await page.getByRole('button',{name:'Engine module',exact:true}).waitFor();
  await page.getByLabel('Component socket block type').selectOption('2');
  await page.getByLabel('Component ship socket').selectOption('component:b0:1');
  await page.getByRole('button',{name:'Attach selected component',exact:true}).click();
@@ -33,8 +38,12 @@ try{
  await page.getByRole('button',{name:'Attach selected component',exact:true}).click();
  await page.getByLabel('Component scale',{exact:true}).waitFor();
  assert.equal(await page.evaluate(()=>scene.model.componentSetup.sockets.length),1);
- await page.getByRole('button',{name:'Turrets',exact:true}).click();assert.equal(await page.getByRole('button',{name:'Engine module',exact:true}).count(),0);
- await page.getByRole('button',{name:'Components',exact:true}).click();await page.getByRole('button',{name:'Engine module',exact:true}).waitFor();
+ await page.evaluate(()=>controller.show('turrets'));assert.equal(await page.getByRole('button',{name:'Engine module',exact:true}).count(),0);
+ await page.evaluate(()=>controller.show('components'));await page.getByRole('button',{name:'Engine module',exact:true}).waitFor();
+ // In the app the Turrets / Components switch sits in the Asset Library header beside Area options.
  await page.goto('http://127.0.0.1:5173/index.html');await page.waitForSelector('#screen canvas');
+ await page.keyboard.press('Escape');await page.getByRole('tab',{name:'Armament'}).click();
+ await page.locator('[data-editor=assets] .area-header .asset-kind-switch [data-kind=components]').click();
+ await page.getByRole('button',{name:'Engine module',exact:true}).waitFor();
  assert.deepEqual(errors,[]);console.log(result);
 }finally{await browser.close();}

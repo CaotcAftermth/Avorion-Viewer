@@ -10,12 +10,38 @@ async function modelKey(model){
     return 'component-model:'+Array.from(new Uint8Array(hash),b=>b.toString(16).padStart(2,'0')).join('');
   })();keys.set(model,key);}return key;
 }
+// A ship re-saved from the game has different XML, so the exact key misses. The
+// setup is also kept under the file name with each socket block's native position,
+// and restored by matching those positions to the new blocks.
+const nameKey=model=>'component-ship:'+String(model.fileName||'').toLowerCase();
+const native=(model,block)=>['x','y','z'].map(a=>Math.round((block.position[a]-(model.placementOffset?.[a]||0))*1000)/1000).join(',')+':'+block.typeIndex;
+const autoSocket=/^component:(b\d+):(.*)$/;
+function anchors(model,setup){
+  const ids=new Set([...setup.sockets.map(s=>s.blockId).filter(Boolean),...setup.mounts.map(m=>autoSocket.exec(m.socketId)?.[1]).filter(Boolean)]);
+  return Object.fromEntries(model.blocks.filter(b=>ids.has(b.id)).map(b=>[b.id,native(model,b)]));
+}
+export function remapSetup(model,saved){
+  const byAnchor=new Map(model.blocks.map(b=>[native(model,b),b.id])),map=new Map(Object.entries(saved.anchors||{}).map(([id,anchor])=>[id,byAnchor.get(anchor)]));
+  let dropped=0;
+  const sockets=saved.setup.sockets.flatMap(s=>{if(!s.blockId)return [s];const id=map.get(s.blockId);if(!id){dropped++;return [];}return [{...s,blockId:id}];});
+  const kept=new Set(sockets.map(s=>s.id));
+  const mounts=saved.setup.mounts.flatMap(m=>{const auto=autoSocket.exec(m.socketId);if(auto){const id=map.get(auto[1]);if(!id){dropped++;return [];}return [{...m,socketId:`component:${id}:${auto[2]}`}];}if(!kept.has(m.socketId)){dropped++;return [];}return [m];});
+  return {setup:validateSetup({...saved.setup,sockets,mounts}),dropped};
+}
 export async function restoreComponentSetup(model){
-  try{const saved=await store.get(await modelKey(model));if(saved)model.componentSetup=validateSetup(saved);}
+  try{
+    const saved=await store.get(await modelKey(model));if(saved){model.componentSetup=validateSetup(saved);return;}
+    const named=await store.get(nameKey(model));if(!named?.setup)return;
+    const {setup,dropped}=remapSetup(model,named);
+    if(!setup.sockets.length&&!setup.mounts.length&&setup.blockType===null)return;
+    model.componentSetup=setup;
+    model.warnings.push({level:'warn',message:`Component setup restored from an earlier version of ${model.fileName}${dropped?`; ${dropped} socket${dropped===1?'':'s'} or mount${dropped===1?'':'s'} no longer match a block and were left out`:''}. Check it in Properties › Components.`});
+  }
   catch(error){model.warnings.push({level:'warn',message:'Component setup could not be restored: '+error.message});}
 }
 export async function saveComponentSetup(model,setup){
   validateSetup(setup);await write(await modelKey(model),structuredClone(setup));
+  if(model.fileName)await write(nameKey(model),{setup:structuredClone(setup),anchors:anchors(model,setup)});
   model.componentSetup=setup;
 }
 let libraryReady,libraryAssets;

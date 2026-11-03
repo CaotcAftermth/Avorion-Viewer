@@ -1,4 +1,8 @@
 import {drawComponentSockets} from './components/overlay.js';
+import {componentLibrary} from './components/library.js';
+import {componentSetup} from './components/core.js';
+import {changeSetup,placeComponent} from './components/mounting.js';
+import {createComponentTools} from './components/viewport-tools.js';
 import {visibleTurretBlocks} from './turrets/posed-blocks.js';
 import {drawCoverageLegend} from './turrets/coverage-render.js';
 import {coverageOptions} from './turrets/coverage-sampling.js';
@@ -13,7 +17,7 @@ import {modelExtents,dimensionRulers,exteriorRuler} from './model-overlays.js';
 import {gridSpacing} from './world-guides.js';
 import { frameVisibleModel } from './model-framing.js';
 import { shadeFace, REFERENCE_NORMALS } from './shading.js';
-import { imageRenderBusy, drawGame, pickGame, pickTurret, pickWeaponCoverage, socketExposed, releaseViewportResources, setPaintPreview } from './game-renderer.js';
+import { imageRenderBusy, drawGame, pickGame, pickGamePoint, pickComponent, pickTurret, pickWeaponCoverage, socketExposed, releaseViewportResources, setPaintPreview } from './game-renderer.js';
 import { liveBlocks, simplified, isThinBlock, viewportHiddenIds } from './ship-structure.js';
 import { selectCubeView } from './view-cube.js';
 import { matchesBinding, modifierActive, bindingFor, shortcutLabel } from './keymaps.js';
@@ -33,6 +37,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   let statsKey=[],width = 1, height = 1, frame = 0, drag = null, regionMode = false, projectedFaces = [];
   const dimensionCache={};
   let socketHits=[],componentSocketHits=[];
+  const componentTools=createComponentTools(scene,view,getPreferences);
   const events = new AbortController();
   const listen = (target, type, handler, options = {}) => target.addEventListener(type, handler, { ...options, signal: events.signal });
   const invalidate = () => { if (!frame) frame = requestAnimationFrame(draw); };
@@ -43,7 +48,30 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   listen(window,'turret-drag-end',()=>{scene.turretDragging=false;scene.turretPreview=null;invalidate();});
   function dragSocket(event){const [x,y]=position(event);return socketHits.find(s=>s.exposed&&s.fitSize&&Math.hypot(s.screen[0]-x,s.screen[1]-y)<24&&!mounts(scene).some(m=>m.socketId===s.id));}
   listen(canvas,'dragover',event=>{if(!turretLibrary.dragged||view.interactionMode==='paint')return;event.preventDefault();const socket=dragSocket(event),asset=turretLibrary.dragged;event.dataTransfer.dropEffect=socket?'copy':'none';scene.turretPreview=socket?{asset,socket,size:initialTurretSize(asset,socket)}:null;invalidate();});
-  listen(canvas,'dragleave',()=>{scene.turretPreview=null;invalidate();});
+  listen(canvas,'dragleave',()=>{scene.turretPreview=null;scene.componentDropTarget=null;invalidate();});
+  // Components drop onto an empty component socket, the way turrets drop onto turret sockets.
+  listen(window,'component-drag-start',()=>{scene.componentDragging=true;invalidate();});
+  listen(window,'component-drag-end',()=>{scene.componentDragging=false;scene.componentDropTarget=null;invalidate();});
+  // Any component socket accepts a drop; an occupied one swaps in the new component.
+  function componentDropSocket(event){const [x,y]=position(event);return componentSocketHits.slice().sort((a,b)=>Math.hypot(a.screen[0]-x,a.screen[1]-y)-Math.hypot(b.screen[0]-x,b.screen[1]-y)).find(s=>Math.hypot(s.screen[0]-x,s.screen[1]-y)<24);}
+  listen(window,'component-drag-end',()=>{scene.componentPreview=null;invalidate();});
+  listen(canvas,'dragover',event=>{
+    if(!componentLibrary.dragged||view.interactionMode==='paint')return;event.preventDefault();
+    const socket=componentDropSocket(event),asset=componentLibrary.dragged;event.dataTransfer.dropEffect=socket?'copy':'none';
+    if(scene.componentDropTarget!==(socket?.id||null)){
+      const current=socket&&componentSetup(scene.model||{}).mounts.find(m=>m.socketId===socket.id);
+      scene.componentDropTarget=socket?.id||null;scene.componentPreview=socket?{asset,socket,scale:current?.scale??1,twist:current?.twist??0}:null;invalidate();
+    }
+  });
+  listen(canvas,'dragleave',()=>{scene.componentPreview=null;invalidate();});
+  listen(canvas,'drop',event=>{
+    const asset=componentLibrary.dragged;if(!asset||view.interactionMode==='paint')return;event.preventDefault();
+    const socket=componentDropSocket(event),model=scene.model;scene.componentDropTarget=null;scene.componentPreview=null;scene.componentDragging=false;invalidate();
+    if(!socket||!model){scene.componentMessage=model?'Drop the component on a component socket. Add sockets in Properties › Components.':'Load a ship first.';onSelect({componentSocketId:null});return;}
+    componentLibrary.selectedId=asset.id;scene.selectedComponentSocketId=socket.id;
+    let next;try{next=placeComponent(scene,asset,socket);}catch(error){scene.componentMessage=error.message;onSelect({componentSocketId:socket.id});return;}
+    changeSetup(scene,next).then(()=>{scene.componentMessage='';scene.selectedComponentMountId=componentSetup(model).mounts.find(m=>m.socketId===socket.id)?.id||null;onSelect({componentSocketId:socket.id});onChange();}).catch(error=>{scene.componentMessage=error.message;reportError(error,'COMPONENT');onSelect({componentSocketId:socket.id});});
+  });
   listen(canvas,'drop',event=>{const asset=turretLibrary.dragged;if(!asset||view.interactionMode==='paint')return;event.preventDefault();const socket=dragSocket(event);scene.turretPreview=null;scene.turretDragging=false;if(socket){scene.turretSockets??={};scene.turretSockets.selectedId=socket.id;placeFromLibrary(scene,asset,socket,socketsChanged);}invalidate();});
 
 
@@ -102,6 +130,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     drawDimensions(ctx,scene,view,width,height,preferences,dimensionCache);
     socketHits=drawSockets(ctx,scene,view,width,height,editorTheme(preferences,'viewport').accent,s=>socketExposed(scene,view,width,height,s,preferences));
     componentSocketHits=drawComponentSockets(ctx,scene,view,width,height,s=>socketExposed(scene,view,width,height,s,preferences));
+    componentTools.draw(ctx,width,height);
     drawCoverageLegend(ctx,scene,view,width,height);
     drawMagnifier();
     drawPaintPreview();
@@ -208,6 +237,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   function cancel() {
     if (!drag && !regionMode && !magnifier) return false;
     closeMagnifier(true);
+    if(drag?.mode==='componentGizmo')componentTools.cancel();
     if(drag?.mode==='paint')onPaint('cancel');
     if (drag) Object.assign(view,drag.before,view.display?{display:view.display}:{},view.paint?{paint:view.paint}:{});
     release();regionMode=false;body.classList.remove('region-zoom');invalidate();onChange();return true;
@@ -218,6 +248,11 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     if(event.button===2)suppressContext=!!(drag||regionMode);
     if (matchesBinding('cancelMouse',event,getPreferences(),'Mouse'+event.button) && (drag||regionMode)) {event.preventDefault();cancel();return;}
     if (drag) return;
+    if(event.button===0&&!event.altKey&&!regionMode){
+      // Socket gizmo handles take the click before navigation or selection.
+      const [hx,hy]=position(event),handle=componentTools.hit(hx,hy);
+      if(handle){event.preventDefault();canvas.setPointerCapture(event.pointerId);componentTools.begin(handle,hx,hy);drag={x:hx,y:hy,startX:hx,startY:hy,button:0,pointerId:event.pointerId,mode:'componentGizmo'};return;}
+    }
     const regionIn=matchesBinding('regionIn',event,getPreferences(),'Mouse'+event.button),regionOut=matchesBinding('regionOut',event,getPreferences(),'Mouse'+event.button);
     // Paint Mode's Select tool box-selects like Object Mode, so paint scope can target the selection.
     const paintSelect=view.interactionMode==='paint'&&paintOptions(view).tool==='select';
@@ -283,6 +318,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     const [x,y]=position(event), dx=x-drag.x,dy=y-drag.y;
     drag.moved ||= Math.hypot(x-drag.startX,y-drag.startY)>3;
     const preferences=getPreferences();
+    if(drag.mode==='componentGizmo'){componentTools.drag(x,y,event,width,height);drag.x=x;drag.y=y;invalidate();return;}
     if(drag.mode==='paint'){const steps=Math.min(256,Math.max(1,Math.ceil(Math.hypot(dx,dy)/Math.max(4,paintOptions(view).radius/2)))),batch=new Set();for(let i=1;i<=steps;i++)paintAt(drag.x+dx*i/steps,drag.y+dy*i/steps,batch);if(batch.size)onPaint('sample',[...batch]);}
     if (drag.mode==='orbit') orbit(view,dx,dy,preferences);
     if (drag.mode==='pan') pan(view,dx,dy,width,height);
@@ -294,6 +330,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     if(magnifier&&event.button===2){event.preventDefault();closeMagnifier();return;}
     if (!drag || event.pointerId!==drag.pointerId || event.button!==drag.button) return;
     let selection = null;
+    if(drag.mode==='componentGizmo'){release();invalidate();componentTools.end().then(()=>{onSelect({componentSocketId:scene.selectedComponentSocketId});onChange();}).catch(error=>{scene.componentMessage=error.message;reportError(error,'COMPONENT');onSelect({componentSocketId:scene.selectedComponentSocketId});});return;}
     if(drag.mode==='paint')onPaint('finish');
     if(drag.mode==='select'&&drag.moved){
       if(view.interactionMode==='socket'){
@@ -315,8 +352,13 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
       const [x,y]=position(event);
       const coverage=scene.showFireCoverage&&!['paint','socket'].includes(view.interactionMode)?pickWeaponCoverage(scene,view,width,height,x,y,getPreferences()):null;
       if(coverage){scene.coverageInspection=coverage;scene.coverageHover=null;release();invalidate();onSelect({coverage:true});onChange();return;}
+      if(scene.pickAttachment&&componentTools.pickAttachment(pickGamePoint(scene,view,width,height,x,y,getPreferences()))){release();invalidate();onSelect({componentSocketId:null});onChange();return;}
       const componentSocket=view.interactionMode==='socket'&&componentSocketHits.find(s=>Math.hypot(s.screen[0]-x,s.screen[1]-y)<=12);
-      if(componentSocket){scene.selectedComponentSocketId=componentSocket.id;release();invalidate();onSelect({componentSocketId:componentSocket.id});onChange();return;}
+      if(componentSocket){scene.selectedComponentSocketId=componentSocket.id;scene.selectedComponentMountId=componentSetup(scene.model||{}).mounts.find(m=>m.socketId===componentSocket.id)?.id||null;release();invalidate();onSelect({componentSocketId:componentSocket.id});onChange();return;}
+      // A mounted component under the cursor is selected for Properties › Components and the outliner.
+      const component=pickComponent(scene,view,width,height,x,y,getPreferences());
+      if(component){scene.selectedComponentMountId=component.componentMountId;scene.selectedComponentSocketId=component.socketId;selectTurrets(scene,null);release();invalidate();onSelect({componentSocketId:component.socketId});onChange();return;}
+      if(scene.selectedComponentMountId){scene.selectedComponentMountId=null;}
       const socket=socketHits.find(s=>Math.hypot(s.screen[0]-x,s.screen[1]-y)<=12);
       const turret=pickTurret(scene,view,width,height,x,y,getPreferences());selectTurrets(scene,turret?.mountId||null,drag.additive);
       if(turret){scene.turretSockets??={};scene.turretSockets.selectedId=turret.socketId;selection={socketId:turret.socketId};}
