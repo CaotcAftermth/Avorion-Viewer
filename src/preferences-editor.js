@@ -1,5 +1,5 @@
 import {enhanceColorCells} from './color-cells.js';
-import {mountCursorTargets,mountCursorPreview} from './cursor-preferences.js';
+import {mountCursorTargets} from './cursor-preferences.js';
 import { setDisabled } from './control-state.js';
 import { mountAssetLibrary } from './asset-library.js';
 import { wireTabs, wirePanels } from './editor-panels.js';
@@ -163,7 +163,7 @@ export function mountPreferences(host, store, editorState = {}, assets = {}, opt
         }
         content.append(details);
       }
-      if(section.id==='cursors')cursorUpdates.push(mountCursorPreview(content,store));
+
     }
     if(!content.childElementCount){const empty=document.createElement('p');empty.className='preferences-empty';empty.textContent=tf('No preferences match “{0}”.',query)+(options.sections?'':' '+t('World and Shaders settings are in the Properties editor; asset folders are in File > Asset folders.'));content.append(empty);}
     wireTabs(nav,content);wirePanels(content,editorState,category+':',searching);

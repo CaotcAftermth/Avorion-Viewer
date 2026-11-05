@@ -35,13 +35,12 @@ export function cursorVisual(name,radius=0,p=activePreferences){
   const angle=number(p,'cursorAngle_'+id,0)*Math.PI/180,distance=number(p,'cursorDistance_'+id,0);
   // Hotspot moves relative to artwork. Defaults put arrow tips at click point.
   let dx=Math.cos(angle)*distance,dy=Math.sin(angle)*distance;
-  if(name==='restore'&&distance>0){const length=Math.max(distance,Math.max(0,radius)+size/2+8);dx=Math.cos(angle)*length;dy=Math.sin(angle)*length;}
   const pad=8,cx=pad+size/2+Math.max(0,-dx-size/2),cy=pad+size/2+Math.max(0,-dy-size/2);
   const x=cx+dx,y=cy+dy;
   const width=Math.ceil(Math.max(cx+size/2,x+6)+pad),height=Math.ceil(Math.max(cy+size/2,y+6)+pad);
   const target=distance>0&&['replace','restore'].includes(name)?`<path d="M${x-5} ${y}h10M${x} ${y-5}v10" fill="none" stroke="#080a0d" stroke-width="3"/><path d="M${x-5} ${y}h10M${x} ${y-5}v10" fill="none" stroke="${p.cursorPrimaryColor||'#f9f9fb'}" stroke-width="1"/>`:'';
   const icon=artwork.replace(/width="40" height="40"/,`x="${cx-size/2}" y="${cy-size/2}" width="${size}" height="${size}"`);
-  return {svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${icon}${target}</svg>`,x:Math.round(x),y:Math.round(y),width,height};
+  return {svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${icon}${target}</svg>`,x:Math.round(x),y:Math.round(y),width,height,artworkCenter:[cx,cy]};
 }
 export function cursorCSS(name,radius=0,p=activePreferences){
   if(!cursorSVGs[name])return name==='region'?'crosshair':'default';
