@@ -96,7 +96,7 @@ async function crashRecoveryGate(record){
   return {model:choice!=='clear',textures:choice!=='lite'};
 }
 addLog(`Avorion Viewer ${APP_VERSION} ready. Layout changes are saved in this browser.`,'SYSTEM');addLog('No model loaded. Drop an Avorion .xml or use File > Import Avorion XML.','SCENE');
-const assetPersistence=embedded?{changed(){},start(){},flush(){},stop(){}}:createSessionPersistence({scene,textures:textureLibrary,restored:kind=>{if(kind==='textures'){scene.revision++;/* rebuild: the restored model was built before its textures finished loading */textureStatus=`${textureLibrary.loadedCount} texture maps - restored locally`;if(textureLibrary.loadedCount)notify(`${textureLibrary.loadedCount} saved texture maps restored.`);}render();log(`${kind==='model'?'Model':'Textures'} restored from this browser.`,'STORAGE');},onError:error=>{notify('Model/texture persistence unavailable. Current session still works.');reportError(error,'STORAGE');},gate:crashRecoveryGate});
+const assetPersistence=embedded?{changed(){},start(){},flush(){},stop(){}}:createSessionPersistence({scene,textures:textureLibrary,restored:kind=>{if(kind==='textures'){scene.revision++;/* rebuild: the restored model was built before its textures finished loading */textureStatus=`${textureLibrary.loadedCount} texture maps - restored locally`;if(textureLibrary.loadedCount)notify(`${textureLibrary.loadedCount} saved texture maps restored.`);}render();if(kind==='model')frameLoadedViewports();log(`${kind==='model'?'Model':'Textures'} restored from this browser.`,'STORAGE');},onError:error=>{notify('Model/texture persistence unavailable. Current session still works.');reportError(error,'STORAGE');},gate:crashRecoveryGate});
 const workspace = () => state.workspaces.find(w => w.id === state.active);
 const currentArea = () => find(workspace().root, hovered) || leaves(workspace().root)[0];
 const areaElement = id => document.querySelector(`[data-area-id="${id}"]`);
@@ -235,16 +235,25 @@ function openGalleryBlock(node){
     commit(`${block.type} updated in the Block Gallery.`);
   });
 }
+// Run after layout so each visible viewport uses its actual canvas dimensions.
+function frameLoadedViewports(model=scene.model){
+ requestAnimationFrame(()=>{
+  if(!scene.loaded||scene.model!==model)return;
+  for(const workspace of state.workspaces)for(const node of leaves(workspace.root))if(node.editor==='viewport'){
+   const canvas=areaElement(node.id)?.querySelector('canvas'),rect=canvas?.getBoundingClientRect();
+   frameVisibleModel(scene,ensureCamera(node.view),rect?.width||800,rect?.height||600,preferences.value);
+   renderers.find(renderer=>renderer.id===node.id)?.draw();
+  }
+  save();
+ });
+}
 function loadModel(model,preview=false){
   cancelPaintTask();scopeCache=null;scene.paintSample=null;scene.paintMessage='';
   if(!preview)placeImportedModel(model,preferences.value.importPlacement);
   Object.assign(scene,{regions:[],paintHistory:null,visibilityHistory:[],outlinerRevealId:null,model,preview,loaded:true,visible:true,selected:false,selectedId:null,selectedIds:new Set(),hiddenIds:new Set(),revision:scene.revision+1});
-  for(const w of state.workspaces)for(const node of leaves(w.root))if(node.editor==='viewport'){
-    const canvas=areaElement(node.id)?.querySelector('canvas');
-    frameBounds(node.view,blockFramePoints(model.blocks),canvas?.clientWidth||800,canvas?.clientHeight||600);
-  }
   welcome?.close();
   commit(`${model.fileName} · ${model.blocks.length} blocks loaded.`);
+  frameLoadedViewports(model);
   const restoredSummary=restorationSummary(model.turretRestoration);if(restoredSummary)notify(restoredSummary);
   for(const warning of model.warnings||[])if(warning.level==='warn')log(warning.message,'MODEL','warning');
 }
@@ -277,7 +286,7 @@ async function openXmlFile(file){
   }catch(error){loading.done();showImportError(file.name,error);return false;}
   try{
     loading.update(55,`${model.blocks.length.toLocaleString()} ${t('blocks')} · ${t('building geometry…')}`);await nextPaint();
-    loadModel(model);rememberModel(file.name);await settleModelBuild(loading);
+    loadModel(model);rememberModel(file.name);await settleModelBuild(loading);frameLoadedViewports(model);
   }finally{loading.done();}
   return true;
 }
@@ -305,7 +314,7 @@ async function loadAssetTextures(files){
     const count=await textureLibrary.loadFiles(files,{onProgress:(done,total)=>loading.update(total?done/total*95:95,`${done} / ${total}`)});
     textureStatus=`${textureLibrary.loadedCount} local texture maps · stored in this browser`;
     if(scene.loaded){loading.update(95,t('Applying textures to the ship…'));await nextPaint();}
-    scene.revision++;render();if(scene.loaded)await settleModelBuild(loading);notify(`${count} texture maps loaded.`);
+    scene.revision++;render();if(scene.loaded)await settleModelBuild(loading);frameLoadedViewports(model);notify(`${count} texture maps loaded.`);
   }finally{loading.done();}
 }
 const assetActions={openModel:openXmlFile,loadTextures:loadAssetTextures,showWorld:()=>{
