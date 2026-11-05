@@ -16,10 +16,10 @@ export function createWelcome({preferences,wireInputStyles,openModel,openTexture
         <div class="input-style-options">
           <button type="button" data-style="blender"><b>Blender</b><span>Mouse + numpad</span></button>
           <button type="button" data-style="laptop"><b>Laptop</b><span>Alt-drag + number row</span></button>
-          <button type="button" data-style="trackpad" disabled aria-describedby="welcome-trackpad-note"><b>Trackpad</b><span>Unavailable</span></button>
+          <button type="button" data-style="trackpad"><b>Trackpad</b><span>Scroll, pinch + edge panels</span></button>
         </div>
         <p class="welcome-controls" aria-live="polite"></p>
-        <p id="welcome-trackpad-note" class="welcome-note">Trackpad support is being fixed.</p>
+        <p id="welcome-trackpad-note" class="welcome-note">Two-finger scroll pans; pinch zooms; Shift+scroll orbits. Tap an edge to show editors.</p>
         <p class="welcome-fallback" role="status" hidden>Trackpad controls were selected previously. Switched to Laptop while trackpad support is being fixed.</p>
       </section>
       <section class="welcome-guide-card"><div><h2>Quick Start Guide</h2><p>Modes, paint, turrets, and exports.</p></div><button type="button" data-guide>Read guide</button></section>
@@ -32,7 +32,7 @@ export function createWelcome({preferences,wireInputStyles,openModel,openTexture
   dialog.querySelector('.welcome-fallback').hidden=!trackpadFallback;
   const sync=()=>{
     wireInputStyles(dialog);
-    dialog.querySelector('.welcome-controls').textContent=preferences.value.inputStyle==='laptop'?'Alt + left-drag rotates · Alt + Shift + left-drag pans · Wheel zooms':'Middle-drag rotates · Shift + middle-drag pans · Wheel zooms';
+    dialog.querySelector('.welcome-controls').textContent=preferences.value.inputStyle==='trackpad'?'Two-finger scroll pans · Pinch zooms · Shift + scroll orbits':preferences.value.inputStyle==='laptop'?'Alt + left-drag rotates · Alt + Shift + left-drag pans · Wheel zooms':'Middle-drag rotates · Shift + middle-drag pans · Wheel zooms';
   };
   preferences.subscribe(sync);
   const showHome=()=>{home.hidden=false;guide.hidden=true;dialog.setAttribute('aria-labelledby','welcome-title');dialog.classList.remove('reading-guide');dialog.scrollTop=0;};

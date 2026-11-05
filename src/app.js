@@ -11,6 +11,7 @@ import {createStudio} from './turrets/studio.js';
 import {attachSubmenu} from './submenu.js';
 import {mountAssetProperties,assetPoseTransforms} from './turrets/asset-properties.js';
 import {renderWorkspaceNode} from './workspace-tree.js';
+import {trackpadLayout,mountTrackpadLayout} from './trackpad-layout.js';
 import {rememberEditorScroll,restoreEditorScrollAfterLayout} from './editor-scroll.js';
 import {mountTurretOutliner} from './turrets/editors.js';
 import {mountHistory,beginPropertyEdit,endPropertyEdit} from './turrets/mounts.js';
@@ -71,13 +72,15 @@ const embeddedAsset = editorParam==='turret', embeddedBlock = editorParam==='blo
 let assetDraft=null;
 const STORAGE = 'avorion-viewer.window-system.v1';
 const preferences=createPreferencesStore({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)});
-const trackpadFallback=preferences.value.inputStyle==='trackpad';
-if(trackpadFallback)preferences.set('inputStyle','laptop');
+const trackpadFallback=false;
 const preferenceEditors=new Map(),lookEditors=new Map(),preferencesWindowState={};
 let preferencesWindow=null;
 let state = defaults(), storageAvailable = true;
 try { const raw = !embedded&&preferences.value.rememberLayout?localStorage.getItem(STORAGE):null; if(raw){const parsed=JSON.parse(raw);if(validateState(parsed))state=parsed;} } catch { storageAvailable=false; }
 let lastViewportId=null;
+const trackpadDrawers={workspace:null,side:null};
+let trackpadEnabled=preferences.value.trackpadNavigation;
+
 let hovered = null, maximized = null, focusMode = false, operation = null, renderers = [], toastTimer, saveTimer;
 const scene = { loaded: false, visible: true, selected: false, selectedId:null, selectedIds:new Set(), hiddenIds:new Set(), preview:false, revision:0, model:null };
 const welcome=embedded?null:createWelcome({preferences,wireInputStyles,openModel:importXml,openTextures:loadTextures,feedback:showFeedback,trackpadFallback});
@@ -564,13 +567,13 @@ $('#restore-button').onclick=()=>{maximized=null;focusMode=false;render();};
 $('#help-button').onclick=()=>$('#help-dialog').showModal();
 function navigationHint(){
   const p=preferences.value;
-  if(p.trackpadNavigation)return 'Two-finger swipe Orbit · Shift + swipe Pan · Pinch Zoom';
+  if(p.trackpadNavigation)return 'Two-finger scroll Pan · Shift + scroll Orbit · Pinch Zoom · Tap an edge for editors';
   if(p.emulate3Button)return 'Alt + LMB Orbit · Alt + Shift + LMB Pan · '+shortcut('wheelZoom')+' Zoom';
   return shortcut('orbitDrag')+' Orbit · '+shortcut('panDrag')+' Pan · '+shortcut('wheelZoom')+' Zoom';
 }
 function wireInputStyles(host){
   for(const choice of host.querySelectorAll('[data-style]')){
-    choice.disabled=choice.dataset.style==='trackpad';
+    choice.disabled=false;
     const selected=choice.dataset.style===preferences.value.inputStyle;
     choice.classList.toggle('active',selected);choice.setAttribute('aria-pressed',String(selected));
     choice.onclick=()=>{
@@ -628,7 +631,12 @@ function render(){
   renderTopbar();const screen=$('#screen');screen.replaceChildren();document.body.classList.toggle('focus-mode',focusMode);$('#restore-bar').hidden=!maximized;
   const root=maximized?find(workspace().root,maximized):workspace().root;
   if(!root){maximized=null;focusMode=false;return render();}
-  const tree=renderNode(root);const size=minimum(root);tree.style.minWidth=`${size.width}px`;tree.style.minHeight=`${size.height}px`;screen.append(tree);
+  const touchLayout=preferences.value.trackpadNavigation&&!maximized?trackpadLayout(root):null;
+  screen.classList.toggle('trackpad-screen',!!touchLayout);
+  if(trackpadDrawers.workspace!==workspace().id){trackpadDrawers.workspace=workspace().id;trackpadDrawers.side=null;}
+  if(touchLayout)mountTrackpadLayout(screen,touchLayout,renderArea,renderNode,trackpadDrawers);
+  else {const tree=renderNode(root);const size=minimum(root);tree.style.minWidth=`${size.width}px`;tree.style.minHeight=`${size.height}px`;screen.append(tree);}
+
   for(const canvas of screen.querySelectorAll('[data-editor=viewport] canvas')){const node=find(workspace().root,canvas.closest('.area').dataset.areaId);renderers.push(mountViewport(canvas,node,scene,save,(selected,additive,meta)=>regionPick(selected,meta)||selected&&typeof selected==='object'&&!Array.isArray(selected)?refreshStructure():selectStructure(Array.isArray(selected)?selected:typeof selected==='string'?[selected]:selected?liveBlocks(scene).map(b=>b.id):[],additive,true),()=>preferences.value,event=>viewportPie(event,node),(phase,data)=>viewportPaint(phase,data,node)));canvas.addEventListener('dblclick',()=>openGalleryBlock(node));}
   updateLogs();applyPreferences();restoreEditorScrollAfterLayout(screen);
 }
@@ -727,7 +735,7 @@ function renderArea(node){
     if(node.panels&&Object.hasOwn(node.panels,key))panel.open=node.panels[key];
     panel.addEventListener('toggle',()=>{node.panels??={};node.panels[key]=panel.open;save();});
   });
-  if(!maximized)for(const corner of ['top-right','bottom-left']){const grip=button('Drag to split or join area','',e=>e.preventDefault(),`corner-grip ${corner}`);grip.tabIndex=-1;grip.addEventListener('pointerdown',e=>cornerDrag(e,node));el.append(grip);}
+  if(!maximized&&!preferences.value.trackpadNavigation)for(const corner of ['top-right','bottom-left']){const grip=button('Drag to split or join area','',e=>e.preventDefault(),`corner-grip ${corner}`);grip.tabIndex=-1;grip.addEventListener('pointerdown',e=>cornerDrag(e,node));el.append(grip);}
   if(focusMode)el.append(button('Exit focus mode','↶ Back to Previous',()=>toggleMaximize(node.id,true),'focus-exit'));
   return el;
 }
@@ -1071,7 +1079,11 @@ document.addEventListener('keydown',e=>{
   if(match('toolbar')){e.preventDefault();node.toolbar=!node.toolbar;commit();}
   if(match('selectAll')||match('deselectAll')){e.preventDefault();selectStructure(match('selectAll')?liveBlocks(scene).map(b=>b.id):[]);}
 });
-preferences.subscribe(applyPreferences);
+preferences.subscribe(()=>{
+  const enabled=preferences.value.trackpadNavigation;
+  if(enabled!==trackpadEnabled){trackpadEnabled=enabled;trackpadDrawers.side=null;maximized=null;focusMode=false;render();}
+  else applyPreferences();
+});
 // Load the interface language before the first paint so English does not flash.
 requestedLanguage=preferences.value.language;await setLanguage(requestedLanguage);translateStatic();
 render();save();
