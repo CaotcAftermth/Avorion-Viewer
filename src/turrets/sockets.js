@@ -1,3 +1,4 @@
+import {drawSocketMarker} from '../socket-markers.js';
 import {mounts} from './mounts.js';
 import * as THREE from '../vendor/three.module.js';
 import {blockSurfaceGeometry} from '../avorion/lib/geometry/blockSurface.js';
@@ -30,15 +31,14 @@ export function drawSockets(ctx,scene,view,width,height,color,visible=()=>true){
   const hidden=scene.hiddenIds||new Set(),hits=[];
   ctx.save();color='#55ddff';ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=2;
   for(const socket of sceneSockets(scene)){
-    if(socket.fitSize==null||mounts(scene).some(m=>m.socketId===socket.id))continue;
+    if(view.socketFilter==='components')continue;
+    const occupied=mounts(scene).some(m=>m.socketId===socket.id),invalid=socket.fitSize==null;
     if(hidden.has(socket.blockId)||!targeting&&scene.turretSockets.scope!=='all'&&!scene.selectedIds?.has(socket.blockId))continue;
     const p=projectPoint(nativeToView(socket.position),view,width,height);if(!p||p[0]<0||p[1]<0||p[0]>width||p[1]>height)continue;
     const exposed=visible(socket,p);if(!exposed&&(!scene.turretSockets?.through||scene.turretDragging))continue;
     const q=projectPoint(nativeToView(socket.position.map((v,i)=>v+socket.normal[i]*.5)),view,width,height);
-    ctx.beginPath();ctx.arc(p[0],p[1],socket.id===scene.turretSockets?.selectedId?9:6,0,Math.PI*2);ctx.strokeStyle='#101820';ctx.lineWidth=5;ctx.stroke();ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke();
-    if(socket.id===scene.turretSockets?.selectedId){ctx.beginPath();ctx.arc(p[0],p[1],12,0,Math.PI*2);ctx.stroke();}
-    if(q){ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(q[0],q[1]);ctx.stroke();}
-    hits.push({...socket,screen:p,exposed});
+    drawSocketMarker(ctx,p,q,{selected:socket.id===scene.turretSockets?.selectedId,occupied,warning:invalid});
+    hits.push({...socket,screen:p,exposed,occupied,invalid,reason:invalid?'Turret base too small':occupied?'Occupied · Replace':''});
   }ctx.restore();return hits.sort((a,b)=>a.screen[2]-b.screen[2]);
 }
 

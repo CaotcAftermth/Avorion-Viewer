@@ -18,12 +18,12 @@ try {
   const library={load:loadTurretLibrary,add:addTurretAsset};
   const model=parseAvorionXml(xml,'Tachi.xml',xml.length);
   await restoreEmbeddedTurrets(model,library);
-  const first=(await loadTurretLibrary()).length;
+  const first=(await loadTurretLibrary()).length;const report=model.turretRestoration;
   await restoreEmbeddedTurrets(model,library);
   const again=parseAvorionXml(xml,'renamed.xml',xml.length);await restoreEmbeddedTurrets(again,library);
-  return {expected:model.doc.getElementsByTagName('turretDesign').length,mounts:model.turretMounts?.map(m=>({size:m.turretSize,normal:blockSockets(model.blocks.find(b=>m.socketId.startsWith(`turret:${b.id}:`))).find(s=>s.id===m.socketId).normal})),first,last:(await loadTurretLibrary()).length,second:again.turretMounts?.length,warnings:model.warnings.filter(w=>w.level==='warn'&&w.message.startsWith('Turret'))};
+  return {report:{restored:report.restored,added:report.added,inferred:report.entries.every(e=>e.inferred)},expected:model.doc.getElementsByTagName('turretDesign').length,mounts:model.turretMounts?.map(m=>({size:m.turretSize,normal:blockSockets(model.blocks.find(b=>m.socketId.startsWith(`turret:${b.id}:`))).find(s=>s.id===m.socketId).normal})),first,last:(await loadTurretLibrary()).length,second:again.turretMounts?.length,warnings:model.warnings.filter(w=>w.level==='warn'&&w.message.startsWith('Turret'))};
  },xml);
- console.log(JSON.stringify(result));assert.equal(result.mounts.length,result.expected);assert.equal(result.second,result.expected);assert.equal(result.first,result.last);assert.equal(result.warnings.length,0);
+ console.log(JSON.stringify(result));assert.equal(result.report.restored,result.expected);assert.equal(result.report.added,result.first);assert.ok(result.report.inferred);assert.equal(result.mounts.length,result.expected);assert.equal(result.second,result.expected);assert.equal(result.first,result.last);assert.equal(result.warnings.length,0);
  const failures=await page.evaluate(async xml=>{
   const {parseAvorionXml}=await import('/src/block-model.js');
   const {restoreEmbeddedTurrets}=await import('/src/turrets/embedded.js');
@@ -31,11 +31,20 @@ try {
   await restoreEmbeddedTurrets(model,{load:async()=>{throw Error('blocked');},add:async()=>{throw Error('quota');}});
   const missing=parseAvorionXml(xml.replace('blockIndex="42"','blockIndex="999"'),'missing.xml',xml.length);
   await restoreEmbeddedTurrets(missing,{load:async()=>[],add:()=>{throw Error('unexpected save');}});
+  const {mountRestorationReview}=await import('/src/turrets/restoration-review.js');
+  const {mountHistory}=await import('/src/turrets/mounts.js');
+  const repairScene={model:missing,loaded:true,visible:true};const host=document.createElement('div');document.body.append(host);
+  mountRestorationReview(host,repairScene);host.querySelector('button').click();
+  const dialog=document.querySelector('dialog'),select=dialog.querySelector('select');select.value=select.options[1].value;select.dispatchEvent(new Event('change'));
+  const repairPreview=!!repairScene.turretPreview;
+  [...dialog.querySelectorAll('button')].find(b=>b.textContent==='Attach saved design').click();
+  const repaired=missing.turretMounts.length;mountHistory(repairScene);
+  const repairUndo=missing.turretMounts.length===0;
   const bad=parseAvorionXml(xml.replace('size="1"','size="invalid"'),'invalid.xml',xml.length);
   await restoreEmbeddedTurrets(bad,{load:async()=>[],add:()=>{throw Error('unexpected save');}});
-  return {mounted:model.turretMounts.length,warnings:model.warnings.filter(w=>w.level==='warn').length,
+  return {repairPreview,repaired,repairUndo,mounted:model.turretMounts.length,warnings:model.warnings.filter(w=>w.level==='warn').length,
     missing:missing.turretMounts?.length||0,missingWarning:missing.warnings.some(w=>w.message.includes('mounting block is missing')),
     invalid:bad.turretMounts?.length||0,invalidWarning:bad.warnings.some(w=>w.message.includes('Invalid turretDesign size'))};
  },fixture);
- assert.equal(failures.mounted,1);assert.equal(failures.warnings,2);assert.equal(failures.missing,0);assert.ok(failures.missingWarning);assert.equal(failures.invalid,0);assert.ok(failures.invalidWarning);
+ assert.ok(failures.repairPreview);assert.equal(failures.repaired,1);assert.ok(failures.repairUndo);assert.equal(failures.mounted,1);assert.equal(failures.warnings,2);assert.equal(failures.missing,0);assert.ok(failures.missingWarning);assert.equal(failures.invalid,0);assert.ok(failures.invalidWarning);
 } finally {await browser.close();}

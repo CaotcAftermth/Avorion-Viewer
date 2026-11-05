@@ -29,7 +29,7 @@ export function wirePanels(content,state,prefix='',searching=false){
     summary.addEventListener('click',event=>{
       if(!event.ctrlKey&&!event.metaKey)return;
       event.preventDefault();
-      for(const other of panels){other.open=other===panel;if(!searching)state.panelOpen[prefix+other.querySelector('summary').textContent]=other.open;}
+      for(const other of panels){other.open=other===panel||other.contains(panel);if(!searching)state.panelOpen[prefix+other.querySelector('summary').textContent]=other.open;}
     });
   }
 }

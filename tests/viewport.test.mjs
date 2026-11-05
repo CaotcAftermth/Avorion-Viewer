@@ -10,8 +10,10 @@ import {makeBlock,makeModel} from '../src/block-model.js';
 
 // Exercise the real renderer's event handlers without a browser dependency.
 test('viewport pointer lifecycle, modifiers, cancellation, and cursor removal', async t => {
-  const saved = new Map(['window','ResizeObserver','requestAnimationFrame','cancelAnimationFrame','devicePixelRatio'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
+  const saved = new Map(['document','Option','window','ResizeObserver','requestAnimationFrame','cancelAnimationFrame','devicePixelRatio'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
   const frames=new Map();let frameId=0;
+  const element=()=>Object.assign(new EventTarget(),{style:{},children:[],setAttribute(){},append(...items){this.children.push(...items);},remove(){},add(item){this.children.push(item);},querySelector(){return null;},classList:{add(){},remove(){},toggle(){}}});
+  globalThis.document=Object.assign(new EventTarget(),{createElement:element});globalThis.Option=class{constructor(text,value){this.text=text;this.value=value;}};
   globalThis.window=new EventTarget();globalThis.devicePixelRatio=1;
   globalThis.requestAnimationFrame=callback=>{frames.set(++frameId,callback);return frameId;};
   globalThis.cancelAnimationFrame=id=>frames.delete(id);
@@ -25,7 +27,7 @@ test('viewport pointer lifecycle, modifiers, cancellation, and cursor removal', 
     Object.assign(canvas,{
       getContext:()=>context,focus:()=>{},getBoundingClientRect:()=>({left:0,top:0,width:800,height:600}),
       setPointerCapture:()=>{captured=true;},hasPointerCapture:()=>captured,releasePointerCapture:()=>{captured=false;},
-      parentElement:{querySelector:selector=>selector==='.view-label'?label:null,querySelectorAll:()=>[],classList:{add:c=>classes.add(c),remove:c=>classes.delete(c)}}
+      parentElement:Object.assign(element(),{querySelector:selector=>selector==='.view-label'?label:null,querySelectorAll:()=>[],classList:{add:c=>classes.add(c),remove:c=>classes.delete(c)}})
     });
     const activeScene={visible:true,loaded:true,selected:true,...sceneOverrides};
     const renderer=mountViewport(canvas,node,activeScene,()=>changes++,()=>selections++,()=>preferences,()=>menus++);
@@ -39,10 +41,10 @@ test('viewport pointer lifecycle, modifiers, cancellation, and cursor removal', 
     try{h.node.view.interactionMode='socket';h.flush();assert.ok(h.calls.some(c=>c.name==='arc'),'armored socket markers remain visible while coverage is enabled');}
     finally{h.renderer.dispose();}
   });
-  await t.test('thin turret bodies retain sockets and undersized faces have no markers',()=>{
+  await t.test('thin turret bodies retain sockets and undersized faces remain inspectable',()=>{
     for(const thickness of [0,.4,.5]){
       const h=setup({...FACTORY_PREFERENCES},{model:makeModel([makeBlock({typeIndex:24,size:{x:2,y:thickness,z:2}})]),turretSockets:{show:true,through:true,scope:'all'}});
-      try{h.node.view.showThinBlocks=false;h.node.view.interactionMode='socket';h.flush();assert.equal(h.calls.filter(c=>c.name==='arc').length,thickness<.5?2:6);}
+      try{h.node.view.showThinBlocks=false;h.node.view.interactionMode='socket';h.flush();assert.equal(h.calls.filter(c=>c.name==='arc').length,6);}
       finally{h.renderer.dispose();}
     }
   });

@@ -1,3 +1,5 @@
+import {enhanceColorCells} from './color-cells.js';
+import {mountCursorTargets,mountCursorPreview} from './cursor-preferences.js';
 import { setDisabled } from './control-state.js';
 import { mountAssetLibrary } from './asset-library.js';
 import { wireTabs, wirePanels } from './editor-panels.js';
@@ -34,7 +36,9 @@ export function mountPreferences(host, store, editorState = {}, assets = {}, opt
     host.querySelector('[data-factory]').onclick=()=>{store.factory();host.querySelector('details.preferences-management').open=false;};
   }
 
+  let cursorUpdates=[];
   function sync() {
+    for(const update of cursorUpdates)update();
     host.querySelectorAll('[data-preference-tip]').forEach(label=>{if(store.value.showTooltips)label.setAttribute('title',label.dataset.preferenceTip);else label.removeAttribute('title');});
     for (const [key, input] of controls) {
       if(input.dataset.binding){if(input.dataset.recording!=='true')input.textContent=shortcutLabel(store.value[key]);continue;}
@@ -51,6 +55,7 @@ export function mountPreferences(host, store, editorState = {}, assets = {}, opt
       slider.value=store.value[slider.dataset.shaderSlider];
       slider.closest('.shader-value-row').style.setProperty('--value-fill',`${100*(Number(slider.value)-Number(slider.min))/(Number(slider.max)-Number(slider.min))}%`);
     });
+    enhanceColorCells(host);
     autoSave.checked = store.value.autoSave;
     save.hidden = store.value.autoSave && !store.error;
     setDisabled(save,!store.dirty&&!store.error,t('No unsaved preference changes. Change a preference to enable saving.'),t('Save Preferences'));
@@ -61,7 +66,7 @@ export function mountPreferences(host, store, editorState = {}, assets = {}, opt
   }
 
   function renderContent() {
-    controls.clear();hexInputs.clear();content.replaceChildren();nav.replaceChildren();
+    cursorUpdates=[];controls.clear();hexInputs.clear();content.replaceChildren();nav.replaceChildren();
     const searching = !!query.trim();
     for (const section of sections) {
       const panels = matchingPanels(section, query);
@@ -89,6 +94,7 @@ export function mountPreferences(host, store, editorState = {}, assets = {}, opt
           summary.textContent=panel.label==='Surface'?'Surface Shader':panel.label==='Lighting'?'Studio Lighting':panel.label;
           const output=document.createElement('div');output.className='shader-node-output';output.textContent=panel.label==='Surface'?'Surface':'Light';output.setAttribute('aria-hidden','true');details.append(output);
         }
+        if(panel.cursorTargets){cursorUpdates.push(mountCursorTargets(details,store));content.append(details);continue;}
         for (const field of panel.fields) {
           const row=document.createElement('div');row.className=`preference-row ${field.type==='checkbox'?'boolean-row':''}`;
           const label=document.createElement('span');label.className='preference-label';const fieldLabel=t(field.label),fieldTip=t(field.description);label.textContent=fieldLabel;label.dataset.preferenceTip=fieldTip;label.dataset.uiTooltip=fieldTip;
@@ -157,6 +163,7 @@ export function mountPreferences(host, store, editorState = {}, assets = {}, opt
         }
         content.append(details);
       }
+      if(section.id==='cursors')cursorUpdates.push(mountCursorPreview(content,store));
     }
     if(!content.childElementCount){const empty=document.createElement('p');empty.className='preferences-empty';empty.textContent=tf('No preferences match “{0}”.',query)+(options.sections?'':' '+t('World and Shaders settings are in the Properties editor; asset folders are in File > Asset folders.'));content.append(empty);}
     wireTabs(nav,content);wirePanels(content,editorState,category+':',searching);

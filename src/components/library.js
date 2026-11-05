@@ -1,3 +1,4 @@
+import {revisedAsset} from '../attachments/lifecycle.js';
 import {thumbnail} from '../turrets/thumbnail.js';
 import {importComponent,validateComponent} from './core.js';
 import {subscribeComponents,loadComponents,saveComponents} from './storage.js';
@@ -14,12 +15,12 @@ export function loadComponentLibrary(){
 }
 export const selectedComponent=()=>componentLibrary.assets.find(a=>a.id===componentLibrary.selectedId)||null;
 export function selectComponent(id){componentLibrary.selectedId=id;emit(true);}
-export async function updateComponentAsset(next){await loadComponentLibrary();await saveComponents(componentLibrary.assets.map(a=>a.id===next.id?next:a));}
+export async function updateComponentAsset(next){await loadComponentLibrary();next=revisedAsset(next,componentLibrary.assets.find(a=>a.id===next.id));await saveComponents(componentLibrary.assets.map(a=>a.id===next.id?next:a));}
 export async function removeComponentAsset(asset){await loadComponentLibrary();await saveComponents(componentLibrary.assets.filter(a=>a.id!==asset.id));if(componentLibrary.selectedId===asset.id)componentLibrary.selectedId=null;emit();}
-export async function addComponentAsset(asset){
+export async function addComponentAsset(asset,{force=false}={}){
  await loadComponentLibrary();
- const existing=componentLibrary.assets.find(a=>a.sourceXml===asset.sourceXml);if(existing)return existing;
- await saveComponents([...componentLibrary.assets,asset]);return asset;
+ const existing=componentLibrary.assets.find(a=>a.sourceXml===asset.sourceXml);if(existing&&!force)return existing;
+ asset=revisedAsset(asset);await saveComponents([...componentLibrary.assets,asset]);return asset;
 }
 export function subscribeComponentLibrary(listener){listeners.add(listener);return ()=>listeners.delete(listener);}
 // Packs share a set of components between browsers or people.
@@ -90,7 +91,7 @@ export function mountComponentLibrary(host,changed){
    name.onpointerup=e=>{if(e.pointerType==='touch'){const now=performance.now();if(lastTap&&now-lastTap<400)rename();lastTap=now;}};
    const remove=document.createElement('button');remove.type='button';remove.className='turret-asset-remove';remove.textContent='×';remove.setAttribute('aria-label','Remove '+asset.name+' from library');remove.title='Remove from library; mounted copies remain on ships';
    remove.onclick=async()=>{remove.disabled=true;try{await removeComponentAsset(asset);changed();}catch(e){error=e.message;draw();}};
-   card.append(tile,name,remove);grid.append(card);
+   card.append(tile,name,remove);const place=document.createElement('button');place.textContent='Place';place.setAttribute('aria-label','Place '+asset.name);place.onclick=()=>window.dispatchEvent(new CustomEvent('attachment-place',{detail:{kind:'component',asset}}));card.append(place);grid.append(card);
   }
   if(!grid)newGrid();
   if(!shown.length&&componentLibrary.assets.length){const none=document.createElement('p');none.className='panel-note';none.textContent='No components match.';grid.before(none);}

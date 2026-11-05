@@ -147,6 +147,7 @@ uniform float uGlowStrength;
 uniform float uHologramGlow;
 uniform float uFogStrength;
 uniform vec3 uSelectColor;
+uniform float uShadeSelected;
 uniform vec3 uPaintColor;
 uniform vec3 uRegionColor;
 uniform vec3 uMirrorOrigin;
@@ -339,7 +340,7 @@ void main() {
     float technical=.7+.3*max(dot(n,normalize(vec3(-.4,.65,.6))),0.);
     vec3 color=mix(vec3(.055,.14,.22)*technical,vec3(.72,.88,1.),line);
     color=mix(color,uRegionColor,step(3.5,vParams.w)*.45);
-    color=mix(color,uSelectColor,mod(vParams.w,2.)*.65);
+    color=mix(color,uSelectColor,mod(vParams.w,2.)*.65*uShadeSelected);
     gl_FragColor=vec4(color,1.);return;
   }
   vec4 materialOverlay = sampleTri(uAux, vMaterialLayers.x, p, w);
@@ -506,7 +507,7 @@ void main() {
   if(uAmbientOnly>.5)outc=col*uAmbientFill*ambientShape;
   // region highlight (state bit 4), then selection tint on top
   outc = mix(outc, uRegionColor, step(3.5, vParams.w) * 0.45);
-  outc = mix(outc, uSelectColor, mod(vParams.w,2.0) * 0.65);
+  outc = mix(outc, uSelectColor, mod(vParams.w,2.0) * 0.65*uShadeSelected);
 
   if (uDebug > 0.5) {
     if (uDebug < 1.5) outc = base.rgb;
@@ -594,6 +595,7 @@ export function createGameMaterial(albedo, normal, aux, params, transparent = fa
             uGloss: { value: 1 }, uSpecular: { value: 0 },
             uNormalStrength: { value: 1 }, uSharpness: { value: 8 },
             uSecondaryFactor: { value: 0.6 }, uGlowStrength: { value: 1 }, uHologramGlow: { value: 1.5 }, uFogStrength: { value: 0 },
+            uShadeSelected: { value: 1 },
             uSelectColor: { value: new THREE.Color().setStyle("#4fd8eb", THREE.LinearSRGBColorSpace) },
             uMirrorOrigin: { value: new THREE.Vector3() },
             uMirrorVisible: { value: new THREE.Vector3() },

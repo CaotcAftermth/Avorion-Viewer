@@ -28,7 +28,7 @@ export function validateSetup(setup){
   const ids=new Set();
   for(const socket of setup.sockets){validateFrame(socket);if(typeof socket.id!=='string'||ids.has(socket.id)||typeof socket.name!=='string'||(socket.blockId!==undefined&&typeof socket.blockId!=='string'))throw Error('Invalid or duplicate component socket.');ids.add(socket.id);}
   const occupied=new Set();
-  for(const mount of setup.mounts){validateComponent(mount.asset);if(typeof mount.id!=='string'||typeof mount.socketId!=='string'||occupied.has(mount.socketId)||(mount.name!==undefined&&(typeof mount.name!=='string'||mount.name.length>100))||(mount.hidden!==undefined&&typeof mount.hidden!=='boolean')||!Number.isFinite(mount.scale)||mount.scale<=0||mount.scale>1000||!Number.isFinite(mount.twist))throw Error('Invalid component mount.');occupied.add(mount.socketId);}
+  for(const mount of setup.mounts){validateComponent(mount.asset);for(const key of ['offset','rotation'])if(mount[key]!==undefined&&!vector(mount[key]))throw Error('Invalid component transform.');if(typeof mount.id!=='string'||typeof mount.socketId!=='string'||occupied.has(mount.socketId)||(mount.name!==undefined&&(typeof mount.name!=='string'||mount.name.length>100))||(mount.hidden!==undefined&&typeof mount.hidden!=='boolean')||!Number.isFinite(mount.scale)||mount.scale<=0||mount.scale>1000||!Number.isFinite(mount.twist))throw Error('Invalid component mount.');occupied.add(mount.socketId);}
   return setup;
 }
 const socketCache=new WeakMap();
@@ -53,7 +53,7 @@ export function savedSocket(model,socket,name=socket.name){
   return {id:crypto.randomUUID(),name,blockId:block?.id,position:socket.position.map((v,i)=>v-(block?block.position[['x','y','z'][i]]:offset?.[['x','y','z'][i]]||0)),rotation:[...socket.rotation]};
 }
 export function componentMatrix(asset,socket,mount){
-  return frame(socket.position,socket.rotation).multiply(new THREE.Matrix4().makeRotationY(THREE.MathUtils.degToRad(mount.twist||0)))
+  return frame(socket.position,socket.rotation).multiply(frame(mount.offset||[0,0,0],mount.rotation||[0,0,0])).multiply(new THREE.Matrix4().makeRotationY(THREE.MathUtils.degToRad(mount.twist||0)))
     .scale(new THREE.Vector3().setScalar(mount.scale??1)).multiply(frame(asset.attachment.position,asset.attachment.rotation).invert());
 }
 export function attachComponent(setup,asset,socket){

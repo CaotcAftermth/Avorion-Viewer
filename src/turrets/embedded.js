@@ -34,6 +34,7 @@ export async function restoreEmbeddedTurrets(model, library) {
   const designs = [...(model.doc?.getElementsByTagName('turretDesign') || [])]
     .filter(node => node.hasAttribute('blockIndex'));
   if (!designs.length) return;
+  const report={restored:0,reused:0,added:0,entries:[]};model.turretRestoration=report;
   const warn = message => model.warnings.push({level:'warn', message});
   let assets;
   try { assets = await library.load(); }
@@ -44,23 +45,26 @@ export async function restoreEmbeddedTurrets(model, library) {
   const clearance = createSocketClearance(blocks), scene = {model};
   for (const design of designs) {
     const index = design.getAttribute('blockIndex'), block = byIndex.get(index);
+    const result={index,blockId:block?.id,state:'unresolved',inferred:true};report.entries.push(result);
     try {
-      if (!block || !isTurretBlock(block)) throw Error('mounting block is missing or is not a turret base');
       // Respect existing mounts, including edits restored from a session.
-      if (model.turretMounts?.some(mount => mount.socketId.startsWith(`turret:${block.id}:`))) continue;
+      if (block && model.turretMounts?.some(mount => mount.socketId.startsWith(`turret:${block.id}:`))){result.state='existing';continue;}
       const imported = importTurretXml(new XMLSerializer().serializeToString(design),
         `${model.fileName.replace(/\.xml$/i, '')} turret ${index}`, crypto.randomUUID());
       const key = turretContentKey(imported);
-      let asset = byContent.get(key);
+      let asset = byContent.get(key);if(asset)report.reused++;
       if (!asset) {
         asset = imported;
-        try { asset = await library.add(asset); }
+        try { asset = await library.add(asset);report.added++; }
         catch (error) { warn(`Turret ${index} restored but could not be saved to the library: ${error.message}`); }
         byContent.set(key, asset);
       }
+      result.assetId=asset.id;result.asset=asset;result.size=imported.sourceSize;
+      if (!block || !isTurretBlock(block)) throw Error('mounting block is missing or is not a turret base');
       const socket = chooseEmbeddedSocket(block, blocks, imported.sourceSize, clearance);
       if (!socket) throw Error('no exposed socket fits the saved turret size');
-      placeTurret(scene, asset, socket, imported.sourceSize);
-    } catch (error) { warn(`Turret on block ${index} could not be attached: ${error.message}`); }
+      placeTurret(scene, asset, socket, imported.sourceSize);result.state='restored';result.socketId=socket.id;report.restored++;
+    } catch (error) { result.reason=error.message;warn(`Turret on block ${index} could not be attached: ${error.message}`); }
   }
+  return report;
 }

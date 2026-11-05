@@ -1,3 +1,4 @@
+import {assetProvenance} from '../attachments/lifecycle.js';
 import * as THREE from '../vendor/three.module.js';
 import {frame} from '../turrets/core.js';
 import {componentSetup,componentSockets} from './core.js';
@@ -6,18 +7,32 @@ import {saveComponentSetup} from './storage.js';
 // Every component setup change goes through here so it is saved, undoable and redrawn.
 const histories=new WeakMap(),LIMIT=100;
 const historyOf=model=>{let h=histories.get(model);if(!h)histories.set(model,h={undo:[],redo:[]});return h;};
-export async function changeSetup(scene,next,{previous}={}){
- const model=scene.model;if(!model)throw Error('Load a ship first.');
- const before=previous||componentSetup(model);
- await saveComponentSetup(model,next);
- const h=historyOf(model);h.undo.push(before);if(h.undo.length>LIMIT)h.undo.shift();h.redo=[];
- settle(scene,model);
+const pending=new WeakMap(),numericEdits=new WeakMap();
+export function beginComponentEdit(scene){if(scene.model&&!numericEdits.has(scene.model))numericEdits.set(scene.model,componentSetup(scene.model));}
+export async function endComponentEdit(scene,cancel=false){const model=scene.model,before=numericEdits.get(model);if(!before)return;const next=componentSetup(model);numericEdits.delete(model);if(cancel){previewSetup(scene,before);return;}if(JSON.stringify(before)===JSON.stringify(next))return;try{await changeSetup(scene,next,{previous:before});}catch(error){previewSetup(scene,before);throw error;}}
+function enqueue(model,operation){const next=(pending.get(model)||Promise.resolve()).then(operation);pending.set(model,next.catch(()=>{}));return next;}
+export function changeSetup(scene,next,{previous}={}){
+ const model=scene.model;if(!model)return Promise.reject(Error('Load a ship first.'));
+ if(numericEdits.has(model)){previewSetup(scene,next);return Promise.resolve();}
+ const expected=componentSetup(model);
+ return enqueue(model,async()=>{
+  if(componentSetup(model)!==expected&&!previous)throw Error('Another component edit finished first. Retry this edit against the updated setup.');
+  const before=previous||componentSetup(model);model.componentSaveState='Saving…';
+  try{await saveComponentSetup(model,next);delete model.componentSaveDraft;model.componentSaveState='Saved locally';}
+  catch(error){model.componentSaveDraft=next;model.componentSaveState='Save failed: '+error.message;throw error;}
+  const h=historyOf(model);h.undo.push(before);if(h.undo.length>LIMIT)h.undo.shift();h.redo=[];settle(scene,model);
+ });
 }
-export async function componentHistory(scene,redo=false){
- const model=scene.model;if(!model)return false;const h=historyOf(model),from=redo?h.redo:h.undo,to=redo?h.undo:h.redo;if(!from.length)return false;
- const target=from.pop();to.push(componentSetup(model));
- try{await saveComponentSetup(model,target);}catch(error){to.pop();from.push(target);throw error;}
- settle(scene,model);return true;
+export function retryComponentSave(scene){const draft=scene.model?.componentSaveDraft;if(!draft)return Promise.resolve();return changeSetup(scene,draft);}
+export function componentHistory(scene,redo=false){
+ const model=scene.model;if(!model)return Promise.resolve(false);
+ return enqueue(model,async()=>{
+  const h=historyOf(model),from=redo?h.redo:h.undo,to=redo?h.undo:h.redo;if(!from.length)return false;
+  const target=from.at(-1),before=componentSetup(model);model.componentSaveState='Saving…';
+  try{await saveComponentSetup(model,target);model.componentSaveState='Saved locally';}
+  catch(error){model.componentSaveState='Save failed: '+error.message;throw error;}
+  from.pop();to.push(before);settle(scene,model);return true;
+ });
 }
 export const canComponentHistory=(scene,redo=false)=>!!scene.model&&!!histories.get(scene.model)?.[redo?'redo':'undo'].length;
 function settle(scene,model){
@@ -69,8 +84,8 @@ export function mirroredMounts(scene,mount){
 // --- Attach / swap / detach -----------------------------------------------
 function placeOne(setup,asset,socketId,{scale=1,twist=0}={}){
  const occupied=setup.mounts.find(m=>m.socketId===socketId);
- if(occupied)return {...setup,mounts:setup.mounts.map(m=>m===occupied?{...m,asset:structuredClone(asset)}:m)};
- return {...setup,mounts:[...setup.mounts,{id:crypto.randomUUID(),socketId,asset:structuredClone(asset),scale,twist}]};
+ if(occupied)return {...setup,mounts:setup.mounts.map(m=>m===occupied?{...m,asset:structuredClone(asset),source:assetProvenance(asset)}:m)};
+ return {...setup,mounts:[...setup.mounts,{id:crypto.randomUUID(),socketId,asset:structuredClone(asset),source:assetProvenance(asset),scale,twist}]};
 }
 // Attach to a socket, or swap the component already there (scale and twist are kept).
 export function placeComponent(scene,asset,socket){

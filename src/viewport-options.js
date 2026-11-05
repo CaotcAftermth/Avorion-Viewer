@@ -1,7 +1,7 @@
 // Each viewport owns its display settings; legacy camera state stays compatible.
 export const VIEWPORT_DEFAULTS=Object.freeze({
   showGizmo:true,showOverlays:true,axisX:true,axisY:true,axisZ:true,gridScale:1,axisInfinite:true,axisLength:70,axisWidth:1,axisBrightness:1,ambientOnly:false,ambientStrength:1,ambientDetail:.35,
-  showText:true,showPerformance:false,showStats:true,outlineSelected:true,showBlockBounds:false,showModelDimensions:false,
+  showText:true,showPerformance:false,showStats:true,shadeSelected:true,outlineSelected:false,showBlockBounds:false,showModelDimensions:false,
   wireOverlay:false,wireThreshold:1,wireOpacity:1,shading:'MATERIAL',
   lighting:'STUDIO',studioLight:'Default',matcap:'Red Wax',background:'WORLD',backgroundColor:'#0d0d0d',
   backfaceCulling:true,objectOutline:true,outlineColor:'#000000',specular:true,
@@ -12,6 +12,9 @@ const enums={shading:['WIREFRAME','SOLID','MATERIAL','RENDERED'],lighting:['STUD
 const ranges={axisLength:[.001,1e12],axisWidth:[.5,12],axisBrightness:[0,4],ambientStrength:[0,4],ambientDetail:[0,1],gridScale:[.001,1000],wireThreshold:[0,1],wireOpacity:[0,1],xrayAlpha:[0,1],shadowIntensity:[0,1],focusDistance:[.001,1e7],aperture:[.1,64],focalLength:[1,300],clipStart:[.0001,1e6],clipEnd:[.001,1e7]};
 export function ensureViewportOptions(view){
   if(!view.display||typeof view.display!=='object'||Array.isArray(view.display))delete view.display;
+  if(view.display&&view.display.shadeSelected===undefined&&typeof view.display.outlineSelected==='boolean'){
+    view.display.shadeSelected=view.display.outlineSelected;view.display.outlineSelected=false;
+  }
   const value=view.display??={...VIEWPORT_DEFAULTS,shading:view.wire?'WIREFRAME':'MATERIAL'};
   // Render timing became opt-in; turn it off once in layouts saved before that.
   if(value.performanceOptIn!==true){value.showPerformance=false;value.performanceOptIn=true;}

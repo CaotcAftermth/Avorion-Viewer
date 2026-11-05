@@ -1,3 +1,4 @@
+import {numericEditing} from '../numeric-field.js';
 // "Camera keys" panel: capture viewport poses at timeline times and edit the resulting path.
 import {KEYED_CAMERA,KEY_ANCHORS,KEY_EASES,EVENT_FLAGS,captureKey,poseFromView,upsertKey,normalizeKeys,normalizeEvents,reanchorKey,sequenceDuration,newKeyId,fovFromFocal,validateKey,MAX_KEY_TIME} from './camera-keys.js';
 import {evaluateCamera,showcaseAt} from './showcase.js';
@@ -22,7 +23,7 @@ export function keysFromPreset(runtime,show){
 
 export function mountCameraKeys(parent,runtime,{onModeChange=()=>{}}={}){
  const show=runtime.settings.showcase;show.keys=normalizeKeys(show.keys||[]);show.events=normalizeEvents(show.events||[]);show.keysVersion=1;
- const d=document.createElement('details');d.className='camera-keys';d.innerHTML='<summary>Camera keys</summary><p class="panel-note">Frame the viewport, seek to a time, then add a key. With Camera preset set to camera keys, playback and exports follow the path through your keys. Moving the view while paused does not change keys until you press Update or Add.</p>';parent.append(d);
+ const d=document.createElement('details');d.className='panel camera-keys';d.innerHTML='<summary>Camera Keyframes</summary><p class="panel-note">Frame the viewport, seek to a time, then add a key. With Camera preset set to camera keys, playback and exports follow the path through your keys. Moving the view while paused does not change keys until you press Update or Add.</p>';parent.append(d);
  const status=document.createElement('p');status.className='panel-note';status.setAttribute('role','status');
  const view=()=>runtime.context?.().view;
  const row=(label,input)=>{const r=document.createElement('label');r.className='field-row';r.append(label,input);return r;};
@@ -34,27 +35,31 @@ export function mountCameraKeys(parent,runtime,{onModeChange=()=>{}}={}){
  const actions=document.createElement('div');d.append(actions);
  const useKeys=()=>{if(show.camera!==KEYED_CAMERA){show.presetCamera=show.camera;runtime.setCamera(KEYED_CAMERA);onModeChange(KEYED_CAMERA);}};
  const present=()=>{runtime.followKeys?.();render();};
- button(actions,'Add key at current time',()=>{const v=view();if(!v)throw Error('Open a 3D viewport first.');const key=captureKey(v,runtime.clock.time,runtime,{anchor:anchor.value,ease:ease.value});show.keys=upsertKey(show.keys,key);useKeys();present();status.textContent=`Key added at ${fmt(key.time)}.`;});
+ button(actions,'Add key at current time',()=>{const v=view();if(!v)throw Error('Open a 3D viewport first.');const key=captureKey(v,runtime.clock.time,runtime,{anchor:anchor.value,ease:ease.value});show.keys=upsertKey(show.keys,key);runtime.selectedCameraKeyId=key.id;useKeys();present();status.textContent=`Key added at ${fmt(key.time)}.`;});
  button(actions,'Follow keys',()=>{if(!show.keys.length)throw Error('Add a camera key first.');useKeys();present();},'Return the view to the keyed camera path');
  button(actions,'Fill from preset sequence',()=>{if(show.keys.length&&!confirm('Replace existing camera keys and events with the preset sequence?'))return;const at=runtime.clock.time,baked=keysFromPreset(runtime,show);show.keys=baked.keys;show.events=baked.events;useKeys();runtime.seek(Math.min(at,sequenceDuration(show)));render();status.textContent=`${baked.keys.length} keys and ${baked.events.length} events created from the preset sequence.`;});
  button(actions,'Clear keys',()=>{if(!show.keys.length&&!show.events.length)return;if(!confirm('Delete all camera keys and events?'))return;show.keys=[];show.events=[];if(show.camera===KEYED_CAMERA){runtime.setCamera('manual');onModeChange('manual');}render();});
  const strip=document.createElement('div');strip.className='camera-key-strip';strip.style.cssText='position:relative;height:18px;margin:8px 0;background:#2a2a2a;border:1px solid #1b1b1b;border-radius:3px';strip.setAttribute('aria-label','Camera key timeline');d.append(strip);
  const list=document.createElement('div');list.className='camera-key-list';d.append(list);
- const eventsBox=document.createElement('details');eventsBox.innerHTML='<summary>Sequence events</summary><p class="panel-note">Switch firing, tracking and the target marker on or off at set times while camera keys are active. Unset values use the normal Studio settings.</p>';d.append(eventsBox);
+ const eventsBox=document.createElement('details');eventsBox.className='panel';eventsBox.dataset.timedEvents='';eventsBox.innerHTML='<summary>Timed Events</summary><p class="panel-note">Switch firing, tracking and the target marker on or off at set times while camera keys are active. Unset values use the normal Studio settings.</p>';d.append(eventsBox);
  const eventList=document.createElement('div');eventsBox.append(eventList);
  button(eventsBox,'Add event at current time',()=>{show.events=normalizeEvents([...show.events,{id:newKeyId(),time:runtime.clock.time,fire:true}]);rebuild();render();});
  d.append(status);
  // Events change the simulation, so rebuild state at the current time without restarting playback position.
  const rebuild=()=>{if(show.camera===KEYED_CAMERA)runtime.seek(runtime.clock.time);};
  function render(){
+  if(numericEditing())return;
+  if(!show.keys.some(k=>k.id===runtime.selectedCameraKeyId))runtime.selectedCameraKeyId=show.keys[0]?.id;
   const total=sequenceDuration({...show,camera:KEYED_CAMERA});strip.replaceChildren();
-  for(const key of show.keys){const m=document.createElement('button');m.title=`Jump to key at ${fmt(key.time)}`;m.setAttribute('aria-label',m.title);m.style.cssText=`position:absolute;top:1px;width:10px;height:14px;padding:0;margin-left:-5px;background:#e9a15b;border-radius:2px;left:${(key.time/total*100).toFixed(3)}%`;m.onclick=()=>{useKeys();runtime.seek(key.time);render();};strip.append(m);}
+  for(const key of show.keys){const m=document.createElement('button');m.title=`Jump to key at ${fmt(key.time)}`;m.setAttribute('aria-label',m.title);m.style.cssText=`position:absolute;top:1px;width:10px;height:14px;padding:0;margin-left:-5px;background:#e9a15b;border-radius:2px;left:${(key.time/total*100).toFixed(3)}%`;m.onclick=()=>{runtime.selectedCameraKeyId=key.id;useKeys();runtime.seek(key.time);render();};strip.append(m);}
   const head=document.createElement('div');head.style.cssText=`position:absolute;top:0;bottom:0;width:2px;background:#82b5e4;pointer-events:none;left:${Math.min(100,runtime.clock.time/total*100).toFixed(3)}%`;strip.append(head);
   list.replaceChildren();if(!show.keys.length){const p=document.createElement('p');p.className='panel-note';p.textContent='No camera keys yet.';list.append(p);}
   show.keys.forEach((key,index)=>{
-   const r=document.createElement('div');r.className='camera-key-row';r.style.cssText='display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:4px 0;border-top:1px solid #2a2a2a';
+   const choose=document.createElement('button');choose.className='setting-button';choose.textContent=`Key ${index+1} · ${fmt(key.time)}`;choose.setAttribute('aria-pressed',String(runtime.selectedCameraKeyId===key.id));choose.onclick=()=>{runtime.selectedCameraKeyId=key.id;render();};list.append(choose);
+   if(runtime.selectedCameraKeyId!==key.id)return;
+   const r=document.createElement('div');r.className='camera-key-row selected-key-details';r.style.cssText='display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:4px 0;border-top:1px solid #2a2a2a';
    const label=document.createElement('span');label.textContent=`Key ${index+1}`;label.style.cssText='font-size:11px;min-width:42px';
-   const time=document.createElement('input');Object.assign(time,{type:"number",min:0,max:MAX_KEY_TIME,step:1/30,value:+key.time.toFixed(3)});time.style.width='70px';time.setAttribute('aria-label',`Key ${index+1} time (seconds)`);time.onchange=()=>{const v=Number(time.value);if(!Number.isFinite(v)||v<0||v>MAX_KEY_TIME){time.setCustomValidity(`0–${MAX_KEY_TIME} seconds`);time.reportValidity();return;}show.keys=upsertKey(show.keys,{...key,time:v});present();};
+   const time=document.createElement('input');Object.assign(time,{type:"number",min:0,max:MAX_KEY_TIME,step:1/30,value:key.time});time.style.width='70px';time.setAttribute('aria-label',`Key ${index+1} time (seconds)`);time.onchange=()=>{const v=Number(time.value);if(!Number.isFinite(v)||v<0||v>MAX_KEY_TIME){time.setCustomValidity(`0–${MAX_KEY_TIME} seconds`);time.reportValidity();return;}show.keys=upsertKey(show.keys,{...key,time:v});present();};
    const a=select(KEY_ANCHORS,key.anchor,`Key ${index+1} anchor`);a.onchange=()=>{const at=runtime.clock.time;runtime.seek(key.time);show.keys=upsertKey(show.keys,reanchorKey(key,a.value,runtime));runtime.seek(at);render();};
    const e=select(KEY_EASES,key.ease,`Key ${index+1} ease to next key`);e.onchange=()=>{show.keys=upsertKey(show.keys,{...key,ease:e.value});present();};
    r.append(label,time,a,e);
@@ -66,12 +71,13 @@ export function mountCameraKeys(parent,runtime,{onModeChange=()=>{}}={}){
   eventList.replaceChildren();
   show.events.forEach((event,index)=>{
    const r=document.createElement('div');r.style.cssText='display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:4px 0;border-top:1px solid #2a2a2a';
-   const time=document.createElement('input');Object.assign(time,{type:"number",min:0,max:MAX_KEY_TIME,step:1/30,value:+event.time.toFixed(3)});time.style.width='70px';time.setAttribute('aria-label',`Event ${index+1} time (seconds)`);time.onchange=()=>{const v=Number(time.value);if(!Number.isFinite(v)||v<0||v>MAX_KEY_TIME)return;show.events=normalizeEvents(show.events.map(x=>x.id===event.id?{...x,time:v}:x));rebuild();render();};r.append(time);
+   const time=document.createElement('input');Object.assign(time,{type:"number",min:0,max:MAX_KEY_TIME,step:1/30,value:event.time});time.style.width='70px';time.setAttribute('aria-label',`Event ${index+1} time (seconds)`);time.onchange=()=>{const v=Number(time.value);if(!Number.isFinite(v)||v<0||v>MAX_KEY_TIME)return;show.events=normalizeEvents(show.events.map(x=>x.id===event.id?{...x,time:v}:x));rebuild();render();};r.append(time);
    for(const flag of EVENT_FLAGS){const s=select(['unchanged','on','off'],flag in event?(event[flag]?'on':'off'):'unchanged',`Event ${index+1} ${flag}`);s.onchange=()=>{show.events=normalizeEvents(show.events.map(x=>{if(x.id!==event.id)return x;const y={...x};if(s.value==='unchanged')delete y[flag];else y[flag]=s.value==='on';return y;}));rebuild();render();};const l=document.createElement('label');l.style.fontSize='11px';l.append(flag+' ',s);r.append(l);}
    button(r,'Delete',()=>{show.events=show.events.filter(x=>x.id!==event.id);rebuild();render();},`Delete event ${index+1}`);
    eventList.append(r);
   });
  }
  const unsubscribe=runtime.subscribe(e=>{if(e.type==='timelineSeek'||e.type==='timelineReset')render();});
+ d.addEventListener('numeric-commit',()=>render());eventsBox.addEventListener('numeric-commit',()=>render());
  render();return {render,dispose:unsubscribe};
 }

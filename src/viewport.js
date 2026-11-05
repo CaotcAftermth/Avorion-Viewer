@@ -1,3 +1,6 @@
+import {createTurretToolbar} from './turrets/context-toolbar.js';
+import {pickSocketMarker,selectSocketMarker} from './socket-markers.js';
+import {choosePlacementTarget,createPlacementStrip} from './attachments/placement.js';
 import {drawComponentSockets} from './components/overlay.js';
 import {componentLibrary} from './components/library.js';
 import {componentSetup} from './components/core.js';
@@ -8,10 +11,11 @@ import {drawCoverageLegend} from './turrets/coverage-render.js';
 import {coverageOptions} from './turrets/coverage-sampling.js';
 import {turretLibrary} from './turrets/library.js';
 import {placeFromLibrary} from './turrets/placement.js';
-import {mounts,initialTurretSize,selectTurrets} from './turrets/mounts.js';
+import {mounts,initialTurretSize,selectTurrets,placeTurret,replaceTurret} from './turrets/mounts.js';
 import {drawSockets} from './turrets/sockets.js';
 import {drawDimensions,drawSymmetryPlanes} from './viewport-annotations.js';
 import {paintOptions} from './paint-tools.js';
+import {cursorCSS,viewportCursor,drawBrushRing} from './viewport-cursors.js';
 import {nativeToView,viewToNative} from './block-model.js';
 import {modelExtents,dimensionRulers,exteriorRuler} from './model-overlays.js';
 import {gridSpacing} from './world-guides.js';
@@ -25,6 +29,7 @@ import { basis, dot, ensureCamera, cameraPoint, projectCamera, clipNear, orbit, 
 import { FACTORY_PREFERENCES, THEMES, editorTheme } from './preferences.js';
 import { reportError } from './app-log.js';
 
+let activePlacementViewport=null;
 // Navigation state is independent of this reference geometry and can be reused
 // by the eventual Avorion renderer.
 export function mountViewport(canvas, area, scene, onChange, onSelect, getPreferences = () => FACTORY_PREFERENCES, onContextMenu = () => {}, onPaint = () => false) {
@@ -33,28 +38,38 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   const faces = [[0,1,2,3],[0,4,5,1],[1,5,6,2],[2,6,7,3],[3,7,4,0],[4,7,6,5]];
   canvas.classList?.toggle('paint-mode',view.interactionMode==='paint');
   let suppressContext=false,magnifier=null,paintPointer=null,brushCache=null,paintPreview=null;
+  let rightHeld=false;
+  const originalCursor=canvas.style?.cursor||'';
   const hoverLabel=globalThis.document?.createElement('div');if(hoverLabel){hoverLabel.className='paint-hover-label';hoverLabel.hidden=true;body.append?.(hoverLabel);}
   let statsKey=[],width = 1, height = 1, frame = 0, drag = null, regionMode = false, projectedFaces = [];
   const dimensionCache={};
   let socketHits=[],componentSocketHits=[];
   const componentTools=createComponentTools(scene,view,getPreferences);
+  const turretToolbar=createTurretToolbar(canvas,scene,view,{changed:()=>{onSelect({socketId:scene.turretSockets?.selectedId||null});onChange();},selected:onSelect,invalidate:()=>invalidate()});
   const events = new AbortController();
   const listen = (target, type, handler, options = {}) => target.addEventListener(type, handler, { ...options, signal: events.signal });
   const invalidate = () => { if (!frame) frame = requestAnimationFrame(draw); };
   listen(window,'avorion-sky-ready',invalidate);
   listen(window,'avorion-model-ready',invalidate);
+  listen(body,'pointerenter',()=>{activePlacementViewport=area.id;});listen(body,'focusin',()=>{activePlacementViewport=area.id;});
+  const attachmentTools=document.createElement('div');attachmentTools.setAttribute('role','group');attachmentTools.setAttribute('aria-label','Attachment tools');Object.assign(attachmentTools.style,{position:'absolute',bottom:'5px',left:'50%',transform:'translateX(-50%)',zIndex:7,background:'#252525',padding:'3px',display:'none',flexWrap:'wrap',maxWidth:'95%'});body.append(attachmentTools);
+  const toolSelect=(label,values,read,write)=>{const select=document.createElement('select');select.setAttribute('aria-label',label);for(const [value,text] of values)select.add(new Option(text,value));select.value=read();select.onchange=()=>{write(select.value);invalidate();};attachmentTools.append(select);return select;};
+  toolSelect('Socket types',[['both','Both socket types'],['turrets','Turret sockets'],['components','Component sockets']],()=>view.socketFilter||'both',value=>view.socketFilter=value);
+  toolSelect('Attachment coordinate space',[['local','Local axes'],['socket','Socket axes'],['ship','Ship axes']],()=>view.attachmentSpace||'local',value=>view.attachmentSpace=value);
+  toolSelect('Attachment rotation axis',[['x','Rotate X'],['y','Rotate Y'],['z','Rotate Z']],()=>view.attachmentAxis||'y',value=>view.attachmentAxis=value);
+  const transform=document.createElement('button');transform.type='button';transform.textContent='Transform attachment';transform.setAttribute('aria-pressed','false');transform.onclick=()=>{if(scene.componentAttachmentDraft||scene.turretEditorAsset)scene.editAttachment=!scene.editAttachment;else scene.attachmentTransform=!scene.attachmentTransform;transform.setAttribute('aria-pressed',String(!!(scene.editAttachment||scene.attachmentTransform)));invalidate();};attachmentTools.append(transform);
   const socketsChanged=()=>onSelect({socketId:scene.turretSockets?.selectedId||null});
   listen(window,'turret-drag-start',()=>{scene.turretDragging=true;invalidate();});
-  listen(window,'turret-drag-end',()=>{scene.turretDragging=false;scene.turretPreview=null;invalidate();});
-  function dragSocket(event){const [x,y]=position(event);return socketHits.find(s=>s.exposed&&s.fitSize&&Math.hypot(s.screen[0]-x,s.screen[1]-y)<24&&!mounts(scene).some(m=>m.socketId===s.id));}
+  listen(window,'turret-drag-end',()=>{if(!placement.state){scene.turretDragging=false;scene.turretPreview=null;}invalidate();});
+  function dragSocket(event){const [x,y]=position(event);return choosePlacementTarget(socketHits.filter(s=>s.fitSize),x,y,scene.turretPreview?.socket.id);}
   listen(canvas,'dragover',event=>{if(!turretLibrary.dragged||view.interactionMode==='paint')return;event.preventDefault();const socket=dragSocket(event),asset=turretLibrary.dragged;event.dataTransfer.dropEffect=socket?'copy':'none';scene.turretPreview=socket?{asset,socket,size:initialTurretSize(asset,socket)}:null;invalidate();});
   listen(canvas,'dragleave',()=>{scene.turretPreview=null;scene.componentDropTarget=null;invalidate();});
   // Components drop onto an empty component socket, the way turrets drop onto turret sockets.
   listen(window,'component-drag-start',()=>{scene.componentDragging=true;invalidate();});
-  listen(window,'component-drag-end',()=>{scene.componentDragging=false;scene.componentDropTarget=null;invalidate();});
+  listen(window,'component-drag-end',()=>{if(!placement.state){scene.componentDragging=false;scene.componentDropTarget=null;}invalidate();});
   // Any component socket accepts a drop; an occupied one swaps in the new component.
-  function componentDropSocket(event){const [x,y]=position(event);return componentSocketHits.slice().sort((a,b)=>Math.hypot(a.screen[0]-x,a.screen[1]-y)-Math.hypot(b.screen[0]-x,b.screen[1]-y)).find(s=>Math.hypot(s.screen[0]-x,s.screen[1]-y)<24);}
-  listen(window,'component-drag-end',()=>{scene.componentPreview=null;invalidate();});
+  function componentDropSocket(event){const [x,y]=position(event);return choosePlacementTarget(componentSocketHits,x,y,scene.componentDropTarget);}
+  listen(window,'component-drag-end',()=>{if(!placement.state)scene.componentPreview=null;invalidate();});
   listen(canvas,'dragover',event=>{
     if(!componentLibrary.dragged||view.interactionMode==='paint')return;event.preventDefault();
     const socket=componentDropSocket(event),asset=componentLibrary.dragged;event.dataTransfer.dropEffect=socket?'copy':'none';
@@ -64,15 +79,30 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     }
   });
   listen(canvas,'dragleave',()=>{scene.componentPreview=null;invalidate();});
-  listen(canvas,'drop',event=>{
-    const asset=componentLibrary.dragged;if(!asset||view.interactionMode==='paint')return;event.preventDefault();
-    const socket=componentDropSocket(event),model=scene.model;scene.componentDropTarget=null;scene.componentPreview=null;scene.componentDragging=false;invalidate();
-    if(!socket||!model){scene.componentMessage=model?'Drop the component on a component socket. Add sockets in Properties › Components.':'Load a ship first.';onSelect({componentSocketId:null});return;}
-    componentLibrary.selectedId=asset.id;scene.selectedComponentSocketId=socket.id;
-    let next;try{next=placeComponent(scene,asset,socket);}catch(error){scene.componentMessage=error.message;onSelect({componentSocketId:socket.id});return;}
-    changeSetup(scene,next).then(()=>{scene.componentMessage='';scene.selectedComponentMountId=componentSetup(model).mounts.find(m=>m.socketId===socket.id)?.id||null;onSelect({componentSocketId:socket.id});onChange();}).catch(error=>{scene.componentMessage=error.message;reportError(error,'COMPONENT');onSelect({componentSocketId:socket.id});});
+  const clearPlacement=()=>{scene.turretPreview=null;scene.componentPreview=null;scene.turretDragging=false;scene.componentDragging=false;invalidate();};
+  const placement=createPlacementStrip(body,{
+    preview(state){scene.turretDragging=state.kind==='turret';scene.componentDragging=state.kind==='component';if(state.kind==='turret')scene.turretPreview=state.socket?{asset:state.asset,socket:state.socket,size:state.size,twist:state.twist}:null;else scene.componentPreview=state.socket?{asset:state.asset,socket:state.socket,scale:state.size,twist:state.twist}:null;invalidate();},
+    cancelled:clearPlacement,
+    async commit(state){
+      if(scene.model!==state.model)throw Error('The ship changed. Cancel placement and choose a socket again.');
+      if(state.kind==='component'){
+        const next=placeComponent(scene,state.asset,state.socket);const mount=next.mounts.find(m=>m.socketId===state.socket.id);mount.scale=state.size;mount.twist=state.twist;
+        await changeSetup(scene,next);scene.selectedComponentSocketId=state.socket.id;scene.selectedComponentMountId=mount.id;onSelect({componentSocketId:state.socket.id});
+      }else{
+        const instance=(state.occupied?replaceTurret:placeTurret)(scene,state.asset,state.socket,state.size);const mount=mounts(scene).find(m=>m.id===instance.id);mount.twist=state.twist;selectTurrets(scene,instance.id);scene.turretSockets??={};scene.turretSockets.selectedId=state.socket.id;socketsChanged();
+      }
+      clearPlacement();onChange();
+    }
   });
-  listen(canvas,'drop',event=>{const asset=turretLibrary.dragged;if(!asset||view.interactionMode==='paint')return;event.preventDefault();const socket=dragSocket(event);scene.turretPreview=null;scene.turretDragging=false;if(socket){scene.turretSockets??={};scene.turretSockets.selectedId=socket.id;placeFromLibrary(scene,asset,socket,socketsChanged);}invalidate();});
+  const occupied=(kind,socket)=>!!socket&&(kind==='turret'?mounts(scene):componentSetup(scene.model||{}).mounts).some(m=>m.socketId===socket.id);
+  function startPlacement(kind,asset,socket){if(!scene.model)return;placement.start({kind,asset,socket,model:scene.model,size:kind==='turret'?(socket?.fitSize||asset.sourceSize||1):1,occupied:occupied(kind,socket)});}
+  listen(canvas,'drop',event=>{const kind=componentLibrary.dragged?'component':'turret',asset=componentLibrary.dragged||turretLibrary.dragged;if(!asset||view.interactionMode==='paint')return;event.preventDefault();const socket=kind==='component'?componentDropSocket(event):dragSocket(event);if(!socket)return;startPlacement(kind,asset,socket);if(!occupied(kind,socket))placement.accept();});
+  listen(window,'attachment-place',event=>{if(activePlacementViewport&&activePlacementViewport!==area.id)return;activePlacementViewport=area.id;const {kind,asset}=event.detail||{};if(asset&&['turret','component'].includes(kind)){startPlacement(kind,asset,null);canvas.focus();}});
+  listen(window,'blur',()=>{placement.cancel();});
+  listen(canvas,'pointermove',event=>{if(!placement.state)return;const state=placement.state,[x,y]=position(event),socket=choosePlacementTarget(state.kind==='turret'?socketHits.filter(s=>s.fitSize):componentSocketHits,x,y,state.socket?.id);placement.target(socket,occupied(state.kind,socket));});
+  listen(canvas,'pointerdown',event=>{if(!placement.state||event.button!==0)return;event.preventDefault();event.stopImmediatePropagation();if(placement.state.socket&&!placement.state.occupied)placement.accept();});
+  listen(window,'keydown',event=>{if(!placement.state||!body.contains(document.activeElement))return;if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();placement.cancel();}else if(event.key==='Enter'&&event.target===canvas){event.preventDefault();placement.accept();}});
+
 
 
   function project(points, closed = true) {
@@ -87,8 +117,10 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     ctx.strokeStyle = color;ctx.lineWidth = 1;ctx.stroke();
   }
   function draw() {
-    const started=performance.now();
+    updateCursor();
+    const started=performance.now();attachmentTools.style.display=(view.interactionMode==='socket'||scene.selectedTurretId||scene.selectedComponentMountId||scene.componentAttachmentDraft||scene.turretEditorAsset)?'flex':'none';
     frame = 0;
+    if(placement.state&&placement.state.model!==scene.model)placement.cancel();
     if(imageRenderBusy())return;
     const preferences=getPreferences(),theme=THEMES[preferences.theme];
     const display=view.display;
@@ -130,7 +162,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     drawDimensions(ctx,scene,view,width,height,preferences,dimensionCache);
     socketHits=drawSockets(ctx,scene,view,width,height,editorTheme(preferences,'viewport').accent,s=>socketExposed(scene,view,width,height,s,preferences));
     componentSocketHits=drawComponentSockets(ctx,scene,view,width,height,s=>socketExposed(scene,view,width,height,s,preferences));
-    componentTools.draw(ctx,width,height);
+    componentTools.draw(ctx,width,height);turretToolbar.draw(ctx);
     drawCoverageLegend(ctx,scene,view,width,height);
     drawMagnifier();
     drawPaintPreview();
@@ -230,11 +262,14 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     return { x: Math.min(drag.startX,drag.x), y: Math.min(drag.startY,drag.y), width: Math.abs(drag.x-drag.startX), height: Math.abs(drag.y-drag.startY) };
   }
   function position(event) { const rect=canvas.getBoundingClientRect();return [event.clientX-rect.left,event.clientY-rect.top]; }
+  function updateCursor(){if(canvas.style)canvas.style.cursor=cursorCSS(viewportCursor(view,drag?.mode,rightHeld,regionMode),view.paint?.radius,getPreferences());}
+  function trackButtons(event){rightHeld=!!(event.buttons&2);updateCursor();}
   function release() {
-    const pointerId=drag?.pointerId;drag=null;
+    const pointerId=drag?.pointerId;drag=null;updateCursor();
     if (pointerId !== undefined && canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
   }
   function cancel() {
+    rightHeld=false;updateCursor();
     if (!drag && !regionMode && !magnifier) return false;
     closeMagnifier(true);
     if(drag?.mode==='componentGizmo')componentTools.cancel();
@@ -292,12 +327,13 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     if(hoverLabel){hoverLabel.hidden=!paintPreview;hoverLabel.textContent=paintPreview?.text||'';}
   }
   function drawPaintPreview(){
-    if(!paintPreview)return;const {point,locked}=paintPreview;
+    if(view.interactionMode!=='paint'||paintOptions(view).tool==='select'||!paintPointer||drag&&drag.mode!=='paint')return;
+    const point=paintPreview?.point||(magnifier?lensPoint(...paintPointer):paintPointer);if(!point)return;
     const options=paintOptions(view),radius=['brush','restore'].includes(options.tool)?options.radius:0;
     const targets=[{c:ctx,map:p=>p,scale:1}];
     if(magnifier){const m=magnifier;targets.push({c:m.lens.getContext('2d'),map:p=>[(p[0]-m.x)*m.zoom+m.size/2,(p[1]-m.y)*m.zoom+m.size/2],scale:m.zoom,size:m.size});}
-    for(const {c,map,scale,size} of targets){c.save();if(size){c.beginPath();c.rect(0,0,size,size-20);c.clip();}c.strokeStyle=locked?'#f1a777':'#aad8ff';c.lineWidth=1.5;
-      if(radius>0){const p=map(point);c.beginPath();c.arc(p[0],p[1],radius*scale,0,Math.PI*2);c.stroke();}c.restore();
+    for(const {c,map,scale,size} of targets){c.save();if(size){c.beginPath();c.rect(0,0,size,size-20);c.clip();}
+      drawBrushRing(c,map(point),radius*scale,getPreferences());c.restore();
     }
   }
   function boxSelection(){
@@ -353,12 +389,12 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
       const coverage=scene.showFireCoverage&&!['paint','socket'].includes(view.interactionMode)?pickWeaponCoverage(scene,view,width,height,x,y,getPreferences()):null;
       if(coverage){scene.coverageInspection=coverage;scene.coverageHover=null;release();invalidate();onSelect({coverage:true});onChange();return;}
       if(scene.pickAttachment&&componentTools.pickAttachment(pickGamePoint(scene,view,width,height,x,y,getPreferences()))){release();invalidate();onSelect({componentSocketId:null});onChange();return;}
-      const componentSocket=view.interactionMode==='socket'&&componentSocketHits.find(s=>Math.hypot(s.screen[0]-x,s.screen[1]-y)<=12);
-      if(componentSocket){scene.selectedComponentSocketId=componentSocket.id;scene.selectedComponentMountId=componentSetup(scene.model||{}).mounts.find(m=>m.socketId===componentSocket.id)?.id||null;release();invalidate();onSelect({componentSocketId:componentSocket.id});onChange();return;}
+      const marker=view.interactionMode==='socket'?pickSocketMarker([...socketHits,...componentSocketHits],x,y):null;
+      if(marker){const result=selectSocketMarker(scene,marker);release();invalidate();onSelect(result);onChange();return;}
       // A mounted component under the cursor is selected for Properties › Components and the outliner.
       const component=pickComponent(scene,view,width,height,x,y,getPreferences());
-      if(component){scene.selectedComponentMountId=component.componentMountId;scene.selectedComponentSocketId=component.socketId;selectTurrets(scene,null);release();invalidate();onSelect({componentSocketId:component.socketId});onChange();return;}
-      if(scene.selectedComponentMountId){scene.selectedComponentMountId=null;}
+      if(component){const ids=new Set(drag.additive?scene.selectedComponentMountIds||[]:[]);if(drag.additive&&ids.has(component.componentMountId))ids.delete(component.componentMountId);else ids.add(component.componentMountId);scene.selectedComponentMountIds=ids;scene.selectedComponentMountId=[...ids].at(-1)||null;scene.selectedComponentSocketId=component.socketId;selectTurrets(scene,null);release();invalidate();onSelect({componentSocketId:component.socketId});onChange();return;}
+      if(scene.selectedComponentMountId){scene.selectedComponentMountId=null;scene.selectedComponentMountIds=new Set();}
       const socket=socketHits.find(s=>Math.hypot(s.screen[0]-x,s.screen[1]-y)<=12);
       const turret=pickTurret(scene,view,width,height,x,y,getPreferences());selectTurrets(scene,turret?.mountId||null,drag.additive);
       if(turret){scene.turretSockets??={};scene.turretSockets.selectedId=turret.socketId;selection={socketId:turret.socketId};}
@@ -372,20 +408,23 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     if (selection!==null) onSelect(selection,additive,{subtract});
     if(paletteClick)onPaint('palette',event);
   }
-  listen(canvas,'pointerdown',event=>{scene.turretStudio?.manualCamera();down(event);});
+  listen(canvas,'pointerdown',event=>{trackButtons(event);scene.turretStudio?.manualCamera();down(event);updateCursor();});
   // Mouse events report button chords; pointerdown/up only report first/last buttons.
   listen(canvas,'mousedown',event=>{
+    trackButtons(event);
     if(!magnifier)return;event.preventDefault();
     if(event.button===0&&lensPoint(...position(event))&&onPaint('begin')){magnifier.painting=true;magnifier.painted.clear();magnifier.last=null;lensPaint(...position(event));}
   });
   listen(canvas,'mouseup',event=>{if(!magnifier)return;event.preventDefault();if(event.button===0)finishLensStroke();if(event.button===2)closeMagnifier();});
-  listen(canvas,'pointermove',move);
+  listen(window,'mouseup',trackButtons);
+  listen(canvas,'pointerenter',trackButtons);
+  listen(canvas,'pointermove',event=>{trackButtons(event);move(event);});
   listen(canvas,'pointerleave',()=>{if(!drag&&!magnifier){paintPointer=null;scene.coverageHover=null;invalidate();}});
-  listen(canvas,'pointerup',up);
+  listen(canvas,'pointerup',event=>{trackButtons(event);up(event);updateCursor();});
   listen(canvas,'pointercancel',cancel);
   listen(canvas,'lostpointercapture',()=>{if(drag||magnifier)cancel();});
   listen(window,'blur',cancel);
-  listen(canvas,'contextmenu',event=>{event.preventDefault();if(magnifier)return;if(drag||regionMode){if(drag?.button!==2&&matchesBinding('cancelMouse',event,getPreferences(),'Mouse2'))cancel();return;}if(!suppressContext)onContextMenu(event);});
+  listen(canvas,'contextmenu',event=>{event.preventDefault();if(magnifier)return;if(drag||regionMode){if(drag?.button!==2&&matchesBinding('cancelMouse',event,getPreferences(),'Mouse2'))cancel();return;}if(!suppressContext){const [x,y]=position(event),marker=pickSocketMarker(socketHits,x,y),hit=pickTurret(scene,view,width,height,x,y,getPreferences()),mount=mounts(scene).find(m=>m.id===hit?.mountId||marker&&m.socketId===marker.id);if(mount){turretToolbar.open(mount);return;}onContextMenu(event);}});
   listen(canvas,'auxclick',event=>event.preventDefault());
   listen(canvas,'wheel',event=>{scene.turretStudio?.manualCamera();
     event.preventDefault();if(drag||regionMode||magnifier)return;
@@ -413,7 +452,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     id: area.id, draw: invalidate, cancel,
     get navigating() { return !!drag || regionMode || !!magnifier; },
     startRegion() {cancel();regionMode=true;body.classList.add('region-zoom');canvas.focus({preventScroll:true});},
-    dispose() {releaseViewportResources(view);cancel();events.abort();observer.disconnect();cancelAnimationFrame(frame);hoverLabel?.remove?.();}
+    dispose() {turretToolbar.dispose();if(activePlacementViewport===area.id)activePlacementViewport=null;placement.cancel();placement.dispose();attachmentTools.remove();releaseViewportResources(view);cancel();events.abort();observer.disconnect();cancelAnimationFrame(frame);hoverLabel?.remove?.();if(canvas.style)canvas.style.cursor=originalCursor;}
   };
 }
 

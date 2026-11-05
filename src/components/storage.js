@@ -40,8 +40,9 @@ export async function restoreComponentSetup(model){
   catch(error){model.warnings.push({level:'warn',message:'Component setup could not be restored: '+error.message});}
 }
 export async function saveComponentSetup(model,setup){
-  validateSetup(setup);await write(await modelKey(model),structuredClone(setup));
-  if(model.fileName)await write(nameKey(model),{setup:structuredClone(setup),anchors:anchors(model,setup)});
+  validateSetup(setup);const entries=[[await modelKey(model),structuredClone(setup)]];
+  if(model.fileName)entries.push([nameKey(model),{setup:structuredClone(setup),anchors:anchors(model,setup)}]);
+  const operation=writes.then(()=>store.putMany(entries));writes=operation.catch(()=>{});await operation;
   model.componentSetup=setup;
 }
 let libraryReady,libraryAssets;

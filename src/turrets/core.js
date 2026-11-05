@@ -12,7 +12,7 @@ function pivotMatrix(pivot,angle){
 export function pitchLimits(asset){return asset.pitch.limits??{min:-15,max:90};}
 export function clampElevation(asset,value){const {min,max}=pitchLimits(asset);return Math.max(min,Math.min(max,value));}
 export function partMatrices(asset,socket,instance){
-  const mount=frame(socket.position,socket.rotation).multiply(new THREE.Matrix4().makeRotationY(rad(instance.twist))).scale(new THREE.Vector3().setScalar(effectiveScale(asset,instance))).multiply(frame(asset.attachment.position,asset.attachment.rotation).invert());
+  const mount=frame(socket.position,socket.rotation).multiply(frame(instance.offset||[0,0,0],instance.rotation||[0,0,0])).multiply(new THREE.Matrix4().makeRotationY(rad(instance.twist))).scale(new THREE.Vector3().setScalar(effectiveScale(asset,instance))).multiply(frame(asset.attachment.position,asset.attachment.rotation).invert());
   const yaw=pivotMatrix(asset.yaw,instance.yaw),pitch=pivotMatrix(asset.pitch,clampElevation(asset,instance.pitch)*(asset.pitch.elevationSign??(asset.native?-1:1)));
   return {base:mount,body:mount.clone().multiply(yaw),barrel:mount.clone().multiply(yaw).multiply(pitch)};
 }

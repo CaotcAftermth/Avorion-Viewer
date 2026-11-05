@@ -1,3 +1,4 @@
+import {revisedAsset} from '../attachments/lifecycle.js';
 import {openTurretWorkspace} from './workspace.js';
 import {thumbnail} from './thumbnail.js';
 import {importTurretXml} from './core.js';
@@ -13,12 +14,12 @@ export async function loadTurretLibrary(){
   return turretLibrary.assets;
 }
 let additions=Promise.resolve();
-export function addTurretAsset(asset){
+export function addTurretAsset(asset,{force=false}={}){
   const operation=additions.then(async()=>{
     await loadTurretLibrary();
     const key=turretContentKey(asset),existing=turretLibrary.assets.find(item=>turretContentKey(item)===key);
-    if(existing)return existing;
-    await records(asset);turretLibrary.assets.push(asset);emit();return asset;
+    if(existing&&!force)return existing;
+    asset=revisedAsset(asset);await records(asset);turretLibrary.assets.push(asset);emit();return asset;
   });
   additions=operation.catch(()=>{});return operation;
 }
@@ -40,7 +41,7 @@ export function mountTurretLibrary(host,changed){
       dragCanvas.getContext('2d').drawImage(preview,0,0,120,80);
       const dragImage=new Image();dragImage.src=dragCanvas.toDataURL('image/png');
       tile.onclick=()=>{turretLibrary.selectedId=asset.id;emit(true);changed();};
-      tile.ondblclick=()=>openTurretWorkspace(asset,async draft=>{await records(draft);turretLibrary.assets=turretLibrary.assets.map(a=>a.id===draft.id?draft:a);emit();changed();});
+      tile.ondblclick=()=>openTurretWorkspace(asset,async draft=>{await updateTurretAsset(draft);changed();});
       const name=document.createElement('span');name.className='turret-asset-name';name.textContent=asset.name;name.tabIndex=0;name.title='Double-click or double-tap to rename; F2 also renames';
       let editing=false,lastTap=0;
       const rename=()=>{
@@ -60,7 +61,7 @@ export function mountTurretLibrary(host,changed){
       name.onpointerup=e=>{if(e.pointerType==='touch'){const now=performance.now();if(lastTap&&now-lastTap<400)rename();lastTap=now;}};
       const remove=document.createElement('button');remove.className='turret-asset-remove';remove.textContent='×';remove.setAttribute('aria-label','Remove '+asset.name+' from library');remove.title='Remove from library; mounted copies remain on ships';
       remove.onclick=async()=>{remove.disabled=true;try{await records(asset,true);turretLibrary.assets=turretLibrary.assets.filter(a=>a.id!==asset.id);if(turretLibrary.selectedId===asset.id)turretLibrary.selectedId=null;emit();changed();}catch(e){error=e.message;draw();}};
-      card.append(tile,name,remove);grid.append(card);
+      card.append(tile,name,remove);const place=document.createElement('button');place.textContent='Place';place.setAttribute('aria-label','Place '+asset.name);place.onclick=()=>window.dispatchEvent(new CustomEvent('attachment-place',{detail:{kind:'turret',asset}}));card.append(place);grid.append(card);
     }
     const add=document.createElement('button');add.className='turret-asset-tile turret-import';add.textContent='+';add.title='Import turret XML';add.setAttribute('aria-label','Import turret XML');add.disabled=busy;grid.append(add);
     const input=document.createElement('input');input.type='file';input.accept='.xml';input.hidden=true;host.append(input);add.onclick=()=>input.click();
@@ -70,3 +71,5 @@ export function mountTurretLibrary(host,changed){
   listeners.add(draw);draw();loadTurretLibrary().catch(e=>{error=e.message;draw();});
   return {dispose(){disposed=true;listeners.delete(draw);}};
 }
+
+export async function updateTurretAsset(draft){await loadTurretLibrary();const next=revisedAsset(draft,turretLibrary.assets.find(a=>a.id===draft.id));await records(next);turretLibrary.assets=turretLibrary.assets.map(a=>a.id===next.id?next:a);emit();return next;}

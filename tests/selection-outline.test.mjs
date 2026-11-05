@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as THREE from '../src/vendor/three.module.js';
+import {selectedBlockEdges,createSelectionOutline} from '../src/selection-outline.js';
+function model(){const group=new THREE.Group(),mesh=new THREE.Mesh(new THREE.BoxGeometry(2,2,2).toNonIndexed());mesh.userData={textured:true,ranges:new Map([['block',[[0,36]]]])};group.add(mesh);return {group,mesh};}
+test('full selected cube has all twelve edges including back edges, without face diagonals',()=>{const {group,mesh}=model();assert.equal(selectedBlockEdges(group,new Set(['block'])).length,12*6);assert.equal(selectedBlockEdges(group,new Set()).length,0);assert.equal(selectedBlockEdges(group,new Set(['block']),new Set(['block'])).length,0);mesh.geometry.dispose();mesh.material.dispose();});
+test('instanced block offsets and mesh transforms apply to selected outlines',()=>{const {group,mesh}=model();mesh.userData.instanced=true;mesh.geometry.setAttribute('aOffset',new THREE.InstancedBufferAttribute(new Float32Array([10,0,0]),3));mesh.position.y=5;const edges=selectedBlockEdges(group,new Set(['block']));for(let i=0;i<edges.length;i+=3){assert.ok(edges[i]>=9&&edges[i]<=11);assert.ok(edges[i+1]>=4&&edges[i+1]<=6);}mesh.geometry.dispose();mesh.material.dispose();});
+test('selection lines ignore depth and render at least three CSS pixels wide',()=>{const outline=createSelectionOutline();assert.equal(outline.material.depthTest,false);assert.equal(outline.material.depthWrite,false);assert.equal(outline.material.uniforms.lineWidth.value,3);outline.dispose();});

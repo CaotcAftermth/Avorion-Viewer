@@ -84,7 +84,8 @@ export function viewportHeader(header,view,changed){
     control(guides,d,'gridScale','Grid Scale','number',refresh,{min:.001,max:1000,step:.1});
     const text=section(el,'Text');for(const [key,label] of [['showText','General Info'],['showPerformance','Performance'],['showStats','Statistics']])control(text,d,key,label,'checkbox',refresh);
     const objects=section(el,'Objects');
-    control(objects,d,'outlineSelected','Outline Selected','checkbox',refresh,{tip:'Highlight selected blocks and draw their visible silhouette in the Selection Color. Requires overlays enabled; selection itself is unchanged.'});
+    control(objects,d,'shadeSelected','Shade Selected','checkbox',refresh,{tip:'Tint selected block faces in the Selection Color.'});
+    control(objects,d,'outlineSelected','Outline Selected','checkbox',refresh,{tip:'Draw thicker outlines of selected blocks, including edges behind faces and other blocks.'});
     control(objects,d,'showBlockBounds','Block Bounds','checkbox',refresh,{tip:'Show axis-aligned bounding extents of visible blocks. Opaque surfaces occlude rear and internal edges. Respects hidden and thin-block filters. Enabling also turns on Show Overlays for this viewport.'});
     control(objects,d,'showModelDimensions','Model Dimensions','checkbox',refresh,{tip:'Whole-model bounding cage with width (native X), height (native Y), and length (native Z) dimension arrows, including hidden blocks. Values use native model units, not export millimeters. Enabling also turns on Show Overlays for this viewport.'});
     const geometry=section(el,'Geometry');control(geometry,d,'wireOverlay','Wireframe','checkbox',refresh);

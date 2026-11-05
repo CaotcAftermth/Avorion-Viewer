@@ -1,3 +1,4 @@
+import {createSelectionOutline} from './selection-outline.js';
 import {presentation} from './turrets/showcase.js';
 import {WeaponEffectsRenderer} from './turrets/effect-renderer.js';
 import {syncAssetGuides,releaseAssetGuides} from './turrets/asset-guides.js';
@@ -29,6 +30,7 @@ let renderer, world, grid, rendered, source, depthModel, revision=-1, error, sim
 let turretBounds,studioTarget,studioEffects;
 let axes=[],guides,shadowTarget,glassTarget,skybox,pendingBuild;
 const viewportPosts=new Map();
+let selectionOutline;
 const boundsOverlays=new Map();let activeBounds=null;let dimensionCage;
 const paintPreviews=new WeakMap();
 export function setPaintPreview(view,ids=[],locked=false){
@@ -165,9 +167,9 @@ function prepare(scene,p,view) {
   }
   rendered.group.visible=scene.loaded&&scene.visible;
   rendered.setParams(gameParams(p));
-  const selectedIds=view.interactionMode==='socket'||scene.turretDragging?emptySelection:view.display?.showOverlays===false||view.display?.outlineSelected===false?emptySelection:scene.selectedIds||emptySelection;
+  const selectedIds=view.interactionMode==='socket'||scene.turretDragging?emptySelection:view.display?.showOverlays===false||(view.display?.shadeSelected===false&&view.display?.outlineSelected!==true)?emptySelection:scene.selectedIds||emptySelection;
   if(rendered.selection!==selectedIds){rendered.setSelection(selectedIds);rendered.selection=selectedIds;}
-  const regionIds=view.interactionMode==='socket'||scene.turretDragging||view.display?.showOverlays===false||view.display?.outlineSelected===false?emptySelection:regionHighlightIds(scene);
+  const regionIds=view.interactionMode==='socket'||scene.turretDragging||view.display?.showOverlays===false||view.display?.shadeSelected===false?emptySelection:regionHighlightIds(scene);
   if(rendered.regionHighlight!==regionIds){rendered.setRegion(regionIds);rendered.regionHighlight=regionIds;}
   const preview=paintPreviews.get(view),hovered=preview?.ids||emptySelection;
   if(rendered.paintPreview!==hovered){rendered.setPaintPreview(hovered);rendered.paintPreview=hovered;}
@@ -176,6 +178,7 @@ function prepare(scene,p,view) {
   rendered.setEffectHidden(engineEffectHiddenIds(scene,view,p.shaderThinEnginePlumes!==false));
   for(const material of rendered.materials){
     const d=view.display,u=material.uniforms;
+    u.uShadeSelected.value=d?.shadeSelected===false?0:1;
     const side=material.userData.hardwareCull&&view.display?.backfaceCulling!==false?THREE.FrontSide:THREE.DoubleSide;
     if(material.side!==side){material.side=side;material.needsUpdate=true;}
     material.userData.originalTransparent??=material.transparent;
@@ -242,10 +245,10 @@ export function drawGame(ctx,scene,view,width,height,p,dpr,crop=null,output=null
   if(scene.turretStudio&&!studioEffects){studioEffects=new WeaponEffectsRenderer(configureDepth);world.add(studioEffects.group);}
   studioEffects?.update(scene.turretStudio,(!output||output.studioEffects)&&!crop&&scene.visible&&!view.display?.blueprint);
   syncAssetGuides(world,scene,!output&&!crop&&view.display?.showOverlays!==false);
-  const turretGroup=syncTurrets(world,scene,view,configureDepth);turretBounds=turretGroup.userData.bounds;
+  const turretGroup=syncTurrets(world,scene,view,configureDepth,{params:gameParams(p),uniforms:rendered?.materials[0]?.uniforms,time:view.imageTime??performance.now()/1000});turretBounds=turretGroup.userData.bounds;
   const coverageGroup=syncCoverage(world,scene,view,configureDepth,!!output||!!crop);
   if(coverageGroup.visible&&coverageGroup.userData.bounds)turretBounds=turretBounds.clone().union(coverageGroup.userData.bounds);
-  const camera=cameraFor(view,width,height,p),theme=THEMES[p.theme];
+  const camera=cameraFor(view,width,height,p),theme=THEMES[p.theme];turretGroup.userData.prepare?.(camera);
   if(studioEffects?.group.visible){const offsets=[8,9,12,13].map(i=>camera.projectionMatrix.elements[i]);camera.far=Math.max(camera.far,camera.position.length()+(scene.turretStudio.effects.profile?.range||0)+100);camera.updateProjectionMatrix();[8,9,12,13].forEach((n,i)=>camera.projectionMatrix.elements[n]=offsets[i]);camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();}
   if(output?.tile){
     const t=output.tile,transform=new THREE.Matrix4().set(width/t.width,0,0,(width-2*t.x-t.width)/t.width,0,height/t.height,0,(2*t.y+t.height-height)/t.height,0,0,1,0,0,0,0,1);
@@ -319,8 +322,12 @@ export function drawGame(ctx,scene,view,width,height,p,dpr,crop=null,output=null
       for(const o of barriers)o.material.uniforms.uBloomPass.value=1;
       try{renderCoverageScene(camera,coverageGroup);}finally{for(const o of barriers)o.material.uniforms.uBloomPass.value=0;}
     }:null;
-    post.draw(renderer,camera,d,useLogDepth.value,p,selected,output?.target||null,output,withoutBarrier);
+    post.draw(renderer,camera,d,useLogDepth.value,p,false,output?.target||null,output,withoutBarrier);
   }else{renderer.setRenderTarget(output?.target||null);renderCoverageScene(camera,coverageGroup);}
+  if(selected&&rendered&&scene.loaded&&scene.visible){
+    selectionOutline??=createSelectionOutline();selectionOutline.update(scene,view,rendered,viewportHiddenIds(scene,view));
+    selectionOutline.draw(renderer,camera,w,h,outputWidth,p.accent,p.outlineWidth,output?.target||null);
+  }
   if(!output)ctx.drawImage(renderer.domElement,0,renderer.domElement.height-h,w,h,0,0,outputWidth,outputHeight);
   if(rendered)rendered.group.visible=shipVisible;turretGroup.visible=turretsVisible;
   return true;
@@ -378,7 +385,7 @@ export function pickGame(scene,view,width,height,x,y,p=FACTORY_PREFERENCES) {
   }
   return null;
 }
-export function releaseGameModel(){studioEffects?.dispose();studioEffects=null;if(studioTarget){studioTarget.removeFromParent();studioTarget.geometry.dispose();studioTarget.material.dispose();studioTarget=null;}releaseAssetGuides();releaseCoverage();pendingBuild?.cancel();pendingBuild=null;if(rendered){world.remove(rendered.group);rendered.dispose();rendered=null;}for(const bounds of boundsOverlays.values()){world?.remove(bounds.object);bounds.dispose();}boundsOverlays.clear();activeBounds=null;if(dimensionCage){world?.remove(dimensionCage.object);dimensionCage.dispose();dimensionCage=null;}source=null;depthModel=null;revision=-1;}
+export function releaseGameModel(){selectionOutline?.dispose();selectionOutline=null;studioEffects?.dispose();studioEffects=null;if(studioTarget){studioTarget.removeFromParent();studioTarget.geometry.dispose();studioTarget.material.dispose();studioTarget=null;}releaseAssetGuides();releaseCoverage();pendingBuild?.cancel();pendingBuild=null;if(rendered){world.remove(rendered.group);rendered.dispose();rendered=null;}for(const bounds of boundsOverlays.values()){world?.remove(bounds.object);bounds.dispose();}boundsOverlays.clear();activeBounds=null;if(dimensionCage){world?.remove(dimensionCage.object);dimensionCage.dispose();dimensionCage=null;}source=null;depthModel=null;revision=-1;}
 
 export function socketExposed(scene,view,width,height,socket,p=FACTORY_PREFERENCES){
   if(!rendered||!scene.loaded||!scene.visible)return false;

@@ -26,7 +26,8 @@ export function openSessionStore(factory=globalThis.indexedDB){
       tx.onerror=()=>{};
     });
   }
-  return {get:key=>transaction(key,undefined,false),put:(key,value)=>transaction(key,value,true)};
+  async function putMany(entries){const db=await open();return new Promise((resolve,reject)=>{const tx=db.transaction('assets','readwrite'),store=tx.objectStore('assets');for(const [key,value] of entries)store.put(value,key);tx.oncomplete=()=>resolve();tx.onabort=()=>reject(tx.error||Error('Local asset storage failed.'));tx.onerror=()=>{};});}
+  return {get:key=>transaction(key,undefined,false),put:(key,value)=>transaction(key,value,true),putMany};
 }
 
 // Weapon Coverage display settings and the comparison baseline travel with the

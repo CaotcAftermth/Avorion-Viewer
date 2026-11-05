@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 256 256" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Avorion Viewer pan cursor, four directional arrows">
+<title>Pan — Cross Arrows</title>
+<!-- Restrained peach insets on each arrowhead follow the palette of the other icons. -->
+<g transform="translate(19.69231 19.69231) scale(0.846154)"><path d="M128 19 L91 58 L107 58 L107 107 L58 107 L58 91 L19 128 L58 165 L58 149 L107 149 L107 198 L91 198 L128 237 L165 198 L149 198 L149 149 L198 149 L198 165 L237 128 L198 91 L198 107 L149 107 L149 58 L165 58 Z" fill="#080A0D" stroke="#080A0D" stroke-width="16" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M128 19 L91 58 L107 58 L107 107 L58 107 L58 91 L19 128 L58 165 L58 149 L107 149 L107 198 L91 198 L128 237 L165 198 L149 198 L149 149 L198 149 L198 165 L237 128 L198 91 L198 107 L149 107 L149 58 L165 58 Z" fill="#F9F9FB" stroke="#080A0D" stroke-width="4" stroke-linejoin="round"/>
+<path d="M128 30 L108 51 L148 51 Z M128 226 L108 205 L148 205 Z M30 128 L51 108 L51 148 Z M226 128 L205 108 L205 148 Z" fill="#DEA466"/>
+<path d="M118 86 L118 118 L86 118 L86 138 L118 138 L118 170 L138 170 L138 138 L170 138 L170 118 L138 118 L138 86 Z" fill="#F9F9FB"/>
+</g></svg>
