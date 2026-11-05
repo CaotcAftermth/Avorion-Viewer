@@ -49,11 +49,11 @@ export const PREFERENCE_SECTIONS = [
   ] },
   { id: 'input', label: 'Input', panels: [
     { label: 'Input Style', fields: [
-      { key: 'inputStyle', label: 'Input Style', type: 'select', options: [['blender','Blender · mouse + numpad'],['laptop','Laptop · Alt-drag + number row'],['trackpad','Trackpad · gestures']], default: 'blender', description: 'Sets the mouse, numpad and trackpad options below together. Blender: middle-drag orbits, numpad views. Laptop: Alt+left-drag orbits, number-row views. Trackpad: two-finger swipe orbits, pinch zooms, Shift+swipe pans.' }
+      { key: 'inputStyle', label: 'Input Style', type: 'select', options: [['blender','Blender · mouse + numpad'],['laptop','Laptop · Alt-drag + number row'],['trackpad','Trackpad · gestures']], default: 'blender', description: 'Sets the mouse, numpad and trackpad options below together. Blender: middle-drag orbits, numpad views. Laptop: Alt+left-drag orbits, number-row views. Trackpad: two-finger scroll pans, pinch zooms, Shift+scroll orbits.' }
     ] },
     { label: 'Mouse', fields: [
       { key: 'emulate3Button', label: 'Emulate 3 Button Mouse', type: 'checkbox', default: false, description: 'Use Alt + left drag in place of the middle mouse button. Shift pans; Ctrl zooms.' },
-      { key: 'trackpadNavigation', label: 'Trackpad Gestures', type: 'checkbox', default: false, description: 'Two-finger swipe orbits, pinch zooms and Shift + swipe pans. A mouse wheel then orbits instead of zooming.' }
+      { key: 'trackpadNavigation', label: 'Trackpad Gestures', type: 'checkbox', default: false, description: 'Two-finger scroll pans, pinch zooms, Shift + scroll orbits. Option/Alt + drag also orbits. Opens a full-size 3D workspace with editors revealed by tapping an edge. A mouse wheel pans in this mode.' }
     ] },
     { label: 'Keyboard', fields: [
       { key: 'emulateNumpad', label: 'Emulate Numpad', type: 'checkbox', default: false, description: 'Use the top-row number keys for numpad view shortcuts. Text fields keep normal typing.' }

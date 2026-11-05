@@ -426,14 +426,34 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   listen(window,'blur',cancel);
   listen(canvas,'contextmenu',event=>{event.preventDefault();if(magnifier)return;if(drag||regionMode){if(drag?.button!==2&&matchesBinding('cancelMouse',event,getPreferences(),'Mouse2'))cancel();return;}if(!suppressContext){const [x,y]=position(event),marker=pickSocketMarker(socketHits,x,y),hit=pickTurret(scene,view,width,height,x,y,getPreferences()),mount=mounts(scene).find(m=>m.id===hit?.mountId||marker&&m.socketId===marker.id);if(mount){turretToolbar.open(mount);return;}onContextMenu(event);}});
   listen(canvas,'auxclick',event=>event.preventDefault());
+  // Safari exposes magnification and rotation as GestureEvents; Chromium/Firefox
+  // expose trackpad magnification as Ctrl+wheel. Scope both to this canvas.
+  let nativeGesture=null;
+  listen(canvas,'gesturestart',event=>{
+    if(!getPreferences().trackpadNavigation||drag||regionMode||magnifier)return;
+    event.preventDefault();scene.turretStudio?.manualCamera();
+    nativeGesture={scale:1,rotation:0};
+  },{passive:false});
+  listen(canvas,'gesturechange',event=>{
+    if(!nativeGesture)return;
+    event.preventDefault();
+    if(!getPreferences().trackpadNavigation||drag||regionMode||magnifier){nativeGesture=null;return;}
+    const p=getPreferences(),scale=Number(event.scale),rotation=Number(event.rotation);
+    if(Number.isFinite(scale)&&scale>0){zoom(view,Math.pow(scale/nativeGesture.scale,p.zoomSensitivity*(p.invertZoom?-1:1)));nativeGesture.scale=scale;}
+    if(Number.isFinite(rotation)){view.roll=(view.roll||0)+(rotation-nativeGesture.rotation)*Math.PI/180;nativeGesture.rotation=rotation;}
+    invalidate();onChange();
+  },{passive:false});
+  listen(canvas,'gestureend',event=>{if(nativeGesture)event.preventDefault();nativeGesture=null;},{passive:false});
+  listen(window,'blur',()=>{nativeGesture=null;});
   listen(canvas,'wheel',event=>{scene.turretStudio?.manualCamera();
     event.preventDefault();if(drag||regionMode||magnifier)return;
     const unit=event.deltaMode===1?16:event.deltaMode===2?height:1,p=getPreferences();
     // Trackpads report pinch as Ctrl+wheel and two-finger swipes as plain wheel deltas.
     if(p.trackpadNavigation){
+      if(nativeGesture)return;
       if(event.ctrlKey)zoom(view,Math.exp(-event.deltaY*unit*.01*p.zoomSensitivity*(p.invertZoom?-1:1)));
-      else if(event.shiftKey)pan(view,-(event.deltaX||0)*unit,-event.deltaY*unit,width,height);
-      else orbit(view,-(event.deltaX||0)*unit,-event.deltaY*unit,p);
+      else if(event.shiftKey)orbit(view,-(event.deltaX||0)*unit,-event.deltaY*unit,p);
+      else pan(view,-(event.deltaX||0)*unit,-event.deltaY*unit,width,height);
     }
     else if(matchesBinding('wheelPan',event,getPreferences(),'Wheel'))pan(view,-(event.deltaX||0)*unit,-event.deltaY*unit,width,height);
     else if(matchesBinding('wheelZoom',event,getPreferences(),'Wheel')) {const p=getPreferences();zoom(view,Math.exp(-event.deltaY*unit*.001*p.zoomSensitivity*(p.invertZoom?-1:1)));}
