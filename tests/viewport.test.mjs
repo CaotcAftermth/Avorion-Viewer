@@ -36,6 +36,35 @@ test('viewport pointer lifecycle, modifiers, cancellation, and cursor removal', 
     return {node,canvas,renderer,pointer,flush,calls,classes,scene:activeScene,get changes(){return changes;},get selections(){return selections;},get menus(){return menus;}};
   }
 
+  await t.test('touch distinguishes orbit, tap-drag selection, pinch and a persistent hold menu',async()=>{
+    const h=setup({...FACTORY_PREFERENCES,trackpadNavigation:true});
+    const touch=(type,x,y,id=1)=>h.pointer('pointer'+type,{pointerType:'touch',pointerId:id,button:0,clientX:x,clientY:y});
+    try{
+      const initialYaw=h.node.view.yaw;
+      touch('down',100,100);touch('move',140,110);touch('up',140,110);
+      assert.notEqual(h.node.view.yaw,initialYaw);
+      assert.equal(h.selections,0);
+      const orbitYaw=h.node.view.yaw;
+      touch('down',100,100);touch('up',100,100);
+      touch('down',102,101);touch('move',160,150);touch('up',160,150);
+      assert.equal(h.node.view.yaw,orbitYaw);
+      assert.equal(h.selections,2);
+      const {zoom,target}=structuredClone(h.node.view);
+      touch('down',100,100);touch('down',200,100,2);touch('move',240,110,2);
+      touch('up',240,110,2);touch('move',140,130);touch('up',140,130);
+      assert.ok(h.node.view.zoom>zoom);
+      assert.notDeepEqual(h.node.view.target,target);
+      assert.equal(h.node.view.yaw,orbitYaw);
+      assert.equal(h.selections,2);
+      touch('down',100,100);
+      await new Promise(resolve=>setTimeout(resolve,525));
+      assert.equal(h.menus,1);
+      touch('up',100,100);
+      assert.equal(h.selections,2);
+      assert.equal(h.menus,1);
+    }finally{h.renderer.dispose();}
+  });
+
   await t.test('coverage does not hide explicitly requested armored-base sockets',()=>{
     const h=setup({...FACTORY_PREFERENCES},{model:makeModel([makeBlock({typeIndex:24})]),showFireCoverage:true,turretSockets:{show:true,through:true,scope:'all'}});
     try{h.node.view.interactionMode='socket';h.flush();assert.ok(h.calls.some(c=>c.name==='arc'),'armored socket markers remain visible while coverage is enabled');}

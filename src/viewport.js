@@ -267,6 +267,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     if (pointerId !== undefined && canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
   }
   function cancel() {
+    resetTouch();
     rightHeld=false;updateCursor();
     if (!drag && !regionMode && !magnifier) return false;
     closeMagnifier(true);
@@ -275,16 +276,16 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     if (drag) Object.assign(view,drag.before,view.display?{display:view.display}:{},view.paint?{paint:view.paint}:{});
     release();regionMode=false;body.classList.remove('region-zoom');invalidate();onChange();return true;
   }
-  function down(event, forcedMode) {
+  function down(event, forcedMode, capture=true) {
     if(!forcedMode&&view.interactionMode==='paint'&&event.button===2&&!drag&&!regionMode){suppressContext=true;startMagnifier(event);return;}
     if(magnifier){event.preventDefault();return;}
     if(event.button===2)suppressContext=!!(drag||regionMode);
     if (matchesBinding('cancelMouse',event,getPreferences(),'Mouse'+event.button) && (drag||regionMode)) {event.preventDefault();cancel();return;}
     if (drag) return;
-    if(event.button===0&&!event.altKey&&!regionMode){
+    if(event.button===0&&!event.altKey&&!regionMode&&!forcedMode){
       // Socket gizmo handles take the click before navigation or selection.
       const [hx,hy]=position(event),handle=componentTools.hit(hx,hy);
-      if(handle){event.preventDefault();canvas.setPointerCapture(event.pointerId);componentTools.begin(handle,hx,hy);drag={x:hx,y:hy,startX:hx,startY:hy,button:0,pointerId:event.pointerId,mode:'componentGizmo'};return;}
+      if(handle){event.preventDefault();if(capture)canvas.setPointerCapture(event.pointerId);componentTools.begin(handle,hx,hy);drag={x:hx,y:hy,startX:hx,startY:hy,button:0,pointerId:event.pointerId,mode:'componentGizmo'};return;}
     }
     const regionIn=matchesBinding('regionIn',event,getPreferences(),'Mouse'+event.button),regionOut=matchesBinding('regionOut',event,getPreferences(),'Mouse'+event.button);
     // Paint Mode's Select tool box-selects like Object Mode, so paint scope can target the selection.
@@ -295,7 +296,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     if(!mode)return;
     if(mode==='paint'&&!onPaint('begin'))return;
     if(event.button===2)suppressContext=true;
-    event.preventDefault();canvas.focus({preventScroll:true});canvas.setPointerCapture(event.pointerId);
+    event.preventDefault();canvas.focus({preventScroll:true});if(capture)canvas.setPointerCapture(event.pointerId);
     const [x,y]=position(event);
     const preferences=getPreferences();
     drag={x,y,startX:x,startY:y,button:event.button,pointerId:event.pointerId,mode,paletteClick:!forcedMode&&!regionMode&&view.interactionMode==='paint'&&event.button===1&&!event.ctrlKey&&!event.shiftKey&&!event.altKey&&!event.metaKey,subtract:!!(event.ctrlKey||event.metaKey),painted:new Set(),additive:!!additiveSelect,regionOut,cubeRegion:event.target?.closest?.('[data-cube-region]')?.dataset.cubeRegion,emulated:preferences.emulate3Button&&event.altKey&&event.button===0,before:structuredClone(view),moved:false};
@@ -406,7 +407,84 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     if (selection!==null) onSelect(selection,additive,{subtract});
     if(paletteClick)onPaint('palette',event);
   }
-  listen(canvas,'pointerdown',event=>{trackButtons(event);scene.turretStudio?.manualCamera();down(event);updateCursor();});
+  const touches=new Map();
+  let touchStart=null, lastTap=null, holdTimer, multiTouch=false;
+  function clearHold(){clearTimeout(holdTimer);}
+  function resetTouch(){
+    clearHold();
+    touches.clear();
+    touchStart=lastTap=null;
+    multiTouch=false;
+  }
+  function handlesTouch(event){
+    return event.pointerType==='touch' && (touches.has(event.pointerId) ||
+      (getPreferences().trackpadNavigation&&!regionMode&&
+       (view.interactionMode!=='paint'||paintOptions(view).tool==='select')));
+  }
+  function touchDown(event){
+    event.preventDefault();
+    canvas.setPointerCapture(event.pointerId);
+    if(!touches.size&&turretToolbar.active)turretToolbar.close();
+    touches.set(event.pointerId,event);
+    if(touches.size>1){
+      clearHold();
+      lastTap=touchStart=null;
+      multiTouch=true;
+      // Keep capture until each finger lifts, but abandon any selection rectangle.
+      if(drag?.mode==='componentGizmo')componentTools.cancel();
+      drag=null;
+      invalidate();
+      return;
+    }
+    const doubleTap=lastTap&&event.timeStamp-lastTap.time<=300&&
+      Math.hypot(event.clientX-lastTap.x,event.clientY-lastTap.y)<=32;
+    touchStart={event,doubleTap};
+    lastTap=null;
+    holdTimer=setTimeout(()=>{
+      if(!touchStart||touches.size!==1)return;
+      touchStart=null;
+      openViewportContext(event);
+    },500);
+  }
+  function touchMove(event){
+    const previous=touches.get(event.pointerId);
+    if(!previous)return;
+    touches.set(event.pointerId,event);
+    if(multiTouch){
+      if(touches.size!==2)return;
+      const other=[...touches.values()].find(t=>t.pointerId!==event.pointerId);
+      const before=Math.hypot(previous.clientX-other.clientX,previous.clientY-other.clientY);
+      const after=Math.hypot(event.clientX-other.clientX,event.clientY-other.clientY);
+      pan(view,(event.clientX-previous.clientX)/2,(event.clientY-previous.clientY)/2,width,height);
+      if(before>4&&after>4)zoom(view,after/before);
+      invalidate();
+      onChange();
+      return;
+    }
+    if(touchStart){
+      const start=touchStart.event;
+      if(Math.hypot(event.clientX-start.clientX,event.clientY-start.clientY)<6)return;
+      clearHold();
+      down(start,touchStart.doubleTap?'select':'orbit');
+      touchStart=null;
+    }
+    move(event);
+  }
+  function touchUp(event){
+    if(!touches.delete(event.pointerId))return;
+    clearHold();
+    if(!multiTouch){
+      if(touchStart){
+        down(event,'select',false);
+        lastTap={time:event.timeStamp,x:event.clientX,y:event.clientY};
+      }
+      up(event);
+    }
+    touchStart=null;
+    if(!touches.size)multiTouch=false;
+    updateCursor();
+  }
+  listen(canvas,'pointerdown',event=>{trackButtons(event);scene.turretStudio?.manualCamera();if(handlesTouch(event))touchDown(event);else down(event);updateCursor();});
   // Mouse events report button chords; pointerdown/up only report first/last buttons.
   listen(canvas,'mousedown',event=>{
     trackButtons(event);
@@ -416,25 +494,28 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   listen(canvas,'mouseup',event=>{if(!magnifier)return;event.preventDefault();if(event.button===0)finishLensStroke();if(event.button===2)closeMagnifier();});
   listen(window,'mouseup',trackButtons);
   listen(canvas,'pointerenter',trackButtons);
-  listen(canvas,'pointermove',event=>{trackButtons(event);move(event);});
+  listen(canvas,'pointermove',event=>{trackButtons(event);if(handlesTouch(event))touchMove(event);else move(event);});
   listen(canvas,'pointerleave',()=>{if(!drag&&!magnifier){paintPointer=null;scene.coverageHover=null;invalidate();}});
-  listen(canvas,'pointerup',event=>{trackButtons(event);up(event);updateCursor();});
+  listen(canvas,'pointerup',event=>{trackButtons(event);if(handlesTouch(event))touchUp(event);else up(event);updateCursor();});
   listen(canvas,'pointercancel',cancel);
-  listen(canvas,'lostpointercapture',()=>{if(drag||magnifier)cancel();});
+  listen(canvas,'lostpointercapture',event=>{if(drag||magnifier||touches.has(event.pointerId))cancel();});
   listen(window,'blur',cancel);
-  listen(canvas,'contextmenu',event=>{event.preventDefault();if(magnifier)return;if(drag||regionMode){if(drag?.button!==2&&matchesBinding('cancelMouse',event,getPreferences(),'Mouse2'))cancel();return;}if(!suppressContext){const [x,y]=position(event);
+  listen(canvas,'contextmenu',event=>{event.preventDefault();if(handlesTouch(event)||touches.size)return;if(magnifier)return;if(drag||regionMode){if(drag?.button!==2&&matchesBinding('cancelMouse',event,getPreferences(),'Mouse2'))cancel();return;}if(!suppressContext)openViewportContext(event);});
+  function openViewportContext(event){
+   const [x,y]=position(event);
    if(view.interactionMode!=='paint'){
     const hit=pickComponent(scene,view,width,height,x,y,getPreferences()),marker=pickSocketMarker(componentSocketHits,x,y);
     const component=componentSetup(scene.model||{}).mounts.find(m=>m.id===hit?.componentMountId||marker&&m.socketId===marker.id);
     if(component){turretToolbar.open(component,true);return;}
    }
-   const marker=pickSocketMarker(socketHits,x,y),hit=pickTurret(scene,view,width,height,x,y,getPreferences()),mount=mounts(scene).find(m=>m.id===hit?.mountId||marker&&m.socketId===marker.id);if(mount){turretToolbar.open(mount);return;}onContextMenu(event);}});
+   const marker=pickSocketMarker(socketHits,x,y),hit=pickTurret(scene,view,width,height,x,y,getPreferences()),mount=mounts(scene).find(m=>m.id===hit?.mountId||marker&&m.socketId===marker.id);if(mount){turretToolbar.open(mount);return;}onContextMenu(event);
+  }
   listen(canvas,'auxclick',event=>event.preventDefault());
   // Safari exposes magnification and rotation as GestureEvents; Chromium/Firefox
   // expose trackpad magnification as Ctrl+wheel. Scope both to this canvas.
   let nativeGesture=null;
   listen(canvas,'gesturestart',event=>{
-    if(!getPreferences().trackpadNavigation||drag||regionMode||magnifier)return;
+    if(!getPreferences().trackpadNavigation||touches.size||drag||regionMode||magnifier)return;
     event.preventDefault();scene.turretStudio?.manualCamera();
     nativeGesture={scale:1,rotation:0};
   },{passive:false});
