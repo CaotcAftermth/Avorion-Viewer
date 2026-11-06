@@ -457,12 +457,12 @@ function renderTopbar(){
 $('#workspaces').addEventListener('keydown',e=>{
   if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();const index=state.workspaces.findIndex(w=>w.id===state.active);switchWorkspace(state.workspaces[(index+(e.key==='ArrowRight'?1:-1)+state.workspaces.length)%state.workspaces.length].id);$('#workspaces [aria-selected=true]').focus();
 });
-function switchWorkspace(id){cancelOperation();state.active=id;maximized=null;focusMode=false;hovered=null;commit();document.title=`Avorion Viewer — ${workspace().name}`;}
+function switchWorkspace(id){cancelOperation();state.active=id;maximized=null;focusMode=false;hovered=null;commit();}
 function addWorkspace(name,root){if(state.workspaces.length>=20||totalAreas()+leaves(root).length>64){notify('Workspace limit reached. Remove an unused workspace first.');return;}const w={id:uid(),name,root};state.workspaces.push(w);switchWorkspace(w.id);log(`Workspace “${name}” added.`);}
 function duplicateWorkspace(w=workspace()){addWorkspace(`${w.name.slice(0,25)} copy`,cloneTree(w.root));}
 function renameWorkspace(w){
   const dialog=$('#name-dialog'),input=dialog.querySelector('input');input.value=w.name;dialog.showModal();input.select();
-  dialog.onclose=()=>{if(dialog.returnValue==='save'&&input.value.trim()){w.name=input.value.trim();commit();document.title=`Avorion Viewer — ${workspace().name}`;}};
+  dialog.onclose=()=>{if(dialog.returnValue==='save'&&input.value.trim()){w.name=input.value.trim();commit();}};
 }
 let brushPalette;
 loadPalette().then(p=>{brushPalette=p;try{scene.recentPaintColors=JSON.parse(localStorage.getItem('avorion-viewer.recent-colors.v1')||'[]').filter(id=>p.byId.has(id)).slice(0,12);}catch{scene.recentPaintColors=[];}renderers.forEach(r=>r.sync?.());}).catch(error=>reportError(error,'COLOR'));
