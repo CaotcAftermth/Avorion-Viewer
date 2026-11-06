@@ -24,7 +24,7 @@ export function numericFill(value,min,max){
 }
 export function enhanceNumericFields(root,{begin=()=>{},end=()=>{},refresh=()=>{}}={}){
  trackPointerFocus();
- for(const input of root.querySelectorAll('input[type=number]:not([data-numeric])')){
+ for(const input of root.querySelectorAll('input[type=number]:not([data-numeric]):not([data-stepper])')){
   if(input.readOnly)continue;
   input.dataset.numeric='';input.classList.add('numeric-field');input.readOnly=true;
   const handler=input.onchange,transaction=input.numericTransaction;

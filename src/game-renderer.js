@@ -31,6 +31,7 @@ let turretBounds,studioTarget,studioEffects;
 let axes=[],guides,shadowTarget,glassTarget,skybox,pendingBuild;
 const viewportPosts=new Map();
 let selectionOutline;
+
 const boundsOverlays=new Map();let activeBounds=null;let dimensionCage;
 const paintPreviews=new WeakMap();
 export function setPaintPreview(view,ids=[],locked=false){
@@ -92,6 +93,10 @@ function configureDepth(material,slopeBias=false){
     `);
   };
 }
+const attachmentMasks=[0,1].map(selected=>{
+  const material=new THREE.MeshBasicMaterial({toneMapped:false,side:THREE.DoubleSide});
+  material.color.setRGB(selected,1,1);configureDepth(material);return material;
+});
 export function gameParams(p) {
   return {...DEFAULT_GAME_SHADER,lightAzimuth:p.shaderAzimuth,lightElevation:p.shaderElevation,
     lightIntensity:p.shaderDirectionalEnabled===false?0:p.shaderLight,ambientFillIntensity:p.shaderAmbientEnabled===false?0:p.shaderAmbient,specularity:p.shaderSpecular,
@@ -234,6 +239,19 @@ function cameraFor(view,width,height,p=FACTORY_PREFERENCES){
   else{camera.projectionMatrix.elements[12]=2*view.panX/width;camera.projectionMatrix.elements[13]=-2*view.panY/height;}
   camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();camera.updateMatrixWorld();return camera;
 }
+let themeGradient;
+function themeGradientBackground(top,bottom){
+  if(themeGradient?.top===top&&themeGradient.bottom===bottom)return themeGradient.texture;
+  themeGradient?.texture.dispose();
+  const canvas=document.createElement('canvas');canvas.width=2;canvas.height=256;
+  const ctx=canvas.getContext('2d'),gradient=ctx.createLinearGradient(0,0,0,canvas.height);
+  gradient.addColorStop(0,top);gradient.addColorStop(1,bottom);
+  ctx.fillStyle=gradient;ctx.fillRect(0,0,canvas.width,canvas.height);
+  // The game renderer writes display-ready colors without an sRGB output conversion.
+  // Keep the canvas gradient bytes in the same space as solid theme backgrounds.
+  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.NoColorSpace;
+  themeGradient={top,bottom,texture};return texture;
+}
 export function drawGame(ctx,scene,view,width,height,p,dpr,crop=null,output=null) {
   if(exportOwner&&output?.owner!==exportOwner)return false;
   if(scene.turretStudio?.settings.showcase?.camera&&scene.turretStudio.settings.showcase.camera!=='manual')p=presentation(view,p,scene.turretStudio.settings.showcase).preferences;
@@ -265,6 +283,7 @@ export function drawGame(ctx,scene,view,width,height,p,dpr,crop=null,output=null
   if(activeBounds){world.remove(activeBounds);activeBounds=null;}
   if(!crop&&scene.loaded&&scene.visible&&d?.showOverlays&&d.showBlockBounds){let bounds=boundsOverlays.get(view);if(!bounds){bounds=createBlockBoundsOverlay();configureDepth(bounds.object.material);boundsOverlays.set(view,bounds);}bounds.update(scene,view);activeBounds=bounds.object;world.add(activeBounds);}
   world.background=new THREE.Color().setStyle(d?.background==='VIEWPORT'?d.backgroundColor:d?.background==='WORLD'?DEFAULT_GAME_SHADER.skyHorizon:editorTheme(p,'viewport').background,THREE.LinearSRGBColorSpace);
+  if((!d||d.background==='THEME')&&p.viewportGradient)world.background=themeGradientBackground(p.viewportGradientTop,editorTheme(p,'viewport').background);
   if(d?.background==='WORLD'&&p.worldEnabled){world.background=skybox.texture(renderer,p)||world.background;world.backgroundRotation.set(0,p.worldRotation*Math.PI/180,0);
     if(camera.isOrthographicCamera&&world.background.isCubeTexture)world.background=skybox.orthographicBackground(renderer,world.background,camera,Math.max(1,Math.round(width*dpr)),Math.max(1,Math.round(height*dpr)),metrics(view,width,height).focal*dpr,p.worldRotation*Math.PI/180,output?.tile);
   }
@@ -303,17 +322,35 @@ export function drawGame(ctx,scene,view,width,height,p,dpr,crop=null,output=null
     for(const m of rendered.materials){m.uniforms.uShadowMap.value=shadowTarget.depthTexture;m.uniforms.uShadowMatrix.value.copy(shadowMatrix);m.uniforms.uShadowStrength.value=d.shadowIntensity;}
   }
   renderGlassDepth(camera,w,h);
-  const selected=view.interactionMode!=='socket'&&!scene.turretDragging&&!!d&&d.showOverlays&&d.outlineSelected&&(scene.selectedIds?.size||scene.selected);
+  const attachmentSelected=holder=>{const {mountId,componentMountId}=holder.userData;
+    return !!(mountId&&(mountId===scene.selectedTurretId||scene.selectedTurretIds?.has(mountId))||
+      componentMountId&&(componentMountId===scene.selectedComponentMountId||scene.selectedComponentMountIds?.has(componentMountId)));
+  };
+  const showAttachmentSelection=turretGroup.visible&&turretGroup.children.some(holder=>holder.visible&&attachmentSelected(holder));
+  let outlineMask=null;
+  const selected=view.interactionMode!=='socket'&&!scene.turretDragging&&!!d&&d.showOverlays&&d.outlineSelected&&(scene.selectedIds?.size||scene.selected||showAttachmentSelection);
   const ambientCavity=!!d&&d.ambientOnly&&(d.ambientDetail??.35)>0&&d.shading!=='WIREFRAME'&&!d.xray&&p.shaderDebug===0;
   if(d&&!coverageGroup.visible&&(ambientCavity||d.objectOutline||selected||d.dof&&d.shading==='RENDERED'||bloomActive(d,p)||aoActive(d,p))){
     // Half-float scene color keeps emission above 1.0 for bloom.
     let post=viewportPosts.get(view);if(!post){post=createViewportPost(Math.min(4,renderer.capabilities.maxSamples||0),renderer.extensions.has('EXT_color_buffer_float'));viewportPosts.set(view,post);}
     post.resize(w,h);renderer.setRenderTarget(post.target);renderCoverageScene(camera,coverageGroup);
     if(selected||d.objectOutline||ambientCavity||aoActive(d,p)){
-      const objects=[...(studioEffects?[studioEffects.group]:[]),...(studioTarget?[studioTarget]:[]),coverageGroup,turretGroup,grid,...axes,dimensionCage.object,...(activeBounds?[activeBounds]:[]),...(rendered?.group.children||[]).filter(c=>c.userData.blockEffects)],visibility=objects.map(o=>o.visible);objects.forEach(o=>o.visible=false);
+      const objects=[...(studioEffects?[studioEffects.group]:[]),...(studioTarget?[studioTarget]:[]),coverageGroup,grid,...axes,dimensionCage.object,...(activeBounds?[activeBounds]:[]),...(rendered?.group.children||[]).filter(c=>c.userData.blockEffects)],visibility=objects.map(o=>o.visible);objects.forEach(o=>o.visible=false);
       const background=world.background;world.background=new THREE.Color(0);
       for(const m of rendered?.materials||[]){m.uniforms.uMaskPass.value=1;m.transparent=false;m.depthWrite=true;}
-      renderer.setRenderTarget(post.mask);renderer.render(world,camera);
+      const attachmentMaterials=new Map();
+      const attachmentOverlays=[];
+      turretGroup.traverseVisible(object=>{
+        if(object.isLine||object.userData.renderEntry?.ghost){attachmentOverlays.push(object);object.visible=false;return;}
+        if(!object.isMesh)return;
+        attachmentMaterials.set(object,object.material);
+        object.material=attachmentMasks[Number(attachmentSelected(object.parent))];
+      });
+      try{renderer.setRenderTarget(post.mask);renderer.render(world,camera);outlineMask=post.mask;}
+      finally{
+        for(const [mesh,material] of attachmentMaterials)mesh.material=material;
+        attachmentOverlays.forEach(object=>object.visible=true);
+      }
       for(const m of rendered?.materials||[]){m.uniforms.uMaskPass.value=0;m.transparent=!d.blueprint&&(m.userData.originalTransparent||!!(d.xray&&['SOLID','WIREFRAME'].includes(d.shading)));m.depthWrite=!m.transparent;}
       world.background=background;objects.forEach((o,i)=>o.visible=visibility[i]);
     }
@@ -322,11 +359,11 @@ export function drawGame(ctx,scene,view,width,height,p,dpr,crop=null,output=null
       for(const o of barriers)o.material.uniforms.uBloomPass.value=1;
       try{renderCoverageScene(camera,coverageGroup);}finally{for(const o of barriers)o.material.uniforms.uBloomPass.value=0;}
     }:null;
-    post.draw(renderer,camera,d,useLogDepth.value,p,false,output?.target||null,output,withoutBarrier);
+    post.draw(renderer,camera,d,useLogDepth.value,p,selected&&showAttachmentSelection,output?.target||null,output,withoutBarrier);
   }else{renderer.setRenderTarget(output?.target||null);renderCoverageScene(camera,coverageGroup);}
   if(selected&&rendered&&scene.loaded&&scene.visible){
     selectionOutline??=createSelectionOutline();selectionOutline.update(scene,view,rendered,viewportHiddenIds(scene,view));
-    selectionOutline.draw(renderer,camera,w,h,outputWidth,p.accent,p.outlineWidth,output?.target||null);
+    selectionOutline.draw(renderer,camera,w,h,outputWidth,p.accent,p.outlineWidth,output?.target||null,outlineMask,useLogDepth.value);
   }
   if(!output)ctx.drawImage(renderer.domElement,0,renderer.domElement.height-h,w,h,0,0,outputWidth,outputHeight);
   if(rendered)rendered.group.visible=shipVisible;turretGroup.visible=turretsVisible;

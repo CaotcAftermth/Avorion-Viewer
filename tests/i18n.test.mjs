@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PREFERENCE_SECTIONS, FACTORY_PREFERENCES, createPreferencesStore, customColorSeed, validPreference, FIELDS } from '../src/preferences.js';
+import { activeViewportTheme, editorTheme, PREFERENCE_SECTIONS, FACTORY_PREFERENCES, createPreferencesStore, customColorSeed, validPreference, FIELDS } from '../src/preferences.js';
 import { LANGUAGES, resolveLanguage, setLanguage, t, tf, currentLanguage } from '../src/i18n.js';
 
 const memory = () => { const data = new Map(); return { getItem: k => data.get(k) ?? null, setItem: (k, v) => data.set(k, v) }; };
@@ -64,4 +64,23 @@ test('enabling editor custom colors starts from the active theme', () => {
   // Colors the user already chose are not overwritten.
   store.set('outlinerCustomColors', false); store.set('outlinerText', '#123456'); store.set('theme', 'contrast');
   assert.deepEqual(customColorSeed(store.value, 'outlinerCustomColors'), {});
+});
+
+test('viewport presets apply exact colors and preserve unrelated theme settings',()=>{
+  const storage=memory(),store=createPreferencesStore(storage);
+  store.set('viewportHeader','#123456');
+  for(const [key,bottom,top] of [
+    ['blender','#393939'],['maya','#4e4e4e','#2a2a2a'],['max','#444444','#1d1d1d'],
+    ['cinema4d','#4a4a4a','#313131'],['zbrush','#3c3c3c','#000000'],['sketchup','#ccccc9']
+  ]){
+    assert.ok(store.set('viewportTheme',key));
+    assert.equal(activeViewportTheme(store.value),key);
+    assert.equal(editorTheme(store.value,'viewport').background,bottom);
+    assert.equal(store.value.viewportGradient,!!top);
+    if(top)assert.equal(store.value.viewportGradientTop,top);
+    assert.equal(store.value.viewportHeader,'#123456');
+    assert.equal(store.value.theme,'blender');
+  }
+  store.set('viewportBackground','#112233');store.save();
+  assert.equal(activeViewportTheme(createPreferencesStore(storage).value),'custom');
 });

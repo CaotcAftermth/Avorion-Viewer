@@ -91,7 +91,7 @@ export function mountComponentLibrary(host,changed){
    name.onpointerup=e=>{if(e.pointerType==='touch'){const now=performance.now();if(lastTap&&now-lastTap<400)rename();lastTap=now;}};
    const remove=document.createElement('button');remove.type='button';remove.className='turret-asset-remove';remove.textContent='×';remove.setAttribute('aria-label','Remove '+asset.name+' from library');remove.title='Remove from library; mounted copies remain on ships';
    remove.onclick=async()=>{remove.disabled=true;try{await removeComponentAsset(asset);changed();}catch(e){error=e.message;draw();}};
-   card.append(tile,name,remove);const place=document.createElement('button');place.textContent='Place';place.setAttribute('aria-label','Place '+asset.name);place.onclick=()=>window.dispatchEvent(new CustomEvent('attachment-place',{detail:{kind:'component',asset}}));card.append(place);grid.append(card);
+   card.append(tile,name,remove);grid.append(card);
   }
   if(!grid)newGrid();
   if(!shown.length&&componentLibrary.assets.length){const none=document.createElement('p');none.className='panel-note';none.textContent='No components match.';grid.before(none);}

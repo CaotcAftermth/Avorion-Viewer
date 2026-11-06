@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {chooseEmbeddedSocket,turretContentKey,restoreEmbeddedTurrets} from '../src/turrets/embedded.js';
+import {chooseEmbeddedSocket,sameTurretContent,restoreEmbeddedTurrets} from '../src/turrets/embedded.js';
 import {makeBlock} from '../src/block-model.js';
 import {demoProject} from '../src/turrets/core.js';
 import {createSocketClearance} from '../src/turrets/socket-clearance.js';
@@ -19,10 +19,27 @@ test('embedded mount faces follow exposed top, bottom and side plates',()=>{
 test('library matching ignores names and source XML but preserves appearance and articulation',()=>{
  const asset=demoProject().assets[0],copy=structuredClone(asset);
  copy.id='other';copy.name='Renamed';copy.sourceXml='different formatting';
- assert.equal(turretContentKey(asset),turretContentKey(copy));
- copy.blocks[0].color='ff123456';assert.notEqual(turretContentKey(asset),turretContentKey(copy));
+ assert.ok(sameTurretContent(asset,copy));
+ copy.sourceSize=2;
+ for(const block of copy.blocks){
+  for(const axis of ['x','y','z']){block.position[axis]*=2;block.size[axis]*=2;}
+ }
+ for(const frame of [copy.attachment,copy.yaw,copy.pitch])frame.position=frame.position.map(value=>value*2);
+ copy.blocks.reverse();
+ assert.ok(sameTurretContent(asset,copy));
+ copy.blocks.reverse();
+ copy.blocks[0].color='ff123456';assert.ok(!sameTurretContent(structuredClone(asset),structuredClone(copy)));
  copy.blocks[0].color=asset.blocks[0].color;copy.pitch.position[0]+=1;
- assert.notEqual(turretContentKey(asset),turretContentKey(copy));
+ assert.ok(!sameTurretContent(structuredClone(asset),structuredClone(copy)));
+});
+
+test('library matching tolerates float32 noise from turrets scaled down inside ship files',()=>{
+ // Ships save each turret pre-scaled (e.g. size 10 -> 0.5), and the float32
+ // values can land either side of a rounding boundary.
+ const asset=demoProject().assets[0],copy=structuredClone(asset),scale=.05;
+ for(const block of copy.blocks)for(const axis of ['x','y','z']){block.position[axis]=Math.fround(block.position[axis]*scale)*(1+3e-7);block.size[axis]=Math.fround(block.size[axis]*scale);}
+ for(const frame of [copy.attachment,copy.yaw,copy.pitch])frame.position=frame.position.map(value=>Math.fround(value*scale));
+ assert.ok(sameTurretContent(asset,copy));
 });
 
 test('ships without embedded assignments do not open library storage',async()=>{

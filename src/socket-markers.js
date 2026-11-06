@@ -1,6 +1,6 @@
 // Shared screen-space socket glyph: the original cyan ring and outward normal.
-export function drawSocketMarker(ctx,point,tip,{selected=false,target=false,occupied=false,warning=false}={}){
- ctx.save();ctx.strokeStyle=warning?'#f19a8d':'#75ddff';ctx.lineWidth=2;
+export function drawSocketMarker(ctx,point,tip,{selected=false,target=false,occupied=false,warning=false,color='#75ddff'}={}){
+ ctx.save();ctx.strokeStyle=warning?'#f19a8d':color;ctx.lineWidth=2;
  ctx.setLineDash(occupied?[3,3]:[]);
  ctx.beginPath();ctx.arc(point[0],point[1],target?11:selected?10:8,0,Math.PI*2);ctx.stroke();
  ctx.setLineDash([]);

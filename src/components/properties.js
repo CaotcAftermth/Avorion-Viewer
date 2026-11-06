@@ -1,4 +1,5 @@
-import {propertyPanel,propertyNote} from '../property-ui.js';
+import {mountSymmetryControls,symmetryAxesOrder} from '../symmetry-controls.js';
+import {propertyPanel,propertyNote,propertyDataRow} from '../property-ui.js';
 import {mountLifecycleControls,previewSetupImport} from '../attachments/lifecycle-controls.js';
 import {BLOCK_DEFINITIONS} from '../block-model.js';
 import {surfaceSockets} from '../turrets/sockets.js';
@@ -85,12 +86,24 @@ export function mountComponentProperties(host,scene,changed,context=scene.attach
 
  // Symmetry
  const symmetry=panel('Symmetry');
- for(const axis of ['x','y','z'])check(symmetry,`Mirror across ${axis.toUpperCase()}`,scene.componentSymmetry?.[axis],on=>{scene.componentSymmetry={...scene.componentSymmetry,[axis]:on};changed();});
- note(symmetry,`Sockets, attachments, swaps, detaches, scale and twist are copied to the mirrored side. Mirror center: ${symmetryCenter(scene).map(v=>v.toFixed(2)).join(', ')} (the ship's bounding-box center).`);
+ mountSymmetryControls(symmetry,{
+  read:()=>({symmetry:scene.componentSymmetry,planeVisible:scene.componentSymmetryPlaneVisible,origin:Object.fromEntries(symmetryAxesOrder.map((axis,i)=>[axis,symmetryCenter(scene)[i]]))}),
+  hasModel:()=>!!scene.model,
+  update:(key,axis,value)=>{
+   if(key==='origin'){const origin=[...symmetryCenter(scene)];origin[symmetryAxesOrder.indexOf(axis)]=value;scene.componentSymmetryOrigin=origin;}
+   else{
+    const field=key==='symmetry'?'componentSymmetry':'componentSymmetryPlaneVisible';
+    scene[field]={...scene[field],[axis]:value};
+   }
+   changed();
+  },
+  reset:()=>{delete scene.componentSymmetryOrigin;changed();}
+ });
+ note(symmetry,'Sockets and attachment edits are mirrored across the enabled planes.');
 
  // Sockets
  const display=panel('Socket Display');
- const ship=panel('Attachment');
+ const ship=panel('Mounting');
  check(display,'Show component sockets',scene.showComponentSockets,on=>{scene.showComponentSockets=on;changed();});
  choose(ship,'Automatic sockets',[['','No automatic block type'],...BLOCK_DEFINITIONS.map(def=>[String(def.typeIndex),`${def.typeIndex} · ${def.displayName}`])],setup.blockType===null?'':String(setup.blockType),value=>run(()=>{if(setup.mounts.some(m=>m.socketId.startsWith('component:')))throw Error('Detach components from automatic sockets before changing block type.');return changeSetup(scene,{...setup,blockType:value===''?null:Number(value)});})).setAttribute('aria-label','Component socket block type');
  const selectedBlock=model.blocks.find(b=>scene.selectedIds?.has(b.id)&&!b.deleted),faces=selectedBlock?surfaceSockets(selectedBlock):[];
@@ -100,7 +113,7 @@ export function mountComponentProperties(host,scene,changed,context=scene.attach
  const socketId=scene.selectedComponentSocketId||'';
  choose(ship,'Socket',[['',sockets.length?'Choose a component socket…':'No component sockets yet'],...sockets.map(s=>[s.id,`${s.name}${s.blockId?' · '+s.blockId:''}`])],sockets.some(s=>s.id===socketId)?socketId:'',value=>{scene.selectedComponentSocketId=value||null;scene.selectedComponentMountId=setup.mounts.find(m=>m.socketId===value)?.id||null;changed();}).setAttribute('aria-label','Component ship socket');
  const socket=sockets.find(s=>s.id===socketId),manual=setup.sockets.find(s=>s.id===socketId),mounted=setup.mounts.find(m=>m.socketId===socketId);
- const socketDetails=panel('Socket Details');socketDetails.open=false;if(socket){note(socketDetails,`Socket: ${socket.id} · ${socket.name}`);note(socketDetails,`Owning block: ${socket.blockId||'Free socket'} · ${mounted?'Occupied':'Available'}`);note(socketDetails,'Normal: '+socket.normal.map(v=>v.toFixed(3)).join(', '));}else note(socketDetails,'Choose a component socket.');
+ const socketDetails=panel('Socket Details');socketDetails.open=false;if(socket){for(const [label,value] of [['ID',socket.id],['Name',socket.name],['Block',socket.blockId||'Free socket'],['Status',mounted?'Occupied':'Available'],['Normal',socket.normal.map(v=>v.toFixed(2)).join(', ')]])propertyDataRow(socketDetails,label,value);}else note(socketDetails,'Choose a component socket.');
  if(manual){
   const apply=next=>changeSetup(scene,{...setup,sockets:setup.sockets.map(s=>s.id===manual.id?next:s)});
   field(ship,'Socket name',manual.name,name=>apply({...manual,name}),'text');
@@ -117,9 +130,8 @@ export function mountComponentProperties(host,scene,changed,context=scene.attach
   const selectedIds=scene.selectedComponentMountIds?.size?[...scene.selectedComponentMountIds]:[selected.id];
   const batch=patch=>{let next=setup;for(const id of selectedIds){const item=next.mounts.find(m=>m.id===id);if(item){const proxy=Object.create(scene);proxy.model={...model,componentSetup:next};next=patchMount(proxy,item,patch);}}return changeSetup(scene,next);};
   const mixed=key=>setup.mounts.filter(m=>selectedIds.includes(m.id)).some(m=>m[key]!==selected[key]);
-  const mount=panel('Transform');
-  const attachment=panel('Selected Component');host.prepend(attachment);note(attachment,selected.name||selected.asset.name);note(attachment,'Mounted instance · Component');note(attachment,'Instance: '+selected.id+' · '+selectedIds.length+' selected');note(attachment,'Socket: '+(sockets.find(s=>s.id===selected.socketId)?.name||'Missing socket'));mountLifecycleControls(attachment,scene,'component',selected,changed);
-  note(mount,`${selected.name||selected.asset.name} on ${sockets.find(s=>s.id===selected.socketId)?.name||'a missing socket'}`);
+  const mount=panel('Transform & Pose');
+  const attachment=panel('Selected Component');mount.before(attachment);mountLifecycleControls(attachment,scene,'component',selected,changed,{inline:true});
   const clash=clashes.get(selected.id);if(clash){const warn=note(mount,'⚠ '+clashText(scene,clash)+'.');warn.classList.add('component-warning');}
   field(mount,'Mount name',selected.name||'',name=>changeSetup(scene,{...setup,mounts:setup.mounts.map(m=>m.id===selected.id?{...m,name:name.slice(0,100)||undefined}:m)}),'text').placeholder=selected.asset.name;
   field(mount,'Component scale',selected.scale,scale=>{if(scale<=0||scale>1000)throw Error('Scale must be above 0 and at most 1000.');return batch({scale});},'number',{min:Number.MIN_VALUE,max:1000});

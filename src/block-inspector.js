@@ -89,5 +89,4 @@ export function mountBlockInspector(host,scene,onChange,{reveal=()=>{},preferenc
   const native=document.createElement('section');native.className='panel block-inspector object-data';
   const heading=document.createElement('h3');heading.textContent='Object Data';native.append(heading);host.append(native);
   mountNativeData(native,b,scene,reveal);
-  for(const warning of model.warnings||[]){const p=document.createElement('p');p.className='panel-note';p.textContent=warning.message;host.append(p);}
 }

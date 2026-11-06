@@ -31,6 +31,16 @@ test('frame and GIF cameras contain posed turrets even when their thin support i
   for(let i=0;i<36;i++){camera.yaw=i*Math.PI/18;for(const p of blockFramePoints(blocks)){const q=projectPoint(p,camera,640,480);assert.ok(q&&q[0]>0&&q[0]<640&&q[1]>0&&q[1]<480);}}
  }
 });
+test('Frame Selected includes posed turrets and respects the Paint Mode toggle',()=>{
+ const scene=fixture(),view=area().view,mount=scene.model.turretMounts[0];
+ assert.deepEqual(visibleFrameBlocks(scene,view,true),[]);
+ scene.selectedTurretIds=new Set([mount.id]);
+ assert.equal(visibleFrameBlocks(scene,view,true).length,4);
+ view.interactionMode='paint';view.hidePaintAttachments=true;
+ assert.deepEqual(visibleFrameBlocks(scene,view,true),[]);
+ view.interactionMode='object';
+ assert.equal(visibleFrameBlocks(scene,view,true).length,4);
+});
 test('all model formats include baked turret poses and preserve snapshot isolation',async()=>{
  const scene=fixture(),snapshot=captureExport(scene,{showThinBlocks:false},{scope:'visible'});
  assert.equal(snapshot.blocks.length,4);assert.ok(snapshot.blocks.every(b=>b.exportPositions?.length));

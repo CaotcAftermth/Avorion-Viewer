@@ -1,4 +1,6 @@
-import {modelPalette} from './model-palette.js';
+import {mountSymmetryControls,shipSymmetryOrigin} from './symmetry-controls.js';
+import {viewportHiddenIds,isIsolated} from './ship-structure.js';
+import {modelPalette,modelColorBlocks} from './model-palette.js';
 import {paintOptions} from './paint-tools.js';
 import {activePalette,activatePalette,readPalettes,paintAvailability} from './color-workshop.js';
 import {setDisabled} from './control-state.js';
@@ -47,12 +49,19 @@ export function mountPaintToolbar(body,area,scene,actions){
   const rule=select(host,'Fill match',[['color','Same ARGB'],['material','Same material'],['type','Same block type']],()=>options().fillRule,v=>options().fillRule=v);track(rule.row,()=>rule.row.hidden=options().tool!=='fill');
   popupButton('Paint symmetry','symmetry',p=>{
    p.append(el('p','Mirror planes use native ship axes: X right, Y up, Z back.'));
-   for(const axis of ['x','y','z']){
-    const row=el('label','Mirror '+axis.toUpperCase()+' '),check=el('input'),origin=el('input');row.className='paint-setting';check.type='checkbox';check.setAttribute('aria-label','Mirror '+axis.toUpperCase());origin.type='number';origin.step='.1';origin.setAttribute('aria-label','Mirror '+axis.toUpperCase()+' plane');origin.title='Plane coordinate in native ship axes';row.append(check,origin);p.append(row);
-    const eye=button(row,'Show '+axis.toUpperCase()+' symmetry plane','eye',()=>change(()=>{const o=options();o.planeVisible??={};o.planeVisible[axis]=o.planeVisible[axis]===false;}));track(eye,()=>{const visible=options().planeVisible?.[axis]!==false;eye.innerHTML=icon(visible?'eye':'eyeClosed');eye.setAttribute('aria-pressed',String(visible));eye.title=(visible?'Hide ':'Show ')+axis.toUpperCase()+' symmetry plane';});
-    track(row,()=>{check.checked=options().symmetry[axis];origin.value=options().origin[axis];});check.onchange=()=>change(()=>options().symmetry[axis]=check.checked);origin.onchange=()=>change(()=>options().origin[axis]=Number(origin.value)||0);
-   }
-   const center=el('button','Use Ship Center');center.onclick=()=>change(()=>{if(scene.model)for(const a of ['x','y','z'])options().origin[a]=(scene.model.bounds.min[a]+scene.model.bounds.max[a])/2;});p.append(center);track(center,()=>setDisabled(center,!scene.model,'Import a ship first.'));
+   mountSymmetryControls(p,{
+    read:options,track,hasModel:()=>!!scene.model,
+    update:(key,axis,value)=>change(()=>{const o=options();o[key]={...o[key],[axis]:value};}),
+    reset:()=>change(()=>{options().origin=shipSymmetryOrigin(scene.model);})
+   });
+  });
+  const hideAttachments=button(host,'Hide Turrets and Components','eye',()=>change(()=>{
+    area.view.hidePaintAttachments=!area.view.hidePaintAttachments;
+  }));
+  track(hideAttachments,()=>{
+    const hidden=!!area.view.hidePaintAttachments;
+    hideAttachments.innerHTML=icon(hidden?'eyeClosed':'eye');
+    hideAttachments.setAttribute('aria-pressed',String(hidden));
   });
   const undo=button(host,'Undo','undo',()=>actions.undo(false)),redo=button(host,'Redo','redo',()=>actions.undo(true));
   track(undo,()=>setDisabled(undo,!paintAvailability(scene).undo||!!scene.paintStroke||scene.paintBusy,'Undo','Undo'));
@@ -68,10 +77,48 @@ export function mountPaintToolbar(body,area,scene,actions){
   const harmonyStrip=el('div');harmonyStrip.className='paint-attached-palette';harmonyStrip.setAttribute('aria-label','Active paint palette');host.append(harmonyStrip);let harmonyKey;
   track(harmonyStrip,()=>{const saved=activePalette(localStorage,palette),ids=saved?.colors||scene.paintHarmony||[brush().colorId],key=JSON.stringify([saved?.name,ids]);palettesButton.title=saved?'Paint palettes · '+saved.name:'Paint palettes';if(key===harmonyKey)return;harmonyKey=key;harmonyStrip.replaceChildren();for(const id of ids){const c=palette.byId.get(id);if(!c)continue;const b=el('button');b.style.background=c.hex;b.title=c.name;b.setAttribute('aria-label','Palette '+c.name);b.onclick=()=>change(()=>actions.color(id));harmonyStrip.append(b);}});
   function modelColors(parent,all){const strip=el('div');strip.className=all?'paint-model-colors':'paint-attached-palette';parent.append(strip);let previous;
-   track(strip,()=>{const colors=modelPalette(scene);if(colors===previous)return;previous=colors;strip.replaceChildren();if(!colors.length&&all)strip.textContent='Import a model to see its colors.';for(const item of all?colors:colors.slice(0,4)){const c=palette.colors.find(c=>c.hex===item.hex),b=el('button'),chip=el('span');chip.className='paint-current-swatch';chip.style.background=item.hex;const label=`${c?.name||item.hex} · ${item.count} blocks`;b.title=label;b.setAttribute('aria-label','Model '+label);if(all)b.append(chip,el('span',label));else b.style.background=item.hex;setDisabled(b,!c,'Imported RGB is not in the named Avorion palette.',label);b.onclick=()=>change(()=>actions.color(c.id));strip.append(b);}});
+   let rows=[],lastHidden,lastManual;
+   track(strip,()=>{
+    const colors=modelPalette(scene),hidden=all?viewportHiddenIds(scene,area.view):null,manual=scene.hiddenIds;
+    if(colors!==previous){
+     previous=colors;lastHidden=null;rows=[];strip.replaceChildren();
+     if(!colors.length&&all)strip.textContent='Import a model to see its colors.';
+     for(const item of all?colors:colors.slice(0,4)){
+      const c=palette.colors.find(c=>c.hex===item.hex),b=el('button'),chip=el('span');
+      chip.className='paint-current-swatch';chip.style.background=item.hex;
+      const name=c?.name||item.hex,label=`${name} · ${item.count} blocks`;
+      b.type='button';b.setAttribute('aria-label','Model '+label);
+      setDisabled(b,!c,'Imported RGB is not in the named Avorion palette.',label);
+      b.onclick=()=>change(()=>actions.color(c.id));
+      if(!all){b.style.background=item.hex;strip.append(b);continue;}
+      b.append(chip,el('span',label));
+      const row=el('div'),ids=modelColorBlocks(scene,item.hex);
+      row.className='paint-model-color-row';row.append(b);strip.append(row);
+      const eye=button(row,'Toggle '+name,'eye',()=>actions.visibility(ids,'toggle'));
+      const isolate=button(row,'Isolate '+name,'isolate',()=>actions.visibility(ids,isIsolated(scene,ids)?'all':'isolate'));
+      rows.push({ids,eye,isolate,name});
+     }
+    }
+    if(!all||(hidden===lastHidden&&manual===lastManual))return;
+    lastHidden=hidden;lastManual=manual;
+    const visibleCount=(scene.model?.blocks.length||0)-(manual?.size||0);
+    for(const {ids,eye,isolate,name} of rows){
+     const visible=ids.some(id=>!hidden.has(id));
+     const isolated=!!manual?.size&&ids.length===visibleCount&&ids.every(id=>!manual.has(id));
+     const eyeLabel=(visible?'Hide ':'Show ')+name;
+     eye.innerHTML=icon(visible?'eye':'eyeClosed');eye.title=eyeLabel;eye.setAttribute('aria-label',eyeLabel);
+     isolate.innerHTML=icon(isolated?'showAll':'isolate');isolate.title=isolated?'Show all':'Isolate '+name;
+     isolate.setAttribute('aria-label',isolate.title);isolate.setAttribute('aria-pressed',String(isolated));
+    }
+   });
   }
   palettesButton.classList.add('paint-palette-group-start');
-  const modelButton=popupButton('Model Palette','modelPalette',p=>modelColors(p,true));modelButton.classList.add('paint-palette-group-start');modelColors(host,false);
+  const modelButton=popupButton('Model Palette','modelPalette',p=>{
+   const showAll=button(p,'Show All','showAll',()=>actions.visibility([],'all'));
+   showAll.append(el('span','Show All'));
+   track(showAll,()=>{showAll.disabled=!viewportHiddenIds(scene,area.view).size;});
+   modelColors(p,true);
+  });modelButton.classList.add('paint-palette-group-start');modelColors(host,false);
 
  }
  function sync(){

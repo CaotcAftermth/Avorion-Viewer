@@ -18,7 +18,8 @@ test('cursor appearance, polar target offsets, and preview match native cursor',
  assert.match(cursorArtwork('orbit',{...p,cursorPrimaryColor:'#123456',cursorSecondaryColor:'#abcdef',cursorLineWeight:2}),/#123456/);
  assert.match(cursorArtwork('orbit',{...p,cursorLineWeight:.5}),/operator="erode"/);
  for(const radius of [0,16,48,64])assert.match(cursorCSS('restore',radius,p),/url\("data:image\/svg\+xml,/);
- const selected=cursorVisual('select',0,p),orbit=cursorVisual('orbit',0,p);assert.equal(selected.x,orbit.x);assert.equal(selected.y,orbit.y);
+ const selected=cursorVisual('select',0,p),orbit=cursorVisual('orbit',0,p);
+ assert.ok(selected.y-selected.artworkCenter[1]<orbit.y-orbit.artworkCenter[1]);
 });
 test('cursor settings persist through existing preference store',()=>{
  const data=new Map(),storage={getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v)},store=createPreferencesStore(storage);

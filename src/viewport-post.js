@@ -64,7 +64,7 @@ export function aoActive(d,p){return !!d&&['RENDERED','MATERIAL'].includes(d.sha
 export function bloomActive(d,p){return !!d&&d.shading==='RENDERED'&&!d.xray&&!d.ambientOnly&&p.shaderDebug===0&&p.shaderBloom>0;}
 export function createViewportPost(samples=4,hdr=false){
   const target=new THREE.WebGLRenderTarget(1,1,hdr?{type:THREE.HalfFloatType}:{});target.depthTexture=new THREE.DepthTexture(1,1,THREE.UnsignedIntType);
-  const mask=new THREE.WebGLRenderTarget(1,1);
+  const mask=new THREE.WebGLRenderTarget(1,1);mask.depthTexture=new THREE.DepthTexture(1,1,THREE.UnsignedIntType);
   let bloomSourceTarget;
   // Canvas antialiasing does not apply to offscreen targets. Resolve both
   // scene color/depth and selection coverage before the composite pass.

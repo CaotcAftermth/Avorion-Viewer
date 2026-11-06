@@ -1,3 +1,4 @@
+import {coverageOptions} from './turrets/coverage-sampling.js';
 import {installColorCells} from './color-cells.js';
 import {setCursorPreferences} from './viewport-cursors.js';
 import {mountRestorationReview,restorationSummary} from './turrets/restoration-review.js';
@@ -27,7 +28,7 @@ import {validateComponent} from './components/core.js';
 import {mountTurretProperties} from './turrets/properties.js';
 import {createSessionPersistence} from './session-persistence.js';
 import {createCrashGuard,findCrashRecords,forgetCrashRecords,askCrashRecovery,warnLiveFailure,isMemoryFailure} from './crash-guard.js';
-import {mountSceneProperties} from './scene-properties.js';
+import {mountSceneProperties,mountEngineState} from './scene-properties.js';
 import {openExportDialog} from './export/dialog.js';
 import {renderPaletteRadial} from './palette-radial.js';
 import {mountPaintToolbar} from './paint-toolbar.js';
@@ -38,7 +39,7 @@ import {loadPalette} from './color-palette.js';
 import {mountColorEditor} from './color-editor.js';
 import {activePalette,beginPaintStroke,finishPaintStroke,paintPaletteColor,addRegion,editRegion,undoPaint,paintAvailability,exportPaintedXml} from './color-workshop.js';
 import { setDisabled } from './control-state.js';
-import { frameVisibleModel } from './model-framing.js';
+import { createViewportLoadFramer, frameVisibleModel, visibleFrameBlocks } from './model-framing.js';
 import { viewportHeader, viewportViewPanel, closeViewportPopover } from './viewport-controls.js';
 import { ensureViewportOptions } from './viewport-options.js';
 import { wireTabs, wirePanels } from './editor-panels.js';
@@ -57,6 +58,7 @@ import { createPreferencesStore, sectionById, THEMES, EDITOR_THEMES, editorTheme
 import { mountPreferences } from './preferences-editor.js';
 import { setLanguage, onLanguageChange, t, translateDom } from './i18n.js';
 import { ensureCamera, orbit, pan, zoom, dolly, alignView, opposite, frameBounds, navigationKey, viewLabel, REFERENCE_VERTICES } from './navigation.js';
+import {statusHint} from './status-hints.js';
 import { layoutPropertyRows } from './property-rows.js';
 import { applyPropertySearch, searchTerms } from './property-search.js';
 import { addLog, reportError, logEntries, onLog, clearLog, errorCount, installGlobalErrorCapture } from './app-log.js';
@@ -78,6 +80,7 @@ let preferencesWindow=null;
 let state = defaults(), storageAvailable = true;
 try { const raw = !embedded&&preferences.value.rememberLayout?localStorage.getItem(STORAGE):null; if(raw){const parsed=JSON.parse(raw);if(validateState(parsed))state=parsed;} } catch { storageAvailable=false; }
 let lastViewportId=null;
+let frameLoadedViewport=()=>false;
 const trackpadDrawers={workspace:null,side:null};
 let trackpadEnabled=preferences.value.trackpadNavigation;
 
@@ -99,7 +102,7 @@ async function crashRecoveryGate(record){
   return {model:choice!=='clear',textures:choice!=='lite'};
 }
 addLog(`Avorion Viewer ${APP_VERSION} ready. Layout changes are saved in this browser.`,'SYSTEM');addLog('No model loaded. Drop an Avorion .xml or use File > Import Avorion XML.','SCENE');
-const assetPersistence=embedded?{changed(){},start(){},flush(){},stop(){}}:createSessionPersistence({scene,textures:textureLibrary,restored:kind=>{if(kind==='textures'){scene.revision++;/* rebuild: the restored model was built before its textures finished loading */textureStatus=`${textureLibrary.loadedCount} texture maps - restored locally`;if(textureLibrary.loadedCount)notify(`${textureLibrary.loadedCount} saved texture maps restored.`);}render();if(kind==='model')frameLoadedViewports();log(`${kind==='model'?'Model':'Textures'} restored from this browser.`,'STORAGE');},onError:error=>{notify('Model/texture persistence unavailable. Current session still works.');reportError(error,'STORAGE');},gate:crashRecoveryGate});
+const assetPersistence=embedded?{changed(){},start(){},flush(){},stop(){}}:createSessionPersistence({scene,textures:textureLibrary,restored:kind=>{if(kind==='textures'){scene.revision++;/* rebuild: the restored model was built before its textures finished loading */textureStatus=`${textureLibrary.loadedCount} texture maps - restored locally`;if(textureLibrary.loadedCount)notify(`${textureLibrary.loadedCount} saved texture maps restored.`);}if(kind==='model')frameLoadedViewport=createViewportLoadFramer();render();log(`${kind==='model'?'Model':'Textures'} restored from this browser.`,'STORAGE');},onError:error=>{notify('Model/texture persistence unavailable. Current session still works.');reportError(error,'STORAGE');},gate:crashRecoveryGate});
 const workspace = () => state.workspaces.find(w => w.id === state.active);
 const currentArea = () => find(workspace().root, hovered) || leaves(workspace().root)[0];
 const areaElement = id => document.querySelector(`[data-area-id="${id}"]`);
@@ -164,6 +167,7 @@ function refreshStructure(){
   if(context?.type!=='component'||priorAttachment?.type===context.type&&priorAttachment?.id===context.id)for(const node of coverageNodes)node.propertyTab='coverage';
   assetPersistence.changed();crashGuard.track();
   reconcileStructure(scene);
+  refreshStatusHint();
   renderers.forEach(r=>{r.sync?.();r.draw?.();});
   if(numericEditing()){pendingNumericRefresh=true;return;}
   for(const node of leaves(workspace().root))if(node.editor==='properties'){
@@ -196,8 +200,8 @@ function viewportPie(event,node){
   el.style.top=clamp(event.clientY-el.offsetHeight/2,6,Math.max(6,innerHeight-el.offsetHeight-6))+'px';
 }
 function structureView(){return (leaves(workspace().root).find(n=>n.id===lastViewportId&&n.editor==='viewport')||leaves(workspace().root).find(n=>n.editor==='viewport'))?.view||{};}
-function visibilityStructure(ids,action){
-  const view=structureView(),hidden=viewportHiddenIds(scene,view);
+function visibilityStructure(ids,action,view=structureView()){
+  const hidden=viewportHiddenIds(scene,view);
   if(action==='toggle')action=ids.some(id=>!hidden.has(id))?'hide':'show';
   if(['show','all','isolate'].includes(action)&&view.showThinBlocks===false&&liveBlocks(scene).some(b=>isThinBlock(b)&&(action==='all'||ids.includes(b.id)))){
     // Retain other filtered blocks as manually hidden when showing specific targets.
@@ -238,25 +242,13 @@ function openGalleryBlock(node){
     commit(`${block.type} updated in the Block Gallery.`);
   });
 }
-// Run after layout so each visible viewport uses its actual canvas dimensions.
-function frameLoadedViewports(model=scene.model){
- requestAnimationFrame(()=>{
-  if(!scene.loaded||scene.model!==model)return;
-  for(const workspace of state.workspaces)for(const node of leaves(workspace.root))if(node.editor==='viewport'){
-   const canvas=areaElement(node.id)?.querySelector('canvas'),rect=canvas?.getBoundingClientRect();
-   frameVisibleModel(scene,ensureCamera(node.view),rect?.width||800,rect?.height||600,preferences.value);
-   renderers.find(renderer=>renderer.id===node.id)?.draw();
-  }
-  save();
- });
-}
 function loadModel(model,preview=false){
   cancelPaintTask();scopeCache=null;scene.paintSample=null;scene.paintMessage='';
   if(!preview)placeImportedModel(model,preferences.value.importPlacement);
   Object.assign(scene,{regions:[],paintHistory:null,visibilityHistory:[],outlinerRevealId:null,model,preview,loaded:true,visible:true,selected:false,selectedId:null,selectedIds:new Set(),hiddenIds:new Set(),revision:scene.revision+1});
   welcome?.close();
+  frameLoadedViewport=createViewportLoadFramer();
   commit(`${model.fileName} · ${model.blocks.length} blocks loaded.`);
-  frameLoadedViewports(model);
   const restoredSummary=restorationSummary(model.turretRestoration);if(restoredSummary)notify(restoredSummary);
   for(const warning of model.warnings||[])if(warning.level==='warn')log(warning.message,'MODEL','warning');
 }
@@ -289,7 +281,7 @@ async function openXmlFile(file){
   }catch(error){loading.done();showImportError(file.name,error);return false;}
   try{
     loading.update(55,`${model.blocks.length.toLocaleString()} ${t('blocks')} · ${t('building geometry…')}`);await nextPaint();
-    loadModel(model);rememberModel(file.name);await settleModelBuild(loading);frameLoadedViewports(model);
+    loadModel(model);rememberModel(file.name);await settleModelBuild(loading);
   }finally{loading.done();}
   return true;
 }
@@ -317,7 +309,7 @@ async function loadAssetTextures(files){
     const count=await textureLibrary.loadFiles(files,{onProgress:(done,total)=>loading.update(total?done/total*95:95,`${done} / ${total}`)});
     textureStatus=`${textureLibrary.loadedCount} local texture maps · stored in this browser`;
     if(scene.loaded){loading.update(95,t('Applying textures to the ship…'));await nextPaint();}
-    scene.revision++;render();if(scene.loaded)await settleModelBuild(loading);frameLoadedViewports(model);notify(`${count} texture maps loaded.`);
+    scene.revision++;render();if(scene.loaded)await settleModelBuild(loading);notify(`${count} texture maps loaded.`);
   }finally{loading.done();}
 }
 const assetActions={openModel:openXmlFile,loadTextures:loadAssetTextures,showWorld:()=>{
@@ -355,6 +347,7 @@ onLanguageChange(()=>{translateStatic();render();});
 function applyPreferences(){
   installColorCells();
   setCursorPreferences(preferences.value);
+  for(const input of document.querySelectorAll('[data-engine-state]'))input.value=preferences.value.shaderEngineState;
   const p=preferences.value,theme=THEMES[p.theme];
   if(p.language!==requestedLanguage){requestedLanguage=p.language;void setLanguage(p.language);}
   if(scene.preview&&scene.model&&scene.lastPreviewColor!==p.shaderColor){
@@ -505,6 +498,7 @@ function scopedPaintIds(node){
  return scopeCache.ids;
 }
 function viewportPaint(phase,data,node){
+ if(phase==='radius'){renderers.forEach(r=>r.sync?.());return;}
  const o=paintOptions(node.view),brush=scene.paintBrush||{colorId:'Dodger Blue',channel:'color',strength:'preserve'};
  if(phase==='palette'){palettePie(data);return;}
  if(phase==='preview'){
@@ -565,12 +559,29 @@ function resetWorkspace(){const template=defaults().workspaces.find(w=>w.id===wo
 function toggleMaximize(id,focus=false){if(maximized===id&&focusMode===focus){maximized=null;focusMode=false;}else{maximized=id;focusMode=focus;}render();}
 $('#restore-button').onclick=()=>{maximized=null;focusMode=false;render();};
 $('#help-button').onclick=()=>$('#help-dialog').showModal();
-function navigationHint(){
-  const p=preferences.value;
-  if(p.trackpadNavigation)return 'Two-finger scroll Pan · Shift + scroll Orbit · Pinch Zoom · Tap an edge for editors';
-  if(p.emulate3Button)return 'Alt + LMB Orbit · Alt + Shift + LMB Pan · '+shortcut('wheelZoom')+' Zoom';
-  return shortcut('orbitDrag')+' Orbit · '+shortcut('panDrag')+' Pan · '+shortcut('wheelZoom')+' Zoom';
+let statusTarget=null;
+function refreshStatusHint(){
+ if(operation)return;
+ const target=statusTarget?.isConnected?statusTarget:null;
+ const areaId=target?.closest('[data-area-id]')?.dataset.areaId;
+ const node=find(workspace().root,areaId||hovered);
+ const hit=selector=>target?.closest(selector);
+ const kind=hit('.numeric-field')?'numeric':hit('input[type=search]')?'search':
+  hit('.divider,.region-resizer')?'divider':hit('.symmetry-controls')?'symmetry':
+  hit('.paint-model-colors')?'modelPalette':hit('.turret-asset-card')?'asset':
+  hit('.tree-row')?'outlinerRow':hit('.area-header')?'header':null;
+ const activity=node?.editor==='viewport'?renderers.find(r=>r.id===node.id)?.statusActivity:null;
+ const text=statusHint({editor:node?.editor,view:node?.view,category:target?.closest('[data-tab]')?.dataset.tab||node?.assetPropertyTab||node?.propertyTab,
+  target:kind,activity,preferences:preferences.value,assetKind:node?.assetKind,
+  selected:!!(scene.selectedIds?.size||scene.selectedTurretId||scene.selectedComponentMountId),
+  coverageInspect:scene.showFireCoverage&&coverageOptions(scene).inspect,translate:t});
+ const label=$('#status-hint');if(label.textContent!==text){label.textContent=text;label.title=text;}
 }
+function trackStatusTarget(event){
+ statusTarget=event.target instanceof Element?event.target:null;refreshStatusHint();
+}
+document.addEventListener('pointerover',trackStatusTarget);
+document.addEventListener('focusin',trackStatusTarget);
 function wireInputStyles(host){
   for(const choice of host.querySelectorAll('[data-style]')){
     choice.disabled=false;
@@ -637,8 +648,8 @@ function render(){
   if(touchLayout)mountTrackpadLayout(screen,touchLayout,renderArea,renderNode,trackpadDrawers);
   else {const tree=renderNode(root);const size=minimum(root);tree.style.minWidth=`${size.width}px`;tree.style.minHeight=`${size.height}px`;screen.append(tree);}
 
-  for(const canvas of screen.querySelectorAll('[data-editor=viewport] canvas')){const node=find(workspace().root,canvas.closest('.area').dataset.areaId);renderers.push(mountViewport(canvas,node,scene,save,(selected,additive,meta)=>regionPick(selected,meta)||selected&&typeof selected==='object'&&!Array.isArray(selected)?refreshStructure():selectStructure(Array.isArray(selected)?selected:typeof selected==='string'?[selected]:selected?liveBlocks(scene).map(b=>b.id):[],additive,true),()=>preferences.value,event=>viewportPie(event,node),(phase,data)=>viewportPaint(phase,data,node)));canvas.addEventListener('dblclick',()=>openGalleryBlock(node));}
-  updateLogs();applyPreferences();restoreEditorScrollAfterLayout(screen);
+  for(const canvas of screen.querySelectorAll('[data-editor=viewport] canvas')){const node=find(workspace().root,canvas.closest('.area').dataset.areaId);renderers.push(mountViewport(canvas,node,scene,save,(selected,additive,meta)=>regionPick(selected,meta)||selected&&typeof selected==='object'&&!Array.isArray(selected)?refreshStructure():selectStructure(Array.isArray(selected)?selected:typeof selected==='string'?[selected]:selected?liveBlocks(scene).map(b=>b.id):[],additive,true),()=>preferences.value,event=>viewportPie(event,node),(phase,data)=>viewportPaint(phase,data,node),(width,height)=>frameLoadedViewport(scene,node.view,width,height,preferences.value),()=>{if(hovered===node.id)refreshStatusHint();}));canvas.addEventListener('dblclick',()=>openGalleryBlock(node));}
+  updateLogs();applyPreferences();restoreEditorScrollAfterLayout(screen);refreshStatusHint();
 }
 function renderNode(node){return renderWorkspaceNode(node,{renderArea,renderers,gesture,save,resizeDirection,modifierActive,preferences,areaMenu});}
 function headerFor(node){
@@ -699,7 +710,6 @@ function headerFor(node){
     }
   }
   if(node.editor==='assets'){
-    // Asset kind switch sits beside Area options, like the Info editor's header buttons.
     const kinds=document.createElement('span');kinds.className='asset-kind-switch';kinds.setAttribute('role','group');kinds.setAttribute('aria-label','Asset type');
     const current=node.assetKind==='components'?'components':'turrets';
     for(const [kind,label] of ASSET_KINDS){
@@ -714,7 +724,7 @@ function headerFor(node){
 }
 function renderArea(node){
   const el=document.createElement('section');el.className=`area${node.headerBottom?' header-bottom':''}`;el.dataset.areaId=node.id;el.dataset.editor=node.editor;el.dataset.scrollContext=node.editor+':'+(node.editor==='properties'?(node.propertyTab||'object'):'');el.setAttribute('aria-label',t(EDITORS[node.editor]));
-  el.addEventListener('pointerenter',()=>{hovered=node.id;if(node.editor==='viewport'){lastViewportId=node.id;renderers.forEach(r=>{if(r.outlinerId)r.sync?.();});syncSceneProperties();}$('#status-hint').textContent=node.editor==='viewport'?navigationHint()+' · '+shortcut('maximize')+' Maximize':'Right-click header for area options · '+shortcut('maximize')+' Maximize';});
+  el.addEventListener('pointerenter',()=>{hovered=node.id;if(node.editor==='viewport'){lastViewportId=node.id;renderers.forEach(r=>{if(r.outlinerId)r.sync?.();});syncSceneProperties();}refreshStatusHint();});
   el.addEventListener('focusin',()=>{hovered=node.id;if(node.editor==='properties')attachmentInspectorId=node.id;if(node.editor==='viewport'){lastViewportId=node.id;renderers.forEach(r=>{if(r.outlinerId)r.sync?.();});syncSceneProperties();}});
   el.append(headerFor(node));
   const body=document.createElement('div');body.className='area-body';
@@ -758,10 +768,10 @@ function renderViewport(body,node){
   ensureViewportOptions(node.view);
   body.classList.add('viewport');if(!node.toolbar)body.classList.add('collapse-toolbar');if(node.sidebar)body.classList.add('sidebar-visible');body.style.setProperty('--sidebar-width',`${node.sidebarWidth}px`);
   ensureCamera(node.view);
-  body.innerHTML=`<canvas aria-label="3D Avorion viewport" tabindex="0"></canvas><div class="viewport-meta"><div class="view-label">${viewLabel(node.view)}</div><div>${scene.loaded?`(1) Collection | <strong>${escape(scene.model?.fileName||BLOCK_GALLERY_NAME)}</strong>`:'Collection | Empty scene'}</div></div><div class="viewport-statistics"></div><div class="viewport-footer"><span class="demo-badge">AVORION</span><span>${scene.model?.blocks.length||0} blocks · ${textureLibrary.loadedCount} texture maps</span></div><div class="region-zoom-hint">Zoom region · LMB in / MMB out · Esc cancel</div>`;
+  body.innerHTML=`<canvas aria-label="3D Avorion viewport" tabindex="0"></canvas><div class="viewport-meta"><div class="view-label">${viewLabel(node.view)}</div><div>${scene.loaded?`(1) Collection | <strong>${escape(scene.model?.fileName||BLOCK_GALLERY_NAME)}</strong>`:'Collection | Empty scene'}</div></div><div class="viewport-statistics"></div><div class="viewport-footer"><span class="demo-badge">AVORION</span><span data-render-status hidden></span></div><div class="region-zoom-hint">Zoom region · LMB in / MMB out · Esc cancel</div>`;
   if(!scene.loaded)body.append(emptyState());
   else{const badge=textureBadge();body.append(badge);}
-  if(node.view.interactionMode==='paint'){body.classList.add('painting-tools');renderers.push(mountPaintToolbar(body,node,scene,{palette:()=>brushPalette,color:chooseBrushColor,undo:changePaintHistory,cancel:()=>{renderers.find(r=>r.id===node.id)?.cancel();if(scene.paintBusy)cancelPaintTask();},change:()=>{save();refreshStructure();}}));}
+  if(node.view.interactionMode==='paint'){body.classList.add('painting-tools');renderers.push(mountPaintToolbar(body,node,scene,{palette:()=>brushPalette,color:chooseBrushColor,visibility:(ids,action)=>visibilityStructure(ids,action,node.view),undo:changePaintHistory,cancel:()=>{renderers.find(r=>r.id===node.id)?.cancel();if(scene.paintBusy)cancelPaintTask();},change:()=>{save();refreshStructure();}}));}
   if(node.toolbar&&node.view.interactionMode!=='paint'){
     const toolbar=document.createElement('div');toolbar.className='viewport-toolbar';toolbar.role='toolbar';toolbar.setAttribute('aria-label','Viewport tools');
     for(const [tool,label] of [['select','Select'],['orbit','Orbit'],['pan','Pan']]){const b=button(label,icon(tool),()=>{node.view.tool=tool;commit();},node.view.tool===tool?'active':'');b.setAttribute('aria-pressed',String(node.view.tool===tool));toolbar.append(b);}
@@ -787,6 +797,7 @@ function renderViewport(body,node){
   if(node.sidebar){
     const sidebar=document.createElement('aside');sidebar.className='viewport-sidebar';sidebar.style.width=`${node.sidebarWidth}px`;sidebar.setAttribute('aria-label','Viewport sidebar');
     sidebar.innerHTML=`<div class="region-resizer" role="separator" aria-label="Resize sidebar" aria-orientation="vertical" tabindex="0"></div><div class="sidebar-tabs"><span>Item / View</span></div>${scene.loaded?transformPanel():'<p class="panel-note">No model in the scene.</p>'}`;
+    mountEngineState(sidebar,node.view,preferences);
     viewportViewPanel(sidebar,node.view,()=>{save();renderers.find(r=>r.id===node.id)?.draw();});
     const handle=sidebar.querySelector('.region-resizer');
     const resize=x=>{node.sidebarWidth=clamp(x,140,Math.min(600,Math.max(140,body.clientWidth-60)));sidebar.style.width=`${node.sidebarWidth}px`;body.style.setProperty('--sidebar-width',`${node.sidebarWidth}px`);};
@@ -819,9 +830,8 @@ function navigate(node,command){
   if(action==='frame'){frameVisibleModel(scene,view,width,height,preferences.value);}
   if(action==='selected'){
     
-    const hidden=viewportHiddenIds(scene,view);
-    const targets=liveBlocks(scene).filter(b=>!hidden.has(b.id)&&(action==='frame'||scene.selectedIds.has(b.id)));
-    if(!targets.length){notify('No visible blocks to frame.');return;}
+    const targets=scene.visible?visibleFrameBlocks(scene,view,true):[];
+    if(!targets.length){notify('No visible selection to frame.');return;}
     frameBounds(view,blockFramePoints(targets),width,height);
   }
   renderer.draw();save();
@@ -869,7 +879,7 @@ function mountPropertyTab(tab,content,node,searching=false){
   if(tab==='object')mountBlockInspector(content,scene,(change)=>{if(change?.appearance){refreshStructure();return;}scene.model={...makeModel(scene.model.blocks,scene.model.fileName),turretMounts:scene.model.turretMounts,componentSetup:scene.model.componentSetup,placementOffset:scene.model.placementOffset};scene.revision++;render();},{reveal:revealStructure,preferences});
   const showCoverageView=(direction,bounds)=>{const viewport=captureViewport();if(viewport){if(direction==='coverage'){viewport.view.target=nativeToView(bounds.center);viewport.view.zoom=3/Math.max(.1,bounds.radius);viewport.view.panX=viewport.view.panY=0;save();renderers.find(r=>r.id===viewport.id)?.draw();}else{viewport.view.projection='orthographic';setView(viewport,direction);}}};
   if(tab==='coverage')mountCoverageControls(content,attachmentScene,refreshStructure,showCoverageView,()=>{node.propertyTab='turrets';node.panelOpen??={};node.panelOpen['turrets:Aiming Configuration']=true;commit();});
-  if(tab==='turrets')mountTurretProperties(content,attachmentScene,refreshStructure,socket=>{const node=leaves(workspace().root).find(n=>n.editor==='viewport');const canvas=node&&areaElement(node.id)?.querySelector('canvas');return !!canvas&&socketExposed(scene,node.view,canvas.clientWidth,canvas.clientHeight,socket,preferences.value);},showCoverageView);
+  if(tab==='turrets')mountTurretProperties(content,attachmentScene,refreshStructure,socket=>{const node=leaves(workspace().root).find(n=>n.editor==='viewport');const canvas=node&&areaElement(node.id)?.querySelector('canvas');return !!canvas&&socketExposed(scene,node.view,canvas.clientWidth,canvas.clientHeight,socket,preferences.value);});
   if(tab==='turrets'&&!searching)mountRestorationReview(content,scene,{selectBlock:id=>{selectStructure([id]);focusStructure([id]);},changed:refreshStructure});
   if(tab==='components')mountComponentProperties(content,attachmentScene,refreshStructure,context);
   // World and Shaders edit live preferences beside an unobscured viewport. The Properties search covers them, so they have no search bar of their own.
@@ -878,9 +888,9 @@ function mountPropertyTab(tab,content,node,searching=false){
     const panel=mountPreferences(content,preferences,searching?{}:lookEditors.get(node.id+tab),assetActions,{sections:[sectionById(tab)],compact:true,searchbar:false});
     renderers.push({dispose:()=>panel.dispose()});
   }
-  if(tab==='scene')mountSceneProperties(content,scene,{getView:()=>captureViewport()?.view,preferences,capture:openCapture,textureStatus});
+  if(tab==='scene')mountSceneProperties(content,scene,{getView:()=>captureViewport()?.view,capture:openCapture});
   if(tab==='workspace'){
-    content.innerHTML=`<div class="property-breadcrumb">${icon('properties')}Workspace</div><details class="panel" open><summary>Window system</summary><div class="field-row"><span>Workspace</span><span>${escape(workspace().name)}</span></div><div class="field-row"><span>Editor areas</span><span>${leaves(workspace().root).length}</span></div><div class="field-row"><span>Storage</span><span>This browser</span></div><p class="panel-note">Drag area borders to resize. Right-click a header or border to split, join, swap, or maximize an editor.</p><button class="setting-button" data-reset>Reset workspace layout</button></details><div class="app-title-panel"><span class="eyebrow" data-no-translate>AVORION VIEWER ${APP_VERSION}</span><h3>${escape(scene.model?.fileName||'No model loaded')}</h3><p>${scene.model?`${scene.model.blocks.length} blocks`:'Open an Avorion XML model from the File menu.'}</p></div>`;
+    content.innerHTML=`<div class="property-breadcrumb">${icon('properties')}Workspace</div><details class="panel" open><summary>Window system</summary><div class="field-row property-data-row"><span>Workspace</span><span>${escape(workspace().name)}</span></div><div class="field-row property-data-row"><span>Editor areas</span><span>${leaves(workspace().root).length}</span></div><div class="field-row property-data-row"><span>Storage</span><span>This browser</span></div><p class="panel-note">Drag area borders to resize. Right-click a header or border to split, join, swap, or maximize an editor.</p><button class="setting-button" data-reset>Reset workspace layout</button></details><div class="app-title-panel"><span class="eyebrow" data-no-translate>AVORION VIEWER ${APP_VERSION}</span></div>`;
     content.querySelector('[data-reset]').onclick=resetWorkspace;
   }
 }
@@ -973,7 +983,7 @@ function areaMenu(event,node){
     {label:node.headerBottom?'Move header to top':'Move header to bottom',action:()=>{node.headerBottom=!node.headerBottom;commit();}}
   ]);
 }
-function cancelOperation(){if(operation){const previous=operation;operation=null;previous.cancel?.();previous.controller?.abort();}$('#operation-overlay').hidden=true;$('#status-hint').textContent='Drag borders to resize · Right-click for area options';}
+function cancelOperation(){if(operation){const previous=operation;operation=null;previous.cancel?.();previous.controller?.abort();}$('#operation-overlay').hidden=true;refreshStatusHint();}
 function gesture(event,move,finish,cancel){
   cancelOperation();const controller=new AbortController();operation={controller,cancel};
   window.addEventListener('pointermove',move,{signal:controller.signal});
@@ -1035,10 +1045,10 @@ function resizeDirection(event){
   for(const [id,value] of [['resizeLeft',-1],['resizeRight',1],['resizeUp',-1],['resizeDown',1]])if(matchesBinding(id,clean,preferences.value))return value;
   return 0;
 }
-document.addEventListener('turret-open-properties',()=>{
+document.addEventListener('turret-open-properties',event=>{
  let node=leaves(workspace().root).find(n=>n.editor==='properties'&&!n.attachmentPin)||leaves(workspace().root).find(n=>n.editor==='properties');
  if(!node){const viewport=captureViewport();if(!viewport)return;workspace().root=splitArea(workspace().root,viewport.id,'x',.72);node=parentOf(workspace().root,viewport.id).second;node.editor='properties';}
- delete node.attachmentPin;node.propertySearch='';node.propertyTab='turrets';node.panelOpen??={};node.panelOpen['turrets:Transform & Pose']=true;commit();
+ delete node.attachmentPin;node.propertySearch='';node.propertyTab=event.detail==='components'?'components':'turrets';node.panelOpen??={};node.panelOpen[node.propertyTab+':Transform & Pose']=true;commit();
 });
 document.addEventListener('property-history',event=>{if(event.target.closest('.property-search-group[data-tab=components]')||currentArea().propertyTab==='components')componentHistory(scene,event.detail.redo).finally(refreshStructure);else{mountHistory(scene,event.detail.redo);refreshStructure();}});
 document.addEventListener('keydown',e=>{
@@ -1083,6 +1093,7 @@ preferences.subscribe(()=>{
   const enabled=preferences.value.trackpadNavigation;
   if(enabled!==trackpadEnabled){trackpadEnabled=enabled;trackpadDrawers.side=null;maximized=null;focusMode=false;render();}
   else applyPreferences();
+  refreshStatusHint();
 });
 // Load the interface language before the first paint so English does not flash.
 requestedLanguage=preferences.value.language;await setLanguage(requestedLanguage);translateStatic();

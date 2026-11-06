@@ -117,32 +117,19 @@ export function mountCoverageControls(host,scene,changed,showView=()=>{},openAim
 export function mountAimingControls(host,scene,changed){
  const o=coverageOptions(scene),list=mounts(scene),panel=host;
  const update=(key,value)=>{scene.weaponCoverage={...coverageOptions(scene),[key]:value};changed();};
- const note=text=>{const p=document.createElement('p');p.className='panel-note';p.textContent=text;panel.append(p);};
- function field(label,type,value,action,values=null,limits={}){
-  const row=document.createElement('label');row.className='field-row';row.textContent=label;const input=document.createElement(type==='select'?'select':'input');input.setAttribute('aria-label',label);
-  if(type==='select')for(const [v,text] of values)input.add(new Option(text,v));else input.type=type;
+ function field(label,type,value,action,limits={}){
+  const row=document.createElement('label');row.className='field-row';row.textContent=label;const input=document.createElement('input');input.setAttribute('aria-label',label);
+  input.type=type;
   Object.assign(input,limits);if(type==='checkbox')input.checked=value;else input.value=type==='number'&&Number.isFinite(value)?Number(value.toPrecision(6)):value??'';
   input.onchange=()=>{if(input.checkValidity()&&(type!=='number'||input.value!=='')){const value=type==='checkbox'?input.checked:type==='number'?Number(input.value):input.value;input.onchange=null;action(value);}};row.append(input);panel.append(row);return input;
  }
- const check=(key,label)=>field(label,'checkbox',o[key],v=>update(key,v));
- const select=(key,label,values)=>field(label,'select',o[key],v=>update(key,v),values);
- const number=(key,label,defaultValue,limits={})=>{const input=field(label,'number',o[key]??defaultValue,v=>update(key,v),null,{step:'any',...limits});input.dataset.default=defaultValue;return input;};
- const button=(label,action,disabled=false)=>{const b=document.createElement('button');b.textContent=label;b.className='setting-button';b.disabled=disabled;b.onclick=action;panel.append(b);return b;};
- const section=(title,build)=>build();
  const selected=list.find(m=>m.id===scene.selectedTurretId);
  if(selected){
   const c=aimingConstraints(selected),edit=patch=>{const {yawMin,yawMax,...rest}=selected.coverage||{};editTurrets(scene,[selected.id],{coverage:{...rest,yawCenter:c.yawCenter,yawHalf:c.yawHalf,...patch}});changed();};
-  section('Selected turret · user-defined aiming',()=>{
    field('Enabled for coverage','checkbox',c.enabled,v=>edit({enabled:v}));field('Fixed aiming (coaxial assumption)','checkbox',c.fixed,v=>edit({fixed:v}));
-   // Center plus half-width lets an arc cross ±180° (for example a rear turret).
-   field('Azimuth center','number',c.yawCenter,v=>edit({yawCenter:v}),null,{min:-180,max:180,step:1,disabled:c.fixed});
-   field('Azimuth half-width','number',c.yawHalf,v=>edit({yawHalf:v}),null,{min:0,max:180,step:1,disabled:c.fixed});
-   note(`Azimuth arc: ${(c.yawCenter-c.yawHalf).toFixed(0)}° to ${(c.yawCenter+c.yawHalf).toFixed(0)}°${c.yawHalf>=180?' (full rotation)':''}`);
-   for(const [key,label,min,max] of [['pitchMin','Minimum elevation',selected.asset.pitch.limits?.min??-15,c.pitchMax],['pitchMax','Maximum elevation',c.pitchMin,selected.asset.pitch.limits?.max??90]])field(label,'number',c[key],v=>edit({[key]:v}),null,{min,max,step:1,disabled:c.fixed});
-   field('Fixed weapon spread (half-angle °)','number',c.spread,v=>edit({spread:v}),null,{min:0,max:45,step:.1,disabled:!c.fixed});
+   const spread=field('Fixed weapon spread (half-angle °)','number',c.spread,v=>edit({spread:v}),{min:0,max:45,step:.1,disabled:!c.fixed});spread.dataset.default=aimingConstraints({...selected,coverage:{}}).spread;
    field('Turret coverage group','text',selected.coverage?.group||'',v=>edit({group:v.trim().slice(0,60)}));
    field('Turret field color','color',o.colors?.[selected.id]||TURRET_COLORS[list.indexOf(selected)%TURRET_COLORS.length],v=>update('colors',{...o.colors,[selected.id]:v}));
-   const defaults=aimingConstraints({...selected,coverage:{}}),labels={'Azimuth center':'yawCenter','Azimuth half-width':'yawHalf','Minimum elevation':'pitchMin','Maximum elevation':'pitchMax','Fixed weapon spread (half-angle °)':'spread'};for(const input of panel.querySelectorAll('input[type=number]'))input.dataset.default=defaults[labels[input.getAttribute('aria-label')]];
-  });
+
  }
 }

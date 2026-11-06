@@ -32,7 +32,7 @@ import { reportError } from './app-log.js';
 let activePlacementViewport=null;
 // Navigation state is independent of this reference geometry and can be reused
 // by the eventual Avorion renderer.
-export function mountViewport(canvas, area, scene, onChange, onSelect, getPreferences = () => FACTORY_PREFERENCES, onContextMenu = () => {}, onPaint = () => false) {
+export function mountViewport(canvas, area, scene, onChange, onSelect, getPreferences = () => FACTORY_PREFERENCES, onContextMenu = () => {}, onPaint = () => false, frameOnLoad = () => false, onStatusChanged = () => {}) {
   const ctx = canvas.getContext('2d');
   const view = ensureCamera(area.view), body = canvas.parentElement;
   const faces = [[0,1,2,3],[0,4,5,1],[1,5,6,2],[2,6,7,3],[3,7,4,0],[4,7,6,5]];
@@ -52,12 +52,6 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   listen(window,'avorion-sky-ready',invalidate);
   listen(window,'avorion-model-ready',invalidate);
   listen(body,'pointerenter',()=>{activePlacementViewport=area.id;});listen(body,'focusin',()=>{activePlacementViewport=area.id;});
-  const attachmentTools=document.createElement('div');attachmentTools.setAttribute('role','group');attachmentTools.setAttribute('aria-label','Attachment tools');Object.assign(attachmentTools.style,{position:'absolute',bottom:'5px',left:'50%',transform:'translateX(-50%)',zIndex:7,background:'#252525',padding:'3px',display:'none',flexWrap:'wrap',maxWidth:'95%'});body.append(attachmentTools);
-  const toolSelect=(label,values,read,write)=>{const select=document.createElement('select');select.setAttribute('aria-label',label);for(const [value,text] of values)select.add(new Option(text,value));select.value=read();select.onchange=()=>{write(select.value);invalidate();};attachmentTools.append(select);return select;};
-  toolSelect('Socket types',[['both','Both socket types'],['turrets','Turret sockets'],['components','Component sockets']],()=>view.socketFilter||'both',value=>view.socketFilter=value);
-  toolSelect('Attachment coordinate space',[['local','Local axes'],['socket','Socket axes'],['ship','Ship axes']],()=>view.attachmentSpace||'local',value=>view.attachmentSpace=value);
-  toolSelect('Attachment rotation axis',[['x','Rotate X'],['y','Rotate Y'],['z','Rotate Z']],()=>view.attachmentAxis||'y',value=>view.attachmentAxis=value);
-  const transform=document.createElement('button');transform.type='button';transform.textContent='Transform attachment';transform.setAttribute('aria-pressed','false');transform.onclick=()=>{if(scene.componentAttachmentDraft||scene.turretEditorAsset)scene.editAttachment=!scene.editAttachment;else scene.attachmentTransform=!scene.attachmentTransform;transform.setAttribute('aria-pressed',String(!!(scene.editAttachment||scene.attachmentTransform)));invalidate();};attachmentTools.append(transform);
   const socketsChanged=()=>onSelect({socketId:scene.turretSockets?.selectedId||null});
   listen(window,'turret-drag-start',()=>{scene.turretDragging=true;invalidate();});
   listen(window,'turret-drag-end',()=>{if(!placement.state){scene.turretDragging=false;scene.turretPreview=null;}invalidate();});
@@ -116,9 +110,13 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     ctx.beginPath();ctx.moveTo(points[0][0], points[0][1]);ctx.lineTo(points[1][0], points[1][1]);
     ctx.strokeStyle = color;ctx.lineWidth = 1;ctx.stroke();
   }
+  const statusActivity=()=>magnifier?'magnifier':placement.state?'placement':turretToolbar.active?'attachment':regionMode?'region':drag?.mode;
+  let lastStatus;
   function draw() {
+    const activity=statusActivity();if(activity!==lastStatus){lastStatus=activity;onStatusChanged();}
+    if(frameOnLoad(width,height))onChange();
     updateCursor();
-    const started=performance.now();attachmentTools.style.display=(view.interactionMode==='socket'||scene.selectedTurretId||scene.selectedComponentMountId||scene.componentAttachmentDraft||scene.turretEditorAsset)?'flex':'none';
+    const started=performance.now();
     frame = 0;
     if(placement.state&&placement.state.model!==scene.model)placement.cancel();
     if(imageRenderBusy())return;
@@ -172,7 +170,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
       ctx.fillStyle='#83b6e522';ctx.strokeStyle='#9fc8ed';ctx.lineWidth=1;ctx.setLineDash([5,4]);
       ctx.fillRect(rect.x,rect.y,rect.width,rect.height);ctx.strokeRect(rect.x,rect.y,rect.width,rect.height);ctx.setLineDash([]);
     }
-    const footer=body.querySelector('.viewport-footer span:last-child');if(footer)footer.textContent=scene.renderPreparing?'Preparing large model…':scene.renderError||`${scene.model?.blocks.length||0} blocks`;
+    const footer=body.querySelector('[data-render-status]');if(footer){footer.textContent=scene.renderPreparing?'Preparing large model…':scene.renderError||'';footer.hidden=!footer.textContent;}
     const hint=body.querySelector('.region-zoom-hint');if(hint)hint.textContent='Zoom region · '+shortcutLabel(bindingFor('regionIn',preferences))+' in / '+shortcutLabel(bindingFor('regionOut',preferences))+' out · '+shortcutLabel(bindingFor('cancel',preferences))+' cancel';
     const label = body.querySelector('.view-label');
     if (label) label.textContent = viewLabel(view);
@@ -223,9 +221,9 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     const prefs=getPreferences(),options={lensSize:prefs.paintLensSize??200,lensZoom:prefs.paintLensZoom??4,lensQuality:prefs.paintLensQuality??'smooth'},[x,y]=position(event),size=Math.max(64,Math.min(options.lensSize,width-8,height-8));
     const left=Math.max(4,Math.min(width-size-4,x+32+size<=width?x+32:x-size-32));
     const top=Math.max(4,Math.min(height-size-4,y-size/2));
-    const lens=document.createElement('canvas');lens.className='paint-magnifier';lens.setAttribute('role','img');lens.setAttribute('aria-label',options.lensZoom+'× paint magnifier: hold right mouse, move into lens, left-drag to paint');
+    const lens=document.createElement('canvas');lens.className='paint-magnifier';lens.setAttribute('role','img');lens.setAttribute('aria-label',options.lensZoom+'× paint magnifier: hold right mouse, move into lens, scroll to resize brush, left-drag to paint');
     lens.width=Math.round(size*2);lens.height=Math.round(size*2);Object.assign(lens.style,{left:left+'px',top:top+'px',width:size+'px',height:size+'px'});body.append(lens);
-    magnifier={lens,x,y,left,top,size,zoom:options.lensZoom,detail:options.lensQuality==='detail'||!!prefs.paintLensWireframe,wireframe:!!prefs.paintLensWireframe,renderView:structuredClone(view),pointerId:event.pointerId,painting:false,painted:new Set(),last:null};
+    magnifier={lens,x,y,left,top,size,zoom:options.lensZoom,detail:options.lensQuality==='detail'||!!prefs.paintLensWireframe,wireframe:!!prefs.paintLensWireframe,renderView:structuredClone(view),pointerId:event.pointerId,brushWheel:0,painting:false,painted:new Set(),last:null};
     canvas.setPointerCapture(event.pointerId);canvas.focus({preventScroll:true});invalidate();
   }
   function drawMagnifier(){
@@ -233,7 +231,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     c.setTransform(2,0,0,2,0,0);c.fillStyle='#161a1e';c.fillRect(0,0,m.size,m.size);
     c.save();c.beginPath();c.rect(0,0,m.size,m.size);c.clip();c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';
     // Draw from the viewport before its guides; the lens never samples itself.
-    if(m.detail){m.renderView.grid=false;m.renderView.interactionMode='object';m.renderView.display={...view.display,showOverlays:m.wireframe,wireOverlay:m.wireframe,axisX:false,axisY:false,axisZ:false,objectOutline:false,outlineSelected:false,dof:false};drawGame(c,scene,m.renderView,width,height,getPreferences(),2,{x:m.x,y:m.y,size:m.size,zoom:m.zoom});}
+    if(m.detail){m.renderView.grid=false;m.renderView.hidePaintAttachments=view.hidePaintAttachments;m.renderView.display={...view.display,showOverlays:m.wireframe,wireOverlay:m.wireframe,axisX:false,axisY:false,axisZ:false,objectOutline:false,outlineSelected:false,dof:false};drawGame(c,scene,m.renderView,width,height,getPreferences(),2,{x:m.x,y:m.y,size:m.size,zoom:m.zoom});}
     else c.drawImage(canvas,(m.x-m.size/scale/2)*canvas.width/width,(m.y-m.size/scale/2)*canvas.height/height,m.size/scale*canvas.width/width,m.size/scale*canvas.height/height,0,0,m.size,m.size);c.restore();
     c.fillStyle='#15191ee6';c.fillRect(0,m.size-20,m.size,20);c.fillStyle='#fff';c.font='11px sans-serif';c.fillText(scale+'× · '+(m.detail?'Detail':'Smooth')+' · hold RMB',7,m.size-6);
   }
@@ -424,7 +422,13 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   listen(canvas,'pointercancel',cancel);
   listen(canvas,'lostpointercapture',()=>{if(drag||magnifier)cancel();});
   listen(window,'blur',cancel);
-  listen(canvas,'contextmenu',event=>{event.preventDefault();if(magnifier)return;if(drag||regionMode){if(drag?.button!==2&&matchesBinding('cancelMouse',event,getPreferences(),'Mouse2'))cancel();return;}if(!suppressContext){const [x,y]=position(event),marker=pickSocketMarker(socketHits,x,y),hit=pickTurret(scene,view,width,height,x,y,getPreferences()),mount=mounts(scene).find(m=>m.id===hit?.mountId||marker&&m.socketId===marker.id);if(mount){turretToolbar.open(mount);return;}onContextMenu(event);}});
+  listen(canvas,'contextmenu',event=>{event.preventDefault();if(magnifier)return;if(drag||regionMode){if(drag?.button!==2&&matchesBinding('cancelMouse',event,getPreferences(),'Mouse2'))cancel();return;}if(!suppressContext){const [x,y]=position(event);
+   if(view.interactionMode!=='paint'){
+    const hit=pickComponent(scene,view,width,height,x,y,getPreferences()),marker=pickSocketMarker(componentSocketHits,x,y);
+    const component=componentSetup(scene.model||{}).mounts.find(m=>m.id===hit?.componentMountId||marker&&m.socketId===marker.id);
+    if(component){turretToolbar.open(component,true);return;}
+   }
+   const marker=pickSocketMarker(socketHits,x,y),hit=pickTurret(scene,view,width,height,x,y,getPreferences()),mount=mounts(scene).find(m=>m.id===hit?.mountId||marker&&m.socketId===marker.id);if(mount){turretToolbar.open(mount);return;}onContextMenu(event);}});
   listen(canvas,'auxclick',event=>event.preventDefault());
   // Safari exposes magnification and rotation as GestureEvents; Chromium/Firefox
   // expose trackpad magnification as Ctrl+wheel. Scope both to this canvas.
@@ -445,9 +449,21 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   },{passive:false});
   listen(canvas,'gestureend',event=>{if(nativeGesture)event.preventDefault();nativeGesture=null;},{passive:false});
   listen(window,'blur',()=>{nativeGesture=null;});
-  listen(canvas,'wheel',event=>{scene.turretStudio?.manualCamera();
-    event.preventDefault();if(drag||regionMode||magnifier)return;
+  listen(canvas,'wheel',event=>{
+    event.preventDefault();
     const unit=event.deltaMode===1?16:event.deltaMode===2?height:1,p=getPreferences();
+    if(magnifier){
+      const options=paintOptions(view);
+      if(event.ctrlKey||!['brush','restore'].includes(options.tool))return;
+      magnifier.brushWheel-=event.deltaY*unit;
+      const step=Math.trunc(magnifier.brushWheel/40);
+      magnifier.brushWheel-=step*40;
+      const radius=Math.max(0,Math.min(64,options.radius+step));
+      if(radius!==options.radius){options.radius=radius;onPaint('radius');invalidate();onChange();}
+      return;
+    }
+    if(drag||regionMode)return;
+    scene.turretStudio?.manualCamera();
     // Trackpads report pinch as Ctrl+wheel and two-finger swipes as plain wheel deltas.
     if(p.trackpadNavigation){
       if(nativeGesture)return;
@@ -470,9 +486,10 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   }
   return {
     id: area.id, draw: invalidate, cancel,
+    get statusActivity() { return statusActivity(); },
     get navigating() { return !!drag || regionMode || !!magnifier; },
-    startRegion() {cancel();regionMode=true;body.classList.add('region-zoom');canvas.focus({preventScroll:true});},
-    dispose() {turretToolbar.dispose();if(activePlacementViewport===area.id)activePlacementViewport=null;placement.cancel();placement.dispose();attachmentTools.remove();releaseViewportResources(view);cancel();events.abort();observer.disconnect();cancelAnimationFrame(frame);hoverLabel?.remove?.();if(canvas.style)canvas.style.cursor=originalCursor;}
+    startRegion() {cancel();regionMode=true;body.classList.add('region-zoom');canvas.focus({preventScroll:true});invalidate();},
+    dispose() {turretToolbar.dispose();if(activePlacementViewport===area.id)activePlacementViewport=null;placement.cancel();placement.dispose();releaseViewportResources(view);cancel();events.abort();observer.disconnect();cancelAnimationFrame(frame);hoverLabel?.remove?.();if(canvas.style)canvas.style.cursor=originalCursor;}
   };
 }
 

@@ -1,11 +1,18 @@
+import {symmetryCenter} from './components/mounting.js';
+import {symmetryAxesOrder} from './symmetry-controls.js';
 import {paintOptions} from './paint-tools.js';
 import {nativeToView,viewToNative} from './block-model.js';
 import {modelExtents,dimensionRulers,exteriorRuler} from './model-overlays.js';
 import {liveBlocks} from './ship-structure.js';
 import {basis,cameraPoint,projectCamera,clipNear} from './navigation.js';
 export function drawSymmetryPlanes(ctx,scene,view,width,height){
-    if(view.interactionMode!=='paint'||view.display?.showOverlays===false||!scene.loaded||!scene.model?.bounds)return;
-    const o=paintOptions(view),bounds=scene.model.bounds,axes=['x','y','z'];
+    if(view.display?.showOverlays===false||!scene.loaded||!scene.model?.bounds)return;
+    const paint=view.interactionMode==='paint',bounds=scene.model.bounds,axes=symmetryAxesOrder;
+    if(!paint&&!axes.some(axis=>scene.componentSymmetry?.[axis]))return;
+    const o=paint?paintOptions(view):{
+      symmetry:scene.componentSymmetry,planeVisible:scene.componentSymmetryPlaneVisible,
+      origin:Object.fromEntries(symmetryCenter(scene).map((value,i)=>[axes[i],value]))
+    };
     const extent=Math.max(1,...axes.map(a=>bounds.max[a]-bounds.min[a]))*.65;
     ctx.save();
     for(const [index,axis] of axes.entries()){
@@ -61,13 +68,15 @@ export function drawDimensions(ctx,scene,view,width,height,preferences,cache={})
         const x=tip[0]+ux*arrowSize*direction,y=tip[1]+uy*arrowSize*direction;
         ctx.beginPath();ctx.moveTo(...tip);ctx.lineTo(x-uy*3,y+ux*3);ctx.lineTo(x+uy*3,y-ux*3);ctx.closePath();ctx.fill();
       }
-      const w=ctx.measureText(ruler.label).width+12;
+      const blocks=preferences.dimensionUnits==='blocks';
+      const label=ruler.label.split(':')[0]+': '+Number((ruler.size*(blocks?1:10)).toPrecision(6))+(blocks?' blocks':' m');
+      const w=ctx.measureText(label).width+12;
       const labelGap=labelHeight/2+4+Math.abs(nx)*w/2;
       let x=(a[0]+b[0])/2+nx*labelGap,y=(a[1]+b[1])/2+ny*labelGap;
       if(preferences.imageExportDimensions){
         x=Math.max(w/2+6,Math.min(width-w/2-6,x));
         y=Math.max(labelHeight/2+4,Math.min(height-(preferences.imageExportTitle?Math.max(100,labelHeight/2+4):labelHeight/2+4),y));
       }
-      ctx.fillStyle='#202020e8';ctx.fillRect(x-w/2,y-labelHeight/2,w,labelHeight);ctx.fillStyle=dimensionColor;ctx.fillText(ruler.label,x,y);
+      ctx.fillStyle='#202020e8';ctx.fillRect(x-w/2,y-labelHeight/2,w,labelHeight);ctx.fillStyle=dimensionColor;ctx.fillText(label,x,y);
     }ctx.restore();
   }

@@ -16,7 +16,8 @@ export const FEATURE_AREAS = [
   ['0.9', 'Turrets', 'Turret library, sockets, studio, animation, effects and weapon coverage'],
   ['0.10', 'Asset library', 'Asset folders, model browser, favorites and saved sessions'],
   ['0.11', 'Preferences and languages', 'Preferences, keymaps, input styles and 8 interface languages'],
+  ['0.12', 'Components and socket editing', 'Component library, sockets, transforms, symmetry, attachment tools and XML baking'],
 ];
 // Smaller features and fixes shipped since the last feature area.
-export const PATCH = 63;
+export const PATCH = 0;
 export const APP_VERSION = `${FEATURE_AREAS.at(-1)[0]}.${PATCH}`;

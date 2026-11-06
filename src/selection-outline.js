@@ -31,8 +31,8 @@ export function createSelectionOutline(){
   const geometry=new THREE.InstancedBufferGeometry();
   geometry.setAttribute('position',new THREE.Float32BufferAttribute([0,-1,0,1,-1,0,1,1,0,0,-1,0,1,1,0,0,1,0],3));geometry.instanceCount=0;
   const material=new THREE.ShaderMaterial({depthTest:false,depthWrite:false,toneMapped:false,
-    uniforms:{resolution:{value:new THREE.Vector2()},lineWidth:{value:3},color:{value:new THREE.Color()},nearPlane:{value:.01}},
-    vertexShader:`attribute vec3 edgeStart,edgeEnd;uniform vec2 resolution;uniform float lineWidth,nearPlane;
+    uniforms:{resolution:{value:new THREE.Vector2()},lineWidth:{value:3},color:{value:new THREE.Color()},nearPlane:{value:.01},depthMap:{value:null},attachmentMap:{value:null},useDepth:{value:false},logFactor:{value:0}},
+    vertexShader:`attribute vec3 edgeStart,edgeEnd;uniform vec2 resolution;uniform float lineWidth,nearPlane;varying float edgeW;
       void main(){
         vec4 a=modelViewMatrix*vec4(edgeStart,1.),b=modelViewMatrix*vec4(edgeEnd,1.);
         if(a.z>-nearPlane&&b.z>-nearPlane){gl_Position=vec4(2.,2.,2.,1.);return;}
@@ -41,9 +41,16 @@ export function createSelectionOutline(){
         a=projectionMatrix*a;b=projectionMatrix*b;
         vec2 delta=(b.xy/b.w-a.xy/a.w)*resolution;
         vec2 normal=vec2(-delta.y,delta.x)/max(length(delta),.0001);
-        vec4 p=mix(a,b,position.x);p.xy+=normal*position.y*lineWidth/resolution*p.w;gl_Position=p;
+        vec4 p=mix(a,b,position.x);p.xy+=normal*position.y*lineWidth/resolution*p.w;edgeW=p.w;gl_Position=p;
       }`,
-    fragmentShader:`uniform vec3 color;void main(){gl_FragColor=vec4(color,1.);#include <colorspace_fragment>}`.replace(';#include',';\n#include')});
+    fragmentShader:`uniform vec3 color;uniform vec2 resolution;uniform sampler2D depthMap,attachmentMap;
+      uniform bool useDepth;uniform float logFactor;varying float edgeW;
+      void main(){
+        float depth=logFactor>0.?log2(1.+edgeW)*logFactor:gl_FragCoord.z;
+        float bias=max(0.000002,fwidth(depth)*1.5);
+        vec2 uv=gl_FragCoord.xy/resolution;
+        if(useDepth&&texture2D(attachmentMap,uv).b>.5&&depth>texture2D(depthMap,uv).r+bias)discard;
+        gl_FragColor=vec4(color,1.);#include <colorspace_fragment>}`.replace(';#include',';\n#include')});
   const object=new THREE.Mesh(geometry,material);object.frustumCulled=false;
   const scene=new THREE.Scene();scene.add(object);
   let last={};
@@ -54,9 +61,13 @@ export function createSelectionOutline(){
     const edges=selectedBlockEdges(rendered.group,model.selectedIds||new Set(),hidden),starts=[],ends=[];
     for(let i=0;i<edges.length;i+=6){starts.push(...edges.slice(i,i+3));ends.push(...edges.slice(i+3,i+6));}
     geometry.dispose();geometry.setAttribute('edgeStart',new THREE.InstancedBufferAttribute(new Float32Array(starts),3));geometry.setAttribute('edgeEnd',new THREE.InstancedBufferAttribute(new Float32Array(ends),3));geometry.instanceCount=starts.length/3;
-  },draw(renderer,camera,w,h,cssWidth,color,lineWidth,target){
+  },draw(renderer,camera,w,h,cssWidth,color,lineWidth,target,mask=null,useLogDepth=false){
     if(!geometry.instanceCount)return;
     material.uniforms.resolution.value.set(w,h);material.uniforms.lineWidth.value=Math.max(3,lineWidth*2)*w/cssWidth;material.uniforms.nearPlane.value=camera.near;
+    material.uniforms.depthMap.value=mask?.depthTexture||null;
+    material.uniforms.attachmentMap.value=mask?.texture||null;
+    material.uniforms.useDepth.value=!!mask;
+    material.uniforms.logFactor.value=useLogDepth&&camera.isPerspectiveCamera?1/Math.log2(1+camera.far):0;
     material.uniforms.color.value.setStyle(color,THREE.LinearSRGBColorSpace);
     const before=renderer.autoClear;renderer.autoClear=false;
     try{renderer.setRenderTarget(target);renderer.render(scene,camera);}finally{renderer.autoClear=before;}

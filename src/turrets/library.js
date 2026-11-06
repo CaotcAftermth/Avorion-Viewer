@@ -2,7 +2,7 @@ import {revisedAsset} from '../attachments/lifecycle.js';
 import {openTurretWorkspace} from './workspace.js';
 import {thumbnail} from './thumbnail.js';
 import {importTurretXml} from './core.js';
-import {turretContentKey} from './embedded.js';
+import {findMatchingTurret} from './embedded.js';
 const listeners=new Set();
 export const turretLibrary={assets:[],selectedId:null};
 let database;
@@ -17,7 +17,7 @@ let additions=Promise.resolve();
 export function addTurretAsset(asset,{force=false}={}){
   const operation=additions.then(async()=>{
     await loadTurretLibrary();
-    const key=turretContentKey(asset),existing=turretLibrary.assets.find(item=>turretContentKey(item)===key);
+    const existing=findMatchingTurret(turretLibrary.assets,asset);
     if(existing&&!force)return existing;
     asset=revisedAsset(asset);await records(asset);turretLibrary.assets.push(asset);emit();return asset;
   });
@@ -61,7 +61,7 @@ export function mountTurretLibrary(host,changed){
       name.onpointerup=e=>{if(e.pointerType==='touch'){const now=performance.now();if(lastTap&&now-lastTap<400)rename();lastTap=now;}};
       const remove=document.createElement('button');remove.className='turret-asset-remove';remove.textContent='×';remove.setAttribute('aria-label','Remove '+asset.name+' from library');remove.title='Remove from library; mounted copies remain on ships';
       remove.onclick=async()=>{remove.disabled=true;try{await records(asset,true);turretLibrary.assets=turretLibrary.assets.filter(a=>a.id!==asset.id);if(turretLibrary.selectedId===asset.id)turretLibrary.selectedId=null;emit();changed();}catch(e){error=e.message;draw();}};
-      card.append(tile,name,remove);const place=document.createElement('button');place.textContent='Place';place.setAttribute('aria-label','Place '+asset.name);place.onclick=()=>window.dispatchEvent(new CustomEvent('attachment-place',{detail:{kind:'turret',asset}}));card.append(place);grid.append(card);
+      card.append(tile,name,remove);grid.append(card);
     }
     const add=document.createElement('button');add.className='turret-asset-tile turret-import';add.textContent='+';add.title='Import turret XML';add.setAttribute('aria-label','Import turret XML');add.disabled=busy;grid.append(add);
     const input=document.createElement('input');input.type='file';input.accept='.xml';input.hidden=true;host.append(input);add.onclick=()=>input.click();

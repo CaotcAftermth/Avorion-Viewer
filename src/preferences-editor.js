@@ -4,7 +4,7 @@ import { setDisabled } from './control-state.js';
 import { mountAssetLibrary } from './asset-library.js';
 import { wireTabs, wirePanels } from './editor-panels.js';
 import { eventBinding, validBinding, shortcutLabel, keymapConflict, matchesBinding } from './keymaps.js';
-import { APP_SECTIONS, matchingPanels } from './preferences.js';
+import { APP_SECTIONS, matchingPanels, activeViewportTheme } from './preferences.js';
 import { t, tf, onLanguageChange } from './i18n.js';
 
 const HEX = /^#?([0-9a-f]{6})$/i;
@@ -43,9 +43,13 @@ export function mountPreferences(host, store, editorState = {}, assets = {}, opt
     for (const [key, input] of controls) {
       if(input.dataset.binding){if(input.dataset.recording!=='true')input.textContent=shortcutLabel(store.value[key]);continue;}
       if (input.type === 'checkbox') input.checked = store.value[key];
-      else input.value = store.value[key];
+      else input.value = key==='viewportTheme'?activeViewportTheme(store.value):store.value[key];
+      if(key==='viewportGradientTop')input.disabled=!store.value.viewportGradient;
     }
-    for (const [key, input] of hexInputs) if (document.activeElement !== input) input.value = store.value[key].toUpperCase();
+    for (const [key, input] of hexInputs) {
+      if(key==='viewportGradientTop')input.disabled=!store.value.viewportGradient;
+      if(document.activeElement!==input)input.value=store.value[key].toUpperCase();
+    }
     // Per-editor colors only apply with that editor's Custom Colors enabled.
     for (const [key, input] of controls) {
       const match = EDITOR_COLOR.exec(key);
@@ -122,7 +126,7 @@ export function mountPreferences(host, store, editorState = {}, assets = {}, opt
           }
           const input=document.createElement(field.type==='paths'?'textarea':field.type==='select'?'select':'input');input.setAttribute('aria-label',fieldLabel);input.setAttribute('aria-description',fieldTip);
           if (field.type==='select') {
-            for(const [value,text] of field.options){const option=document.createElement('option');option.value=value;option.textContent=t(text);if(field.key==='inputStyle'&&value==='trackpad')option.disabled=true;input.append(option);}
+            for(const [value,text] of field.options){const option=document.createElement('option');option.value=value;option.textContent=t(text);if(field.key==='inputStyle'&&value==='trackpad'||field.key==='viewportTheme'&&value==='custom')option.disabled=true;input.append(option);}
           } else if(field.type==='paths'){input.rows=3;input.maxLength=16000;input.placeholder=t('One folder path per line');} else input.type=field.type;
           if(field.type==='number'){input.min=field.min;input.max=field.max;input.step=field.step;}
           input.dataset.preference=field.key;

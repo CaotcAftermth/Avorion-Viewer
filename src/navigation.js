@@ -124,7 +124,7 @@ export function viewLabel(view) {
   return `${name} ${view.projection === 'perspective' ? 'Perspective' : 'Orthographic'}`;
 }
 
-export function frameBounds(view, points, width, height) {
+export function frameBounds(view, points, width, height, fill=.72) {
   if (!points.length || width <= 0 || height <= 0) return false;
   ensureCamera(view);
   const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
@@ -135,7 +135,7 @@ export function frameBounds(view, points, width, height) {
   const bounds=distance=>{let left=Infinity,right=-Infinity,bottom=Infinity,top=-Infinity;
     for(let i=0;i<coords.length;i+=3){const scale=view.projection==='perspective'?focal/(distance-coords[i+2]):focal/distance,x=coords[i]*scale,y=coords[i+1]*scale;left=Math.min(left,x);right=Math.max(right,x);bottom=Math.min(bottom,y);top=Math.max(top,y);}
     return {left,right,bottom,top};};
-  const fits=d=>{const r=bounds(d);return r.right-r.left<=width*.72&&r.top-r.bottom<=height*.72;};
+  const fits=d=>{const r=bounds(d);return r.right-r.left<=width*fill&&r.top-r.bottom<=height*fill;};
   let low=view.projection==='perspective'?Math.max(.0001,maxDepth+NEAR):.0001,high=Math.max(1,low*2);
   while(!fits(high)&&high<1e12)high*=2;
   for(let i=0;i<36;i++){const mid=(low+high)/2;if(fits(mid))high=mid;else low=mid;}

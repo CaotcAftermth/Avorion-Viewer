@@ -3,6 +3,16 @@ export function propertyPanel(host,title,open=false){
  const panel=document.createElement('details');panel.className='panel';panel.open=open;
  const summary=document.createElement('summary');summary.textContent=title;panel.append(summary);host.append(panel);return panel;
 }
+export function propertyDataRow(host,label,value){
+ const row=document.createElement('div');row.className='field-row property-data-row';
+ const name=document.createElement('span'),data=document.createElement('span');
+ const lines=Array.isArray(label)?label:[label];
+ for(const [index,line] of lines.entries()){
+  if(index)name.append(document.createElement('br'));
+  name.append(line);
+ }
+ data.textContent=value;row.append(name,data);host.append(row);return data;
+}
 export function propertyNote(host,text){const p=document.createElement('p');p.className='panel-note';p.textContent=text;host.append(p);return p;}
 export function propertyAction(host,label,action,disabled=false){const b=document.createElement('button');b.type='button';b.className='setting-button';b.textContent=label;b.disabled=disabled;b.onclick=action;host.append(b);return b;}
 // Move existing controls with their listeners; never recreate domain handlers.

@@ -63,7 +63,7 @@ export function syncTurrets(world,scene,view,configureDepth,textureOptions){
     material.polygonOffset=blueprint;material.polygonOffsetFactor=1;material.polygonOffsetUnits=1;
   });
   if(!group.userData.bounds)group.userData.bounds=new THREE.Box3().setFromObject(group);
-  group.visible=!!scene.loaded&&scene.visible;const hidden=scene.hiddenIds||new Set();for(const child of group.children)child.visible=!child.userData.hidden&&!hidden.has(child.userData.blockId);group.traverse(o=>{if(o.material?.userData.highlight)o.material.userData.highlight.value=!blueprint&&(o.parent.userData.mountId&&(scene.selectedTurretIds?.has(o.parent.userData.mountId)||o.parent.userData.mountId===scene.selectedTurretId)||o.parent.userData.componentMountId&&o.parent.userData.componentMountId===scene.selectedComponentMountId)?1:0;});if(textureOptions)syncAttachmentTextures(group,scene,view,configureDepth,textureOptions);return group;
+  group.visible=!!scene.loaded&&scene.visible&&!(view.interactionMode==='paint'&&view.hidePaintAttachments);const hidden=scene.hiddenIds||new Set();for(const child of group.children)child.visible=!child.userData.hidden&&!hidden.has(child.userData.blockId);group.traverse(o=>{if(o.material?.userData.highlight)o.material.userData.highlight.value=!blueprint&&(o.parent.userData.mountId&&(scene.selectedTurretIds?.has(o.parent.userData.mountId)||o.parent.userData.mountId===scene.selectedTurretId)||o.parent.userData.componentMountId&&o.parent.userData.componentMountId===scene.selectedComponentMountId)?1:0;});if(textureOptions)syncAttachmentTextures(group,scene,view,configureDepth,textureOptions);return group;
 }
 
 export function pickMountedComponent(raycaster){

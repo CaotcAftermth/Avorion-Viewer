@@ -8,3 +8,13 @@ test('preview target orbits fixed artwork center at cardinal directions',()=>{
 });
 
 test('Restore honors the configured target distance instead of a forced minimum',()=>{const p={...FACTORY_PREFERENCES,cursorAngle_restore:0,cursorDistance_restore:10};const layout=cursorPreviewLayout('restore',p);assert.ok(Math.abs(layout.target[0]-106)<1);assert.ok(Math.abs(layout.target[1]-96)<1);});
+
+test('factory cursor targets use the configured offsets for each tool',()=>{
+ for(const [key,angle,distance] of [
+  ['select',254,11],['orbit',253,9],['pan-open',0,0],['frame',0,0],['brush',0,0],
+  ['eyedropper',252,10],['replace',30,24],['fill',33,12],['restore',110,3],
+ ]){
+  assert.equal(FACTORY_PREFERENCES['cursorAngle_'+key],angle);
+  assert.equal(FACTORY_PREFERENCES['cursorDistance_'+key],distance);
+ }
+});

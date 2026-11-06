@@ -9,6 +9,7 @@ import {posedComponentBlocks} from '../src/turrets/posed-blocks.js';
 import {syncTurrets} from '../src/turrets/render.js';
 import {captureExport} from '../src/export/snapshot.js';
 import {captureImage} from '../src/export/image-options.js';
+import {visibleFrameBlocks} from '../src/model-framing.js';
 import {area} from '../src/layout.js';
 import {FACTORY_PREFERENCES} from '../src/preferences.js';
 const fixture=()=>({loaded:true,visible:true,model:makeModel([makeBlock({typeIndex:2,position:{x:10,y:5,z:0}})]),hiddenIds:new Set(),selectedIds:new Set(),revision:0});
@@ -35,6 +36,13 @@ test('free sockets use original coordinates through centering and persistence',(
  const restored=restoreModel(snapshotModel(scene));assert.deepEqual(componentSockets(restored)[0].position,[0,0,0]);
 });
 
+test('Frame Selected includes a mounted component',()=>{
+ const scene=fixture(),view=area().view;
+ scene.model.componentSetup={...emptySetup(),blockType:2};
+ scene.model.componentSetup=attachComponent(scene.model.componentSetup,asset(),componentSockets(scene)[0]);
+ const mount=scene.model.componentSetup.mounts[0];scene.selectedComponentMountId=mount.id;
+ assert.deepEqual(visibleFrameBlocks(scene,view,true).map(block=>block.mountId),[mount.id]);
+});
 test('component anchor alignment, isolated copies, blueprint rendering and mesh exports',()=>{
  const scene=fixture();scene.model.componentSetup={...emptySetup(),blockType:2};const socket=componentSockets(scene).find(s=>s.normal[0]===1),original=asset();original.attachment.position=[0,1,0];
  scene.model.componentSetup=attachComponent(scene.model.componentSetup,original,socket);const mount=scene.model.componentSetup.mounts[0];

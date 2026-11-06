@@ -20,11 +20,13 @@ export function previewSetupImport(scene,next,changed){
  const unresolved=next.mounts.filter(m=>!ids.has(m.socketId)).length;
  return confirmAttachmentChange('Import component setup',[`Replace ${current.mounts.length} mounted components and ${current.sockets.length} manual sockets with ${next.mounts.length} components and ${next.sockets.length} sockets.`,`${unresolved} mounted components have unresolved sockets. A backup can be exported before proceeding.`],async()=>{if(scene.model!==model)throw Error('The active ship changed. Open the import again.');await changeSetup(scene,next);changed();});
 }
-export function mountLifecycleControls(host,scene,kind,mount,changed){
- const turret=kind==='turret',model=scene.model,section=document.createElement('details');section.className='panel';section.open=true;const title=document.createElement('summary');title.textContent='Library source';section.append(title);host.append(section);
+export function mountLifecycleControls(host,scene,kind,mount,changed,{inline=false}={}){
+ const turret=kind==='turret',model=scene.model,section=document.createElement(inline?'div':'details');host.append(section);
+ if(inline)section.className='selected-turret-library';
+ if(!inline){section.className='panel';section.open=true;const title=document.createElement('summary');title.textContent='Library source';section.append(title);}
  const status=document.createElement('p');status.setAttribute('role','status');section.append(status);
  const run=async action=>{try{await action();changed();}catch(error){status.textContent=error.message;}};
- const button=(label,action,disabled=false)=>{const b=document.createElement('button');b.textContent=label;b.disabled=disabled;b.onclick=()=>run(action);section.append(b);};
+ const button=(label,action,disabled=false)=>{const b=document.createElement('button');b.type='button';b.className='setting-button';b.textContent=label;b.disabled=disabled;b.onclick=()=>run(action);section.append(b);};
  const build=()=>{
   const source=(turret?turretLibrary:componentLibrary).assets.find(a=>a.id===(mount.source?.assetId||mount.assetId||mount.asset.id));
   status.textContent=source?`Mounted revision ${mount.source?.revision||sourceRevision(mount.asset)} · Library revision ${sourceRevision(source)}`:'Source unavailable. The mounted copy remains usable.';

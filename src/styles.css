@@ -359,6 +359,8 @@ canvas.paint-mode{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org
 .paint-attached-palette{display:flex;gap:1px;}
 .paint-tool-settings .paint-attached-palette button{width:18px;height:20px;padding:0;border:1px solid #191919;border-radius:2px;}
 .paint-model-colors button:disabled{opacity:1;}
+.paint-model-color-row{display:flex;align-items:center;gap:4px;}
+.paint-model-color-row>button:first-child{flex:1;min-width:0;}
 
 .paint-tool-settings .paint-palette-group-start{margin-left:9px;}
 
@@ -380,7 +382,7 @@ canvas.paint-mode{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org
 .component-warning{color:#ffb4a8}
 .component-outliner-row input{min-width:0;flex:1}
 /* Asset Library header: Turrets / Components switch beside Area options. */
-[data-editor=assets]>.area-header .asset-kind-switch{display:flex;gap:2px;margin-right:4px}
+[data-editor=assets]>.area-header .asset-kind-switch{display:flex;flex-shrink:0;gap:2px;margin-inline:auto}
 [data-editor=assets]>.area-header .asset-kind-switch button{padding:3px 10px;background:#ffffff0d}
 [data-editor=assets]>.area-header .asset-kind-switch button.active{background:var(--accent);color:#fff}
 .turret-asset-card{position:relative;display:flex;flex-direction:column;align-items:stretch;min-width:0;background:var(--header);border:1px solid var(--line);border-radius:4px}
@@ -628,3 +630,22 @@ input.color-cell-readout,.property-content input.color-cell-readout{background:v
 .trackpad-edge[data-side=right]{right:0}
 .trackpad-edge[data-side=top]{top:0}
 .trackpad-edge[data-side=bottom]{bottom:0}
+
+.property-content .property-data-row{display:grid;grid-template-columns:minmax(0,36%) minmax(0,1fr);align-items:start;text-align:left}
+.property-content .field-row.property-data-row>span{overflow-wrap:anywhere;text-align:left}
+.property-content .field-row.property-data-row{min-height:0;line-height:1.4}
+.socket-detail-group h4{font-size:12px;font-weight:500;margin:10px 0 5px}
+.socket-detail-group .property-data-row{margin-inline-start:12px}
+.selected-turret-library{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.selected-turret-library p{margin:0 0 2px;font-size:12px}
+.property-content .selected-turret-library>.setting-button{display:block;width:calc(100% - var(--property-label) - var(--property-gap));margin:2px 0 2px calc(var(--property-label) + var(--property-gap));text-align:center;white-space:normal}
+.selected-turret-library{gap:0}
+.symmetry-control-row{display:grid;grid-template-columns:minmax(88px,1fr) minmax(40px,110px) auto;align-items:center;gap:8px;margin:5px 0}
+.symmetry-control-row label{display:flex;justify-content:space-between;align-items:center;gap:4px}
+.symmetry-control-row button{display:grid;place-items:center}
+.symmetry-control-row input[type=number]{width:100%}
+.turret-size-stepper{display:flex;align-items:center;gap:2px;min-width:0}
+.turret-size-stepper input{width:60px;text-align:center;appearance:textfield}
+.turret-size-stepper input::-webkit-inner-spin-button,.turret-size-stepper input::-webkit-outer-spin-button{appearance:none}
+
+#status-hint{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
