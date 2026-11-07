@@ -1,3 +1,5 @@
+import { thrusterDirectionVectors } from './thruster-settings.js';
+import {socketToolActive} from './interaction-modes.js';
 import {createSelectionOutline} from './selection-outline.js';
 import {presentation} from './turrets/showcase.js';
 import {WeaponEffectsRenderer} from './turrets/effect-renderer.js';
@@ -104,7 +106,7 @@ export function gameParams(p) {
     ambientFillColor:p.shaderAmbientColor,ambientIntensity:p.shaderSkyEnabled===false?0:p.shaderSkyAmbient,
     minReflectivity:p.shaderMinReflection,maxReflectivity:Math.max(p.shaderMinReflection,p.shaderMaxReflection),
     normalStrength:p.shaderNormal,glowStrength:p.shaderGlow,hologramGlow:p.shaderHologramGlow??1.5,tileScale:p.shaderTileScale,
-    engineState:p.shaderEngineState??0,thrustPreview:p.shaderThrust,plumeLength:[0,p.shaderCruiseLength??4,p.shaderBoostLength??8.25][p.shaderEngineState??0]??0,barrierStrength:p.shaderBarrier,shadowStrength:0,bloomStrength:0,
+    engineState:p.shaderEngineState??0,thrustPreview:p.shaderThrust,thrustDirections:thrusterDirectionVectors(p),plumeLength:[0,p.shaderCruiseLength??4,p.shaderBoostLength??8.25][p.shaderEngineState??0]??0,barrierStrength:p.shaderBarrier,shadowStrength:0,bloomStrength:0,
     spillStrength:p.shaderSpill??0,spillRadius:p.shaderSpillRadius??5};
 }
 function initialize() {
@@ -172,9 +174,9 @@ function prepare(scene,p,view) {
   }
   rendered.group.visible=scene.loaded&&scene.visible;
   rendered.setParams(gameParams(p));
-  const selectedIds=view.interactionMode==='socket'||scene.turretDragging?emptySelection:view.display?.showOverlays===false||(view.display?.shadeSelected===false&&view.display?.outlineSelected!==true)?emptySelection:scene.selectedIds||emptySelection;
+  const selectedIds=socketToolActive(view)||scene.turretDragging?emptySelection:view.display?.showOverlays===false||(view.display?.shadeSelected===false&&view.display?.outlineSelected!==true)?emptySelection:scene.selectedIds||emptySelection;
   if(rendered.selection!==selectedIds){rendered.setSelection(selectedIds);rendered.selection=selectedIds;}
-  const regionIds=view.interactionMode==='socket'||scene.turretDragging||view.display?.showOverlays===false||view.display?.shadeSelected===false?emptySelection:regionHighlightIds(scene);
+  const regionIds=socketToolActive(view)||scene.turretDragging||view.display?.showOverlays===false||view.display?.shadeSelected===false?emptySelection:regionHighlightIds(scene);
   if(rendered.regionHighlight!==regionIds){rendered.setRegion(regionIds);rendered.regionHighlight=regionIds;}
   const preview=paintPreviews.get(view),hovered=preview?.ids||emptySelection;
   if(rendered.paintPreview!==hovered){rendered.setPaintPreview(hovered);rendered.paintPreview=hovered;}
@@ -328,7 +330,7 @@ export function drawGame(ctx,scene,view,width,height,p,dpr,crop=null,output=null
   };
   const showAttachmentSelection=turretGroup.visible&&turretGroup.children.some(holder=>holder.visible&&attachmentSelected(holder));
   let outlineMask=null;
-  const selected=view.interactionMode!=='socket'&&!scene.turretDragging&&!!d&&d.showOverlays&&d.outlineSelected&&(scene.selectedIds?.size||scene.selected||showAttachmentSelection);
+  const selected=!socketToolActive(view)&&!scene.turretDragging&&!!d&&d.showOverlays&&d.outlineSelected&&(scene.selectedIds?.size||scene.selected||showAttachmentSelection);
   const ambientCavity=!!d&&d.ambientOnly&&(d.ambientDetail??.35)>0&&d.shading!=='WIREFRAME'&&!d.xray&&p.shaderDebug===0;
   if(d&&!coverageGroup.visible&&(ambientCavity||d.objectOutline||selected||d.dof&&d.shading==='RENDERED'||bloomActive(d,p)||aoActive(d,p))){
     // Half-float scene color keeps emission above 1.0 for bloom.

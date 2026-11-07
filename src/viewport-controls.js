@@ -113,8 +113,9 @@ export function viewportHeader(header,view,changed){
   }));shading.append(shadingMenu);
 }
 export function viewportViewPanel(sidebar,view,changed){
-  const d=ensureViewportOptions(view),panel=section(sidebar,'View');
+  const d=ensureViewportOptions(view),panel=section(sidebar,'View');panel.classList.add('panel');
   control(panel,d,'focalLength','Focal Length (mm)','number',changed,{min:1,max:300,step:1});
   control(panel,d,'clipStart','Clip Start','number',changed,{min:.0001,max:1e6,step:.01,tip:'Near clipping distance in native model units'});
   control(panel,d,'clipEnd','Clip End','number',changed,{min:.001,max:1e7,step:1,tip:'Far clipping distance in native model units'});
+  panel.querySelectorAll('.viewport-property').forEach(row=>row.className='field-row');
 }

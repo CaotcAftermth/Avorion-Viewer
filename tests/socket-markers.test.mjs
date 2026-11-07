@@ -8,11 +8,11 @@ const context=()=>({arcs:[],save(){},restore(){},setLineDash(){},beginPath(){},s
 test('socket glyph is a thin cyan ring with an outward normal, without square markers',()=>{
  const ctx=context();drawSocketMarker(ctx,[20,30],[20,5]);assert.equal(ctx.strokeStyle,'#75ddff');assert.equal(ctx.lineWidth,2);assert.equal(ctx.arcs.length,1);assert.equal(ctx.arcs[0][2],8);
 });
-test('Socket Mode exposes component sockets without enabling persistent display; filters still apply',()=>{
- const scene={loaded:true,visible:true,revision:1,model:makeModel([makeBlock({typeIndex:2})]),hiddenIds:new Set()};scene.model.componentSetup={version:1,blockType:2,sockets:[],mounts:[]};const view=area().view;view.interactionMode='socket';
+test('Select Sockets exposes component sockets without enabling persistent display; filters still apply',()=>{
+ const scene={loaded:true,visible:true,revision:1,model:makeModel([makeBlock({typeIndex:2})]),hiddenIds:new Set()};scene.model.componentSetup={version:1,blockType:2,sockets:[],mounts:[]};const view=area().view;view.interactionMode='object';view.tool='sockets';
  assert.ok(drawComponentSockets(context(),scene,view,600,400,()=>true).length>0);
  view.socketFilter='turrets';assert.equal(drawComponentSockets(context(),scene,view,600,400,()=>true).length,0);
- view.socketFilter='both';view.interactionMode='object';assert.equal(drawComponentSockets(context(),scene,view,600,400,()=>true).length,0);
+ view.socketFilter='both';view.tool='select';assert.equal(drawComponentSockets(context(),scene,view,600,400,()=>true).length,0);
 });
 test('overlapping socket picking respects distance and depth across attachment types',()=>{
  const near={id:'turret',screen:[10,10,2]},far={id:'component',screen:[10,10,8]};assert.equal(pickSocketMarker([far,near],10,10),near);assert.equal(pickSocketMarker([near,far],100,100),null);

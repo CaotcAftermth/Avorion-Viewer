@@ -1,3 +1,4 @@
+import {socketToolActive} from '../interaction-modes.js';
 import {mounts,editTurrets} from '../turrets/mounts.js';
 import * as THREE from '../vendor/three.module.js';
 import {nativeToView} from '../block-model.js';
@@ -23,7 +24,7 @@ export function createComponentTools(scene,view,getPreferences){
    const socket=mount&&(kind==='component'?componentSockets(scene):sceneSockets(scene)).find(s=>s.id===mount.socketId);
    if(socket){const matrix=frame(socket.position,socket.rotation).multiply(frame(mount.offset||[0,0,0],mount.rotation||[0,0,0])),position=new THREE.Vector3().setFromMatrixPosition(matrix).toArray(),euler=new THREE.Euler().setFromRotationMatrix(matrix);return {kind,mount,setup,list,basis:frame([0,0,0],socket.rotation),manual:{position:mount.offset||[0,0,0],rotation:mount.rotation||[0,0,0]},live:{position,rotation:[euler.x,euler.y,euler.z].map(THREE.MathUtils.radToDeg),normal:new THREE.Vector3(0,1,0).transformDirection(matrix).toArray()}};}
   }
-  if(view.interactionMode!=='socket'||!scene.showComponentSockets||!scene.model?.componentSetup)return null;
+  if(!socketToolActive(view)||!scene.model?.componentSetup)return null;
   const setup=componentSetup(scene.model),manual=setup.sockets.find(s=>s.id===scene.selectedComponentSocketId);if(!manual)return null;
   const live=componentSockets(scene).find(s=>s.id===manual.id);return live?{kind:'socket',manual,live,setup}:null;
  }

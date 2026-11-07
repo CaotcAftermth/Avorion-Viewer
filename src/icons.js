@@ -1,8 +1,9 @@
 import {cursorIcon} from './viewport-cursors.js';
-const cursorTools={select:'select',orbit:'orbit',pan:'pan-open',frame:'frame',paintBrush:'brush',eyedropper:'eyedropper',replaceColor:'replace',fillPaint:'fill',restorePaint:'restore'};
+const cursorTools={select:'select',socket:'sockets',orbit:'orbit',pan:'pan-open',frame:'frame',paintBrush:'brush',eyedropper:'eyedropper',replaceColor:'replace',fillPaint:'fill',restorePaint:'restore'};
 const paths = {
  coverage:'<circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="3"/><path d="M8 1v14M1 8h14"/>',
   // User-supplied turret silhouette from SVG Repo; normalized to the shared 16px icon grid.
+  socket:'<circle cx="6" cy="8" r="4"/><circle cx="6" cy="8" r="1" fill="currentColor"/><path d="M10 8h5"/>',
   turret: '<path transform="scale(0.03125)" fill="currentColor" stroke="none" d="M130.72 61C106 61.11 106 62.875 106 91H76l-15 30v60l15 30h30c0 30 0 30 30 30h120c30 0 30 0 30-30h15l15-30h180v-60H316l-15-30h-15c0-30 0-30-30-30H136c-1.875 0-3.633-.007-5.28 0zM166 271a15 15 0 0 0-15 15v45a15 15 0 0 0 15 15h60a15 15 0 0 0 15-15v-45a15 15 0 0 0-15-15h-60zm-15 105c-30 0-45 30-45 30-15 0-30 0-30 15l-60 15v15h360v-15l-60-15c0-15-15-15-30-15 0 0-15-30-45-30h-90z"/>',
   modelPalette:'<path d="m8 1 6 3.5v7L8 15l-6-3.5v-7ZM2 4.5 8 8l6-3.5M8 8v7"/><path d="M4 7v3M11 7v3"/>',
   paintBrush:'<path d="m6 10 6-8 2 2-7 7M6 10c-4-2-2 4-5 4 4 1 7 0 6-3Z"/>',

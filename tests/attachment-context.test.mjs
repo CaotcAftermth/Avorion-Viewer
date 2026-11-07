@@ -19,3 +19,10 @@ test('pinned inspection edits model without changing live viewport selection',()
 test('model replacement clears stale attachment context',()=>{
  const s=scene();s.selectedTurretId='t';syncAttachmentContext(s);s.model={turretMounts:[]};s.selectedTurretId=null;assert.equal(syncAttachmentContext(s),null);
 });
+
+test('Select returns the designated inspector to Object Properties while preserving pins',()=>{
+ const nodes=[{id:'pinned',editor:'properties',propertyTab:'turrets',attachmentPin:{id:'t'}},{id:'active',editor:'properties',propertyTab:'components'}];
+ routeAttachmentInspector(nodes,{type:'object'},'active');
+ assert.equal(nodes[0].propertyTab,'turrets');
+ assert.equal(nodes[1].propertyTab,'object');
+});

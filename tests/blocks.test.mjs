@@ -38,7 +38,7 @@ test('nonconsecutive catalog IDs and local functional sides are preserved',()=>{
   for(const id of [21,23,25,601,651])assert.equal(getBlockDefinition(id).geometryKind,'wedge');
   assert.equal(getBlockDefinition(18).displayName,'Torpedo Launcher');assert.equal(getBlockDefinition(22).displayName,'Frontal Torpedo Launcher');
   assert.equal(getBlockDefinition(9999).geometryKind,'placeholder');
-  for(let side=0;side<6;side++){assert.equal(surfaceKind('engine',side),side===4?1:0);assert.equal(surfaceKind('directional-thruster',side),side>=4?2:0);}
+  for(let side=0;side<6;side++){assert.equal(surfaceKind('engine',side),side===4?1:0);assert.equal(surfaceKind('directional-thruster',side),side<2?2:0);}
 });
 test('ARGB repaint preserves alpha and secondary alpha blends only once',()=>{
   assert.equal(repaintRGB('80ffffff','#123456'),'80123456');

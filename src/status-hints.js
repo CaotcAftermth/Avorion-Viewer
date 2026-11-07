@@ -1,3 +1,4 @@
+import {socketToolActive} from './interaction-modes.js';
 import {bindingFor,shortcutLabel} from './keymaps.js';
 
 const editorHints={
@@ -64,10 +65,10 @@ export function statusHint({editor,view={},category,target,activity,preferences=
  if(target==='outlinerRow')return join(words('Click to select','Ctrl / Shift + click extend selection','Eye toggles visibility','RMB for actions'));
  if(editor==='viewport'){
   if(view.interactionMode==='paint')return join(words(paintHints[view.paint?.tool]||paintHints.select,'MMB opens palette or drag to orbit','Hold RMB for magnifier'),keys('undoPaint','Undo'));
-  if(view.interactionMode==='socket')return join(words('LMB select socket or attachment','Drag library asset onto socket','RMB mounted turret or component for tools'),keys('selected','Frame Selected'));
+  if(socketToolActive(view))return join(words('LMB select socket or attachment','Drag library asset onto socket','RMB mounted turret or component for tools'),keys('selected','Frame Selected'));
   if(coverageInspect)return join(words('Click a coverage point to inspect','Open Inspection & Statistics for contributors'),keys('frame','Frame All'));
   const navigation=preferences.trackpadNavigation?words('Two-finger scroll Pan','Shift + scroll Orbit','Pinch Zoom'):preferences.emulate3Button?words('Alt + LMB Orbit','Alt + Shift + LMB Pan'):[keys('orbitDrag','Orbit'),keys('panDrag','Pan')];
-  return join(navigation,!preferences.trackpadNavigation&&keys('wheelZoom','Zoom'),selected?keys('selected','Frame Selected'):keys('frame','Frame All'),keys('toggleMode','Cycle Mode'),keys('sidebar','Sidebar'));
+  return join(navigation,!preferences.trackpadNavigation&&keys('wheelZoom','Zoom'),selected?keys('selected','Frame Selected'):keys('frame','Frame All'),keys('toggleMode','Cycle Mode'),keys('assetLibrary','Asset Library'),keys('sidebar','Sidebar'));
  }
  if(editor==='properties'&&categoryHints[category])return join(words(categoryHints[category]),keys('maximize','Maximize'));
  if(editor==='assets'&&assetKind)return join(words('Click to select','Double-click to edit',assetKind==='components'?'Drag component to a component socket':'Drag turret to a turret socket'));

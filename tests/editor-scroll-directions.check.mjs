@@ -15,7 +15,7 @@ try{
  const before=await scrolls.evaluateAll(els=>els.map((el,i)=>{el.scrollTop=140+i*70;return el.scrollTop;}));assert.ok(before.every(v=>v>0));
  await page.getByLabel('Slice extent',{exact:true}).first().evaluate(el=>{el.value='8';el.dispatchEvent(new Event('change',{bubbles:true}));});
  assert.deepEqual(await scrolls.evaluateAll(els=>els.map(el=>el.scrollTop)),before,'partial Properties refresh preserves both scroll positions');
- await page.getByLabel('Interaction mode',{exact:true}).selectOption('socket');await page.waitForTimeout(150);
+ await page.getByRole('button',{name:'Select Sockets',exact:true}).click();await page.waitForTimeout(150);
  assert.deepEqual(await scrolls.evaluateAll(els=>els.map(el=>el.scrollTop)),before,'whole editor redraw preserves scroll');
  for(const direction of ['Top','Bottom','Left','Right','Front','Back']){
   await page.getByRole('button',{name:direction+' firing view',exact:true}).first().click();

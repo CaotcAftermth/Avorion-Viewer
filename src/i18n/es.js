@@ -1,6 +1,10 @@
 // Español interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+ "Select Sockets Target Azimuth": "Azimut del objetivo de selección de sockets",
+ "Select Sockets Target Distance": "Distancia del objetivo de selección de sockets",
+ "Cycle Object / Paint Mode": "Alternar modo Objeto / Pintura",
+ "Quick Asset Library": "Biblioteca rápida de recursos",
  "Dimension Units": "Unidades de medida",
  "Meters": "Metros",
  "Block Units": "Unidades de bloque",
@@ -611,5 +615,15 @@ export default {
  "Connected Fill Target Azimuth": "Connected Fill · Azimut del destino",
  "Connected Fill Target Distance": "Connected Fill · Distancia del destino",
  "Restore Target Azimuth": "Restore · Azimut del destino",
- "Restore Target Distance": "Restore · Distancia del destino"
+ "Restore Target Distance": "Restore · Distancia del destino",
+ "Active": "Activo",
+ "Inactive": "Inactivo",
+ "Thruster plumes are off or full, with fixed lengths for each port size.": "Los chorros de propulsores están apagados o al máximo, con longitudes fijas para cada tamaño de puerto.",
+ "Thruster Front": "Propulsor frontal",
+ "Thruster Back": "Propulsor trasero",
+ "Thruster Left": "Propulsor izquierdo",
+ "Thruster Right": "Propulsor derecho",
+ "Thruster Top": "Propulsor superior",
+ "Thruster Bottom": "Propulsor inferior",
+ "Activate ports facing this ship direction. Multiple directions can be active together.": "Activa los puertos orientados en esta dirección de la nave. Se pueden activar varias direcciones a la vez.",
 };

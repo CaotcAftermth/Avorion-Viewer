@@ -1,3 +1,4 @@
+import { DIRECTIONAL_THRUSTER_SIDES } from "./thrusterPorts.js";
 import * as THREE from "../../../vendor/three.module.js";
 import { getBlockDefinition } from "../avorion/blockDefinitions.js";
 import { localScaleFor, resolveOrientation } from "../avorion/orientation.js";
@@ -14,7 +15,7 @@ export function surfaceKind(surface, side) {
     if (surface === "thruster")
         return SURFACE_THRUSTER;
     if (surface === "directional-thruster")
-        return side >= 4 ? SURFACE_THRUSTER : SURFACE_PLAIN;
+        return DIRECTIONAL_THRUSTER_SIDES.includes(side) ? SURFACE_THRUSTER : SURFACE_PLAIN;
     if (surface === "decal")
         return SURFACE_DECAL;
     if (surface === "generator")

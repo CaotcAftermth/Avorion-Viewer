@@ -1,6 +1,10 @@
 // Русский interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+ "Select Sockets Target Azimuth": "Азимут цели выбора сокетов",
+ "Select Sockets Target Distance": "Расстояние до цели выбора сокетов",
+ "Cycle Object / Paint Mode": "Переключить режим объекта / рисования",
+ "Quick Asset Library": "Быстрая библиотека ресурсов",
  "Dimension Units": "Единицы размеров",
  "Meters": "Метры",
  "Block Units": "Блоки",
@@ -611,5 +615,15 @@ export default {
  "Connected Fill Target Azimuth": "Connected Fill · Азимут цели",
  "Connected Fill Target Distance": "Connected Fill · Расстояние до цели",
  "Restore Target Azimuth": "Restore · Азимут цели",
- "Restore Target Distance": "Restore · Расстояние до цели"
+ "Restore Target Distance": "Restore · Расстояние до цели",
+ "Active": "Активно",
+ "Inactive": "Неактивно",
+ "Thruster plumes are off or full, with fixed lengths for each port size.": "Струи маневровых двигателей выключены или работают на полную мощность; длина фиксирована для каждого размера сопла.",
+ "Thruster Front": "Маневровые двигатели спереди",
+ "Thruster Back": "Маневровые двигатели сзади",
+ "Thruster Left": "Маневровые двигатели слева",
+ "Thruster Right": "Маневровые двигатели справа",
+ "Thruster Top": "Маневровые двигатели сверху",
+ "Thruster Bottom": "Маневровые двигатели снизу",
+ "Activate ports facing this ship direction. Multiple directions can be active together.": "Включить сопла, направленные в эту сторону корабля. Можно включить несколько направлений одновременно.",
 };

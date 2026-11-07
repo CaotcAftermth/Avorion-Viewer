@@ -1,6 +1,10 @@
 // 日本語 interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+ "Select Sockets Target Azimuth": "ソケット選択ターゲットの方位角",
+ "Select Sockets Target Distance": "ソケット選択ターゲットの距離",
+ "Cycle Object / Paint Mode": "オブジェクト／ペイントモードを切り替え",
+ "Quick Asset Library": "クイックアセットライブラリ",
  "Dimension Units": "寸法の単位",
  "Meters": "メートル",
  "Block Units": "ブロック単位",
@@ -611,5 +615,15 @@ export default {
  "Connected Fill Target Azimuth": "Connected Fill · ターゲット方位角",
  "Connected Fill Target Distance": "Connected Fill · ターゲット距離",
  "Restore Target Azimuth": "Restore · ターゲット方位角",
- "Restore Target Distance": "Restore · ターゲット距離"
+ "Restore Target Distance": "Restore · ターゲット距離",
+ "Active": "作動",
+ "Inactive": "停止",
+ "Thruster plumes are off or full, with fixed lengths for each port size.": "スラスター噴射は停止または全出力で、噴射口のサイズごとに長さが固定されます。",
+ "Thruster Front": "スラスター：前面",
+ "Thruster Back": "スラスター：後面",
+ "Thruster Left": "スラスター：左面",
+ "Thruster Right": "スラスター：右面",
+ "Thruster Top": "スラスター：上面",
+ "Thruster Bottom": "スラスター：下面",
+ "Activate ports facing this ship direction. Multiple directions can be active together.": "船体のこの方向を向く噴射口を作動させます。複数の方向を同時に作動できます。",
 };

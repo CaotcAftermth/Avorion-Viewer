@@ -7,6 +7,10 @@ const orbit=paths(svgs.orbit),black=orbit[0].d.split(/Z/i).filter(x=>x.trim());
 // Orbit's second black contour contains its arrow and the left orbit arc.
 // Clip out that arc, retaining the exact arrow and its white interior.
 svgs.select='<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 256 256"><defs><clipPath id="arrow"><rect x="101" y="60" width="85" height="130"/></clipPath></defs><g clip-path="url(#arrow)"><path d="'+black[1]+'Z" fill="'+orbit[0].fill+'" fill-rule="evenodd"/><path d="'+orbit.at(-1).d+'" fill="'+orbit.at(-1).fill+'" fill-rule="evenodd"/></g></svg>';
+// Socket cursor uses the supplied plate and the exact Select / Orbit arrow.
+const plate=await readFile(new URL('socket-plate.svg',root),'utf8');
+const arrow=svgs.select.replace(/^<svg[^>]*>/,'').replace(/<\/svg>$/,'');
+svgs.sockets=plate.trim().replace('</svg>',arrow+'</svg>');
 svgs['brush-icon']=svgs.brush;
 const brush=paths(svgs.brush),parts=brush[0].d.split(/Z/i).filter(x=>x.trim());
 if(parts.length!==3)throw Error('Unexpected v4 brush contours');

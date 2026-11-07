@@ -649,3 +649,24 @@ input.color-cell-readout,.property-content input.color-cell-readout{background:v
 .turret-size-stepper input::-webkit-inner-spin-button,.turret-size-stepper input::-webkit-outer-spin-button{appearance:none}
 
 #status-hint{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.viewport-mode-control{position:relative;display:inline-flex;flex-shrink:0;color:#b8b8b8}
+.viewport-mode-control .header-name{margin-left:0;padding-left:25px;background:#262626;color:var(--text)}
+.viewport-mode-icon{position:absolute;left:6px;top:50%;transform:translateY(-50%);display:flex;pointer-events:none}
+.viewport-mode-icon svg{width:14px;height:14px}
+.viewport-mode-control[data-mode=paint]{color:#86b9e9}
+.viewport-mode-control[data-mode=paint] select{border-color:#53779a;background:#283644}
+
+.quick-asset-library{position:fixed;z-index:90;left:50%;bottom:32px;transform:translateX(-50%);width:min(1000px,calc(100vw - 32px));max-height:45vh;display:flex;flex-direction:column;background:var(--panel);border:2px solid var(--accent);border-radius:6px;box-shadow:0 0 0 1px #111,0 8px 30px #000c;font-size:12px;overflow:hidden}
+.quick-asset-library>header{display:flex;align-items:center;gap:12px;min-height:30px;padding:3px 7px;background:var(--header)}
+.quick-asset-library>header strong{font-weight:500}
+.quick-asset-library .asset-kind-switch{display:flex;gap:3px;margin-inline:auto}
+.quick-asset-library-body{overflow:auto;min-height:0;padding:7px;max-height:240px}
+.quick-asset-library-body .turret-asset-grid{display:flex;flex-wrap:nowrap;gap:8px}
+.quick-asset-library-body .turret-asset-card,.quick-asset-library-body .turret-import{flex:0 0 145px}
+.quick-asset-library-body .turret-asset-tile{min-height:105px}
+.quick-asset-library-body .turret-asset-name{min-height:28px}
+.quick-asset-library-body .component-folder-heading{font-size:11px;margin:4px 0}
+.quick-asset-library-body .component-library-tools{flex-wrap:wrap}
+.quick-asset-library-body .panel-note{margin:3px 0;font-size:11px}
+.quick-asset-library:focus{outline:none}

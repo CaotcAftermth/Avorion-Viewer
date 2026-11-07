@@ -1,3 +1,4 @@
+import {normalizeInteraction} from './interaction-modes.js';
 // Each viewport owns its display settings; legacy camera state stays compatible.
 export const VIEWPORT_DEFAULTS=Object.freeze({
   showGizmo:true,showOverlays:true,axisX:true,axisY:true,axisZ:true,gridScale:1,axisInfinite:true,axisLength:70,axisWidth:1,axisBrightness:1,ambientOnly:false,ambientStrength:1,ambientDetail:.35,
@@ -11,6 +12,7 @@ export const VIEWPORT_DEFAULTS=Object.freeze({
 const enums={shading:['WIREFRAME','SOLID','MATERIAL','RENDERED'],lighting:['STUDIO','MATCAP'],background:['THEME','WORLD','VIEWPORT'],studioLight:['Default'],matcap:['Red Wax']};
 const ranges={axisLength:[.001,1e12],axisWidth:[.5,12],axisBrightness:[0,4],ambientStrength:[0,4],ambientDetail:[0,1],gridScale:[.001,1000],wireThreshold:[0,1],wireOpacity:[0,1],xrayAlpha:[0,1],shadowIntensity:[0,1],focusDistance:[.001,1e7],aperture:[.1,64],focalLength:[1,300],clipStart:[.0001,1e6],clipEnd:[.001,1e7]};
 export function ensureViewportOptions(view){
+  normalizeInteraction(view);
   if(!view.display||typeof view.display!=='object'||Array.isArray(view.display))delete view.display;
   if(view.display&&view.display.shadeSelected===undefined&&typeof view.display.outlineSelected==='boolean'){
     view.display.shadeSelected=view.display.outlineSelected;view.display.outlineSelected=false;

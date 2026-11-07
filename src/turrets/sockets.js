@@ -1,3 +1,4 @@
+import {socketToolActive} from '../interaction-modes.js';
 import {drawSocketMarker} from '../socket-markers.js';
 import {mounts} from './mounts.js';
 import * as THREE from '../vendor/three.module.js';
@@ -26,7 +27,7 @@ export function sceneSockets(scene){
   const blocks=liveBlocks(scene);let sockets=cache.get(blocks);if(!sockets){const clearance=createSocketClearance(blocks);sockets=blocks.filter(isTurretBlock).flatMap(blockSockets).map(s=>({...s,fitSize:clearance(s)}));cache.set(blocks,sockets);}return sockets;
 }
 export function drawSockets(ctx,scene,view,width,height,color,visible=()=>true){
-  const targeting=view.interactionMode==='socket'||scene.turretDragging;
+  const targeting=socketToolActive(view)||scene.turretDragging;
   if(!targeting||!scene.visible||view.display?.showOverlays===false||view.interactionMode==='paint')return [];
   const hidden=scene.hiddenIds||new Set(),hits=[];
   ctx.save();color='#55ddff';ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=2;

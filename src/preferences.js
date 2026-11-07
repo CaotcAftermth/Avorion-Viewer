@@ -1,3 +1,4 @@
+import { THRUSTER_DIRECTION_FIELDS } from './thruster-settings.js';
 import { KEYMAPS, validBinding } from './keymaps.js';
 import { WORLD_FIELDS } from './sky-settings.js';
 import { LANGUAGE_OPTIONS, t } from './i18n.js';
@@ -165,7 +166,8 @@ PREFERENCE_SECTIONS.find(s=>s.id==='shaders').panels.push(
     {key:'shaderEngineState',label:'Engine State',type:'select',numeric:true,default:1,options:[[0,'Idle'],[1,'Cruise'],[2,'Boost']],description:'Engine plumes as in game: none when idle, fixed lengths when cruising or boosting. Length does not depend on engine size.'},
     {key:'shaderCruiseLength',label:'Cruise Plume Length',type:'number',min:0,max:30,step:.25,default:5,suffix:'u',description:'Engine plume length in native units while cruising. Observed in game: 4 blocks.'},
     {key:'shaderBoostLength',label:'Boost Plume Length',type:'number',min:0,max:30,step:.25,default:8.25,suffix:'u',description:'Engine plume length in native units while boosting. Observed in game: about 8 to 8.5 blocks.'},
-    {key:'shaderThrust',label:'Thruster Preview',type:'number',min:0,max:1,step:.05,default:.2,description:'Viewer-only animated thruster jet intensity. Jet length and spacing remain approximations.'},
+    {key:'shaderThrust',label:'Thruster Preview',type:'select',numeric:true,default:0,options:[[0,'Inactive'],[1,'Active']],description:'Thruster plumes are off or full, with fixed lengths for each port size.'},
+    ...THRUSTER_DIRECTION_FIELDS,
     {key:'shaderBarrier',label:'Hangar Barrier',type:'number',min:0,max:1,step:.05,default:1,description:'Hangar barrier visibility in the viewer preview.'}
   ]}
 );
@@ -188,8 +190,17 @@ PREFERENCE_SECTIONS.find(s=>s.id==='viewport').panels.push(
 PREFERENCE_SECTIONS.push({id:'world',label:'World',scope:'render',panels:[{label:'World',fields:WORLD_FIELDS}]});
 // Scene look (World, Shaders) lives in the Properties editor and asset folders in File;
 // they stay in the same store so saving, reverting and factory reset still cover them.
-export const APP_SECTIONS = PREFERENCE_SECTIONS.filter(section => !section.scope);
+export const APP_SECTIONS = [...PREFERENCE_SECTIONS.filter(section => !section.scope), {
+  id:'thrusters',label:'Thruster Preview',panels:[{label:'Thruster Preview',fields:
+    PREFERENCE_SECTIONS.flatMap(section=>section.panels.flatMap(panel=>panel.fields)).filter(field=>field.key.startsWith('shaderThrust'))
+  }]
+}];
 export const sectionById = id => PREFERENCE_SECTIONS.find(section => section.id === id);
+const cursorTargets=PREFERENCE_SECTIONS.find(section=>section.id==='cursors').panels.find(panel=>panel.cursorTargets);
+for(const source of cursorTargets.fields.filter(field=>['cursorAngle_select','cursorDistance_select'].includes(field.key))){
+ cursorTargets.fields.push({...source,key:source.key.replace('_select','_sockets'),label:source.label.replace('Select Target','Select Sockets Target')});
+}
+cursorTargets.fields=cursorTargets.fields.filter(field=>!['cursorAngle_frame','cursorDistance_frame'].includes(field.key));
 export const FIELDS = Object.fromEntries(PREFERENCE_SECTIONS.flatMap(section => section.panels.flatMap(panel => panel.fields)).map(field => [field.key, field]));
 export const FACTORY_PREFERENCES = Object.freeze({ version: 1, autoSave: true, ...Object.fromEntries(Object.values(FIELDS).map(field => [field.key, field.default])) });
 // Each input style is a bundle of the individual input preferences.
@@ -232,8 +243,12 @@ export function parsePreferences(raw) {
   const result = { ...FACTORY_PREFERENCES };
   for (const key of Object.keys(result)) {
     if (key === 'version' || !Object.hasOwn(parsed, key)) continue;
-    if (!validPreference(key, parsed[key])) throw new Error(`Invalid preference: ${key}`);
-    result[key] = parsed[key];
+    // Older saves used a continuous thruster preview. Preserve those saves and
+    // their other settings while converting any positive intensity to Active.
+    const value = key === 'shaderThrust' && Number.isFinite(parsed[key]) && parsed[key] >= 0 && parsed[key] <= 1
+      ? (parsed[key] > 0 ? 1 : 0) : parsed[key];
+    if (!validPreference(key, value)) throw new Error(`Invalid preference: ${key}`);
+    result[key] = value;
   }
   // 0.1 was the old Hologram Glow default; saved copies of it move to the new default.
   if (parsed.shaderHologramGlow === .1) result.shaderHologramGlow = FACTORY_PREFERENCES.shaderHologramGlow;

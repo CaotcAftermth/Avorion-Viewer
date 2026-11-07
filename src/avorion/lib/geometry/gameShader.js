@@ -23,7 +23,7 @@
 // secondary color, layer indices and flags.
 // ---------------------------------------------------------------------------
 import * as THREE from "../../../vendor/three.module.js";
-import { THRUSTER_PITCH_GLSL } from "./thrusterPorts.js";
+import { THRUSTER_PORTS_GLSL } from "./thrusterPorts.js";
 import { DEFAULT_GAME_SHADER } from "../../types/index.js";
 import { SPILL_GLSL, emptySpillGrid } from "./blockLights.js";
 export { DEFAULT_GAME_SHADER };
@@ -58,7 +58,7 @@ flat out float vSide;
 attribute vec4 aWindow;
 flat out vec4 vWindow;
 attribute vec4 aEmission; // rgb: material's default effect color; w: seam sides touching another block (bit per -X,+X,-Y,+Y,-Z,+Z)
-attribute vec2 aMaterialLayers; // plating accent and glow, independent of decals
+attribute vec3 aMaterialLayers; // plating accent and glow, independent of decals
 flat out float vSeamFace;
 
 varying vec3 vTexturePosition;
@@ -74,7 +74,7 @@ flat out vec4 vParams;
 varying vec2 vFaceUV;
 flat out vec4 vSurface;
 flat out vec3 vEmission;
-flat out vec2 vMaterialLayers;
+flat out vec3 vMaterialLayers;
 
 void main() {
   vBary=vec3(equal(vec3(floor(aEdges.w+.5)),vec3(0.,1.,2.)));vEdges=aEdges.xyz;
@@ -170,7 +170,7 @@ flat in vec4 vParams;
 varying vec2 vFaceUV;
 flat in vec4 vSurface;
 flat in vec3 vEmission;
-flat in vec2 vMaterialLayers;
+flat in vec3 vMaterialLayers;
 flat in float vSeamFace;
 
 bool hasFlag(float flags, float bit) { return mod(floor(flags / bit), 2.0) >= 1.0; }
@@ -209,21 +209,17 @@ vec3 faceNormal(vec3 decoded, vec3 n) {
   return normalize(n * max(decoded.z, 0.001) + (tangent * decoded.x + bitangent * decoded.y) * uNormalStrength);
 }
 
-${THRUSTER_PITCH_GLSL}
-// The physical mask and CPU emitters use the same calibrated pitch.
-float thrusterPlating(vec2 uv, vec2 size, vec2 dx, vec2 dy) {
-  float pitch = thrusterPitch(size);
-  vec2 point = (uv - 0.5) * size;
-  vec2 cell = fract(point / pitch + 0.5) - 0.5;
-  float footprint = max(length(dx * size), length(dy * size)) / pitch;
-  float aa = max(0.002, footprint * 0.5);
-  float hole = 1.0 - smoothstep(0.24 - aa, 0.32 + aa, length(cell));
-  vec2 border = min(vec2(0.3 * (pitch / 0.4)), size * 0.25);
-  vec2 edge = min(uv, 1.0 - uv) * size;
-  float borderFade = clamp(edge.x / border.x, 0.0, 1.0) * clamp(edge.y / border.y, 0.0, 1.0);
-  float resolved = pow(clamp(1.0 - hole * borderFade + 0.1, 0.0, 1.0), 12.0);
-  // Average the final coverage, not the input to the nonlinear power curve.
-  return mix(resolved, mix(1.0, 0.7537, borderFade), smoothstep(0.5, 1.5, footprint));
+${THRUSTER_PORTS_GLSL}
+// Square port footprint, shared with the CPU's centered, finite emitter grid.
+float thrusterCoverage(vec2 point, float portSize) {
+  float aa = max(0.00001, max(length(faceDx * vSurface.xy), length(faceDy * vSurface.xy)) * 0.5);
+  return 1.0 - smoothstep(portSize * 0.5 - aa, portSize * 0.5 + aa, max(abs(point.x), abs(point.y)));
+}
+vec4 sampleThruster(float layer, vec2 point, float portSize) {
+  if (layer < 0.5) return vec4(0.0);
+  // Native port artwork wraps across the four texture corners.
+  float scale = portSize * 3.2;
+  return textureGrad(uAux, vec3(fract(point / scale), layer), faceDx * vSurface.xy / scale, faceDy * vSurface.xy / scale);
 }
 
 vec3 triWeights(vec3 n) {
@@ -309,6 +305,9 @@ void main() {
   bool ore = surface >= 10.0 && surface <= 13.0;
   bool stripes = surface >= 20.0 && surface <= 25.0;
   bool decal = surface == 3.0 || surface == 28.0;
+  float portSize = max(vMaterialLayers.z, 0.1);
+  vec2 portPoint = thrusterPortPoint(vFaceUV, vSurface.xy, portSize);
+  float portCoverage = surface == 2.0 ? thrusterCoverage(portPoint, portSize) : 0.0;
   vec2 edgeDistance = min(vFaceUV, 1.0 - vFaceUV) * vSurface.xy;
   float solar = surface == 7.0 ? step(0.3, min(edgeDistance.x, edgeDistance.y)) : 0.0;
   if (vParams.w < -0.5) discard; // hidden block, independent of selection
@@ -363,6 +362,12 @@ void main() {
     // overlay decal
     vec4 overlay = sampleTri(uAux, vLayers.w, p, w);
     if (decal) overlay = sampleDecal(uAux, vLayers.w);
+    if (surface == 2.0) {
+      overlay = sampleThruster(vLayers.w, portPoint, portSize);
+      overlay.a = portCoverage;
+    }
+    // Directional thruster artwork only belongs to its two thrust faces.
+    if (surface == 0.0 && vMaterialLayers.z > 0.0) overlay = vec4(0.0);
     if (surface == 16.0 || surface == 17.0) overlay = sampleFace(uAux, vLayers.w, 1.0);
     if (stripes && vLayers.w > 0.5) {
       float variant = mod(surface - 20.0, 3.0);
@@ -415,6 +420,10 @@ void main() {
     N = normalize(mix(N, faceNormal(decoded, n), detail.a));
     if (generator) col = mix(col, vColor.rgb, detail.a);
     if (surface == 4.0) base = mix(base, vec4(1.0), detail.a);
+  }
+  if (surface == 2.0 && vSurface.w > 0.5) {
+    vec4 detail = sampleThruster(vSurface.w, portPoint, portSize);
+    N = normalize(mix(N, faceNormal(detail.rgb * 2.0 - 1.0, n), detail.a * portCoverage));
   }
   vec3 eyeDir = isOrthographic
     ? -vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2])
@@ -486,8 +495,6 @@ void main() {
     float outer = outerRamp.x * outerRamp.y;
     float inner = innerRamp.x * innerRamp.y;
     outc = mix(outc, (outer * effectColor + inner * vec3(1.0)) * uGlowStrength, outer);
-  } else if (surface == 2.0) {
-    outc *= thrusterPlating(vFaceUV, vSurface.xy, faceDx, faceDy);
   }
 
   // fog (game: exponential on view depth, toward the sky colour)
@@ -613,7 +620,7 @@ export function createGameMaterial(albedo, normal, aux, params, transparent = fa
     });
     // Raw test/preview geometries without functional-face data remain plain hull.
     m.defaultAttributeValues = { ...m.defaultAttributeValues,
-        aFaceUV: [0.5, 0.5], aSurface: [1, 1, 0, 0], aEmission: [1, 1, 1, 0], aMaterialLayers: [0, 0] };
+        aFaceUV: [0.5, 0.5], aSurface: [1, 1, 0, 0], aEmission: [1, 1, 1, 0], aMaterialLayers: [0, 0, 0] };
     applyGameParams(m, params);
     return m;
 }

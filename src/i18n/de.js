@@ -1,6 +1,10 @@
 // Deutsch interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+ "Select Sockets Target Azimuth": "Sockelauswahl-Zielwinkel",
+ "Select Sockets Target Distance": "Sockelauswahl-Zielabstand",
+ "Cycle Object / Paint Mode": "Objekt- / Malmodus wechseln",
+ "Quick Asset Library": "Schnelle Asset-Bibliothek",
  "Dimension Units": "Maßeinheiten",
  "Meters": "Meter",
  "Block Units": "Blockeinheiten",
@@ -611,5 +615,15 @@ export default {
  "Connected Fill Target Azimuth": "Connected Fill · Zielazimut",
  "Connected Fill Target Distance": "Connected Fill · Zielabstand",
  "Restore Target Azimuth": "Restore · Zielazimut",
- "Restore Target Distance": "Restore · Zielabstand"
+ "Restore Target Distance": "Restore · Zielabstand",
+ "Active": "Aktiv",
+ "Inactive": "Inaktiv",
+ "Thruster plumes are off or full, with fixed lengths for each port size.": "Steuerdüsenstrahlen sind aus oder vollständig aktiv, mit festen Längen für jede Portgröße.",
+ "Thruster Front": "Steuerdüse Vorne",
+ "Thruster Back": "Steuerdüse Hinten",
+ "Thruster Left": "Steuerdüse Links",
+ "Thruster Right": "Steuerdüse Rechts",
+ "Thruster Top": "Steuerdüse Oben",
+ "Thruster Bottom": "Steuerdüse Unten",
+ "Activate ports facing this ship direction. Multiple directions can be active together.": "Ports in dieser Schiffsrichtung aktivieren. Mehrere Richtungen können gleichzeitig aktiv sein.",
 };

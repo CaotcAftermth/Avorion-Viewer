@@ -1,6 +1,6 @@
 import {cursorSVGs,brushRingPaths} from './assets/cursors/traced-cursors.js';
 
-export const CURSOR_NAMES=[['select','Select'],['orbit','Orbit'],['pan-open','Pan'],['frame','Frame All'],['brush','Brush'],['eyedropper','Eyedropper'],['replace','Replace Color with Selected'],['fill','Connected Fill'],['restore','Restore']];
+export const CURSOR_NAMES=[['select','Select'],['sockets','Select Sockets'],['orbit','Orbit'],['pan-open','Pan'],['brush','Brush'],['eyedropper','Eyedropper'],['replace','Replace Color with Selected'],['fill','Connected Fill'],['restore','Restore']];
 let activePreferences={};
 const cache=new Map();
 export function setCursorPreferences(value){
@@ -11,12 +11,21 @@ const number=(p,key,fallback)=>Number.isFinite(p[key])?p[key]:fallback;
 export function cursorArtwork(name,p=activePreferences){
   let svg=cursorSVGs[name];if(!svg)return null;
   const primary=p.cursorPrimaryColor||'#f9f9fb',secondary=p.cursorSecondaryColor||'#dea466',weight=number(p,'cursorLineWeight',1);
-  svg=svg.replace(/#F9F9FB/gi,primary).replace(/#DEA466/gi,secondary);
-  if(weight!==1){
-    const operation=weight<1?'erode':'dilate',amount=Math.abs(weight-1)*4;
-    svg=svg.replace(/(<path\b[^>]*fill=")([^" ]+)("[^>]*)(\/?>)/g,(all,a,color,b,end)=>color.toLowerCase()==='#080a0d'?all:all.replace(/\s*\/?>$/,' filter="url(#cursor-weight)"/>'));
-    svg=svg.replace(/(<svg\b[^>]*>)/,'$1'+`<defs><filter id="cursor-weight" x="-20%" y="-20%" width="140%" height="140%"><feMorphology operator="${operation}" radius="${amount}"/></filter></defs>`);
+  const box=svg.match(/viewBox="([^"]+)"/)[1].split(' ').map(Number),scale=box[2]/256;
+  const correction=name==='eyedropper'?{ink:-1,color:-.5}:name==='brush'?{ink:-5,color:0}:{ink:0,color:0};
+  const amounts={ink:correction.ink+(weight-1)*4*scale,color:correction.color+(weight-1)*4*scale};
+  const filters=[];
+  for(const [kind,amount] of Object.entries(amounts)){
+    if(!amount)continue;
+    const id=kind==='color'?'cursor-weight':'cursor-ink-weight';
+    filters.push(`<filter id="${id}" x="-20%" y="-20%" width="140%" height="140%"><feMorphology operator="${amount<0?'erode':'dilate'}" radius="${Math.abs(amount)}"/></filter>`);
+    svg=svg.replace(/<path\b[^>]*fill="([^" ]+)"[^>]*\/?>/g,(path,color)=>{
+      if((color.toLowerCase()==='#080a0d')!==(kind==='ink'))return path;
+      return path.replace(/\s*\/?>$/,' filter="url(#'+id+')"/>');
+    });
   }
+  if(filters.length)svg=svg.replace(/(<svg\b[^>]*>)/,'$1<defs>'+filters.join('')+'</defs>');
+  svg=svg.replace(/#F9F9FB/gi,primary).replace(/#DEA466/gi,secondary);
   return svg;
 }
 export function cursorIcon(name,p=activePreferences){
@@ -24,7 +33,7 @@ export function cursorIcon(name,p=activePreferences){
   const svg=name==='brush'?cursorArtwork('brush-icon',p):cursorArtwork(name,p);
   const artwork=svg||cursorArtwork('select',p);
   const points=[...artwork.matchAll(/<path\b[^>]*\sd="([^"]+)"/g)].flatMap(m=>[...m[1].matchAll(/(-?[\d.]+)[ ,]+(-?[\d.]+)/g)].map(([,x,y])=>[+x,+y]));
-  const bounds=name==='select'?[101,66,183,187]:[Math.min(...points.map(p=>p[0])),Math.min(...points.map(p=>p[1])),Math.max(...points.map(p=>p[0])),Math.max(...points.map(p=>p[1]))];
+  const bounds=name==='select'?[101,66,183,187]:name==='sockets'?[98,60,242,244]:[Math.min(...points.map(p=>p[0])),Math.min(...points.map(p=>p[1])),Math.max(...points.map(p=>p[0])),Math.max(...points.map(p=>p[1]))];
   const side=Math.max(bounds[2]-bounds[0],bounds[3]-bounds[1])*1.06,cx=(bounds[0]+bounds[2])/2,cy=(bounds[1]+bounds[3])/2;
   return artwork.replace(/viewBox="[^"]+"/,'viewBox="'+[cx-side/2,cy-side/2,side,side].join(' ')+'"').replace('<svg ',`<svg data-cursor-icon="${name}" aria-hidden="true" `);
 }
@@ -58,7 +67,7 @@ export function cursorCSS(name,radius=0,p=activePreferences){
 export function viewportCursor(view,dragMode,rightHeld=false,region=false){
   if(region)return 'region';
   const tool=dragMode&&dragMode!=='paint'?dragMode:view.interactionMode==='paint'?view.paint?.tool||'brush':view.tool||'select';
-  return tool==='pan'?(rightHeld?'pan-closed':'pan-open'):tool;
+  return tool==='sockets'||tool==='select'&&view.tool==='sockets'&&view.interactionMode!=='paint'?'sockets':tool==='pan'?(rightHeld?'pan-closed':'pan-open'):tool;
 }
 export function brushRingGeometry(radius,p=activePreferences){
   const thickness=24/99*number(p,'cursorLineWeight',1);

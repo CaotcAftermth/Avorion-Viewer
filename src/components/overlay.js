@@ -1,10 +1,11 @@
+import {socketToolActive} from '../interaction-modes.js';
 import {drawSocketMarker,socketOnScreen} from '../socket-markers.js';
 import {componentSockets,componentSetup} from './core.js';
 import {componentClashes} from './clearance.js';
 import {nativeToView} from '../block-model.js';
 import {projectPoint} from '../navigation.js';
 export function drawComponentSockets(ctx,scene,view,width,height,visible){
- if(!(scene.showComponentSockets||scene.componentDragging||view.interactionMode==='socket')||!scene.visible||view.display?.showOverlays===false||view.interactionMode==='paint')return [];
+ if(!(scene.showComponentSockets||scene.componentDragging||socketToolActive(view))||!scene.visible||view.display?.showOverlays===false||view.interactionMode==='paint')return [];
  const hits=[];ctx.save();
  // Sockets whose component may overlap something are drawn red.
  const clashes=componentClashes(scene),clashing=new Set(componentSetup(scene.model||{}).mounts.filter(m=>clashes.has(m.id)).map(m=>m.socketId));

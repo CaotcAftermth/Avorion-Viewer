@@ -19,6 +19,7 @@ import { getBlockDefinition, getMaterial } from "../avorion/blockDefinitions.js"
 import { blockSurfaceGeometry, surfaceKind } from "./blockSurface.js";
 import { getShadingSpec, textureName } from "../textures/shadingMap.js";
 import { textureLibrary } from "../textures/textureLibrary.js";
+import { thrusterTier } from "./thrusterPorts.js";
 import { buildBlockEffects } from "./blockEffects.js";
 import { collectBlockLights, buildSpillGrid } from "./blockLights.js";
 import { BlockPose } from "./blockPose.js";
@@ -177,7 +178,7 @@ class Builder {
         g.setAttribute("aSide", new THREE.Float32BufferAttribute(this.side.flatMap((side,i)=>[...this.pos.slice(i*3,i*3+3),side]), 4));
         g.setAttribute("aWindow", new THREE.Float32BufferAttribute(this.windowColor, 4));
         g.setAttribute("aEmission", new THREE.Float32BufferAttribute(this.emission, 4));
-        g.setAttribute("aMaterialLayers", new THREE.Float32BufferAttribute(this.materialLayers, 2));
+        g.setAttribute("aMaterialLayers", new THREE.Float32BufferAttribute(this.materialLayers, 3));
         const par = new THREE.Float32BufferAttribute(this.par, 4);
         par.setUsage(THREE.DynamicDrawUsage);
         g.setAttribute("aParams", par);
@@ -267,7 +268,7 @@ export function buildTexturedModel(model, profile, params) {
         const pars = [layer(aux, names.glow), flags, spec.reflect ?? 1, 0];
         const emission = parseColor("ff" + getMaterial(b.materialIndex).color.slice(1), [1, 1, 1, 1]).slice(0, 3);
         const blended = spec.translucent && !(spec.surface === "hologram" && color[3] >= 1);
-        const args=[color,secondary,layers,pars,spec.surface,layer(aux,names.normalOverlay),emission,secondary,[layer(aux,names.materialOverlay),layer(aux,names.materialGlow)],[b.typeIndex===10?0:seams.get(b.id)]];
+        const args=[color,secondary,layers,pars,spec.surface,layer(aux,names.normalOverlay),emission,secondary,[layer(aux,names.materialOverlay),layer(aux,names.materialGlow),[7,13].includes(b.typeIndex)?thrusterTier(b.size.x,b.size.y,b.size.z).size:0],[b.typeIndex===10?0:seams.get(b.id)]];
         if(blended)translucent.add(b.id,blockSurfaceGeometry(b,profile),...args);
         else{
           const key=[b.typeIndex,b.materialIndex,b.look,b.up,b.size.x,b.size.y,b.size.z,flags,Math.floor(b.position.x/cell),Math.floor(b.position.y/cell),Math.floor(b.position.z/cell)].join('|');
@@ -285,7 +286,7 @@ export function buildTexturedModel(model, profile, params) {
         const chunk=entries.slice(start,start+1024),first=chunk[0],builder=new Builder();
         builder.add(first.b.id,blockSurfaceGeometry({...first.b,position:{x:0,y:0,z:0}},profile),...first.args);
         const base=builder.geometry(),g=new THREE.InstancedBufferGeometry();g.copy(base);g.instanceCount=chunk.length;base.dispose();
-        const attributes={aColor:[0,4],aSecondary:[1,4],aLayers:[2,4],aParams:[3,4],aEmission:[6,4],aWindow:[7,4],aMaterialLayers:[8,2]};
+        const attributes={aColor:[0,4],aSecondary:[1,4],aLayers:[2,4],aParams:[3,4],aEmission:[6,4],aWindow:[7,4],aMaterialLayers:[8,3]};
         for(const [name,[argument,size]] of Object.entries(attributes)){
           const data=new Float32Array(chunk.length*size);chunk.forEach((entry,i)=>data.set(name==='aEmission'?[...entry.args[6],entry.args[9][0]]:entry.args[argument],i*size));
           const attr=new THREE.InstancedBufferAttribute(data,size);if(['aParams','aColor','aSecondary','aWindow'].includes(name))attr.setUsage(THREE.DynamicDrawUsage);g.setAttribute(name,attr);

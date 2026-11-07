@@ -1,3 +1,5 @@
+import {mountNativeTransform} from './native-transform.js';
+import {openQuickAssetLibrary} from './quick-asset-library.js';
 import {coverageOptions} from './turrets/coverage-sampling.js';
 import {installColorCells} from './color-cells.js';
 import {setCursorPreferences} from './viewport-cursors.js';
@@ -28,11 +30,11 @@ import {validateComponent} from './components/core.js';
 import {mountTurretProperties} from './turrets/properties.js';
 import {createSessionPersistence} from './session-persistence.js';
 import {createCrashGuard,findCrashRecords,forgetCrashRecords,askCrashRecovery,warnLiveFailure,isMemoryFailure} from './crash-guard.js';
-import {mountSceneProperties,mountEngineState} from './scene-properties.js';
+import {mountSceneProperties,mountEngineState,mountThrusterState} from './scene-properties.js';
 import {openExportDialog} from './export/dialog.js';
 import {renderPaletteRadial} from './palette-radial.js';
 import {mountPaintToolbar} from './paint-toolbar.js';
-import {INTERACTION_MODES,interactionMode,nextInteractionMode} from './interaction-modes.js';
+import {INTERACTION_MODES,interactionMode,nextInteractionMode,socketToolActive,normalizeInteraction} from './interaction-modes.js';
 import {paintOptions,paintScope,samplePaintColor,applyPaintTool,channelColor,mirroredIds} from './paint-tools.js';
 import {blockIndex} from './block-colors.js';
 import {loadPalette} from './color-palette.js';
@@ -79,6 +81,8 @@ const preferenceEditors=new Map(),lookEditors=new Map(),preferencesWindowState={
 let preferencesWindow=null;
 let state = defaults(), storageAvailable = true;
 try { const raw = !embedded&&preferences.value.rememberLayout?localStorage.getItem(STORAGE):null; if(raw){const parsed=JSON.parse(raw);if(validateState(parsed))state=parsed;} } catch { storageAvailable=false; }
+for(const w of state.workspaces)for(const node of leaves(w.root))if(node.editor==='viewport')normalizeInteraction(node.view);
+let quickAssetLibrary=null,quickAssetKind='turrets';
 let lastViewportId=null;
 let frameLoadedViewport=()=>false;
 const trackpadDrawers={workspace:null,side:null};
@@ -184,7 +188,7 @@ function regionPick(selected,meta){
   try{const n=editRegion(scene,edit.id,ids,mode);notify(n?`${mode==='add'?'Added':'Removed'} ${n} block${n===1?'':'s'} ${mode==='add'?'to':'from'} ${region.name}.`:`No change to ${region.name}.`);}catch(error){notify(error.message);reportError(error,'REGION');}
   refreshStructure();return true;
 }
-function selectStructure(ids,additive=false,fromViewport=false){scene.attachmentContext=null;scene.selectedTurretId=null;scene.selectedTurretIds=new Set();scene.selectedComponentMountId=null;scene.selectedComponentSocketId=null;if(scene.turretSockets)scene.turretSockets.selectedId=null;selectBlocks(scene,ids,additive);if(fromViewport){scene.outlinerRevealId=ids.findLast(id=>scene.selectedIds.has(id))||null;scene.outlinerRevealRevision=(scene.outlinerRevealRevision||0)+1;}refreshStructure();}
+function selectStructure(ids,additive=false,fromViewport=false){scene.attachmentContext=null;scene.selectedTurretId=null;scene.selectedTurretIds=new Set();scene.selectedComponentMountId=null;scene.selectedComponentSocketId=null;if(scene.turretSockets)scene.turretSockets.selectedId=null;selectBlocks(scene,ids,additive);routeAttachmentInspector(leaves(workspace().root),{type:'object'},attachmentInspectorId);if(fromViewport){scene.outlinerRevealId=ids.findLast(id=>scene.selectedIds.has(id))||null;scene.outlinerRevealRevision=(scene.outlinerRevealRevision||0)+1;}refreshStructure();}
 function viewportPie(event,node){
   lastViewportId=node.id;
   const ids=[...scene.selectedIds];if(!ids.length)return;
@@ -233,7 +237,7 @@ function revealStructure(ids,{focus=true,kind}={}){
 
 // Double-clicking a Block Gallery block opens it alone in a workspace window.
 function openGalleryBlock(node){
-  if(embedded||!isBlockGallery(scene)||interactionMode(node.view.interactionMode)!=='object')return;
+  if(embedded||!isBlockGallery(scene)||interactionMode(node.view.interactionMode)!=='object'||socketToolActive(node.view))return;
   const block=scene.model.blocks.find(b=>b.id===scene.selectedId);if(!block)return;
   openBlockWorkspace(block,edited=>{
     applyGalleryEdit(block,edited);
@@ -348,6 +352,8 @@ function applyPreferences(){
   installColorCells();
   setCursorPreferences(preferences.value);
   for(const input of document.querySelectorAll('[data-engine-state]'))input.value=preferences.value.shaderEngineState;
+  for(const input of document.querySelectorAll('[data-thruster-state]'))input.value=preferences.value.shaderThrust;
+  for(const input of document.querySelectorAll('[data-thruster-direction]')){input.checked=preferences.value[input.dataset.thrusterDirection];input.disabled=!preferences.value.shaderThrust;}
   const p=preferences.value,theme=THEMES[p.theme];
   if(p.language!==requestedLanguage){requestedLanguage=p.language;void setLanguage(p.language);}
   if(scene.preview&&scene.model&&scene.lastPreviewColor!==p.shaderColor){
@@ -633,6 +639,7 @@ document.addEventListener('drop',async e=>{
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
 
 function render(){
+ quickAssetLibrary?.close({restoreFocus:false});
  cancelNumericEdit();
   rememberEditorScroll($('#screen'));
   assetPersistence.changed();crashGuard.track();
@@ -656,7 +663,10 @@ function headerFor(node){
   const header=document.createElement('header');header.className='area-header';
   const picker=button('Editor type',`${icon(editorIcon(node.editor))}<span class="chevron">⌄</span>`,()=>anchorMenu(picker,'Editor type',Object.entries(EDITORS).map(([id,label])=>({label:`${id===node.editor?'✓  ':''}${label}`,action:()=>{node.editor=id;commit(`Editor changed to ${label}.`);}}))),'editor-switch');header.append(picker);
   if(node.editor==='viewport'){
-    const mode=document.createElement('select');mode.className='header-name';mode.setAttribute('aria-label','Interaction mode');for(const [id,label] of INTERACTION_MODES)mode.add(new Option(label,id));mode.value=interactionMode(node.view.interactionMode);mode.title='Tab cycles modes. Object: drag to box select, Ctrl-drag to subtract. Paint: drag to paint blocks with the active Color Editor color; Escape cancels the stroke. Socket: select turret sockets and mounted turrets.';mode.onchange=()=>{renderers.find(r=>r.id===node.id)?.cancel();cancelPaintTask();node.view.interactionMode=mode.value;commit();};header.append(mode);
+    const mode=document.createElement('select');mode.className='header-name';mode.setAttribute('aria-label','Interaction mode');for(const [id,label] of INTERACTION_MODES)mode.add(new Option(label,id));mode.value=interactionMode(node.view.interactionMode);mode.title='Tab switches Object and Paint modes. In Object Mode, use Select Sockets to pick sockets and mounted attachments. Paint applies the active brush color.';mode.onchange=()=>{renderers.find(r=>r.id===node.id)?.cancel();cancelPaintTask();node.view.interactionMode=mode.value;commit();};const modeControl=document.createElement('span');modeControl.className='viewport-mode-control';modeControl.dataset.mode=mode.value;
+    const glyph=document.createElement('span');glyph.className='viewport-mode-icon';glyph.setAttribute('aria-hidden','true');
+    glyph.innerHTML=icon({object:'cube',paint:'paintBrush'}[mode.value]);
+    modeControl.append(glyph,mode);header.append(modeControl);
     const divider=document.createElement('span');divider.className='header-divider';header.append(divider);
     const view=button('View menu','View',()=>anchorMenu(view,'View',[
       {label:'Frame all',key:shortcut('frame'),action:()=>frameArea(node)},
@@ -749,7 +759,7 @@ function renderArea(node){
   if(focusMode)el.append(button('Exit focus mode','↶ Back to Previous',()=>toggleMaximize(node.id,true),'focus-exit'));
   return el;
 }
-function transformPanel(){const b=scene.model?.blocks.find(b=>b.id===scene.selectedId)||scene.model?.blocks[0];return b?`<details class="panel" open><summary>Native Transform</summary><div class="sub-label">Position · X / Y / Z</div><p class="panel-note">${['x','y','z'].map(a=>b.position[a].toFixed(3)).join(' / ')}</p><div class="sub-label">Dimensions · X / Y / Z</div><p class="panel-note">${['x','y','z'].map(a=>b.size[a].toFixed(3)).join(' / ')}</p><p class="panel-note">Look ${b.look} · Up ${b.up} · Native units</p></details>`:'';}
+
 function emptyState(){
   const card=document.createElement('section');card.className='empty-state';
   card.innerHTML='<p>Drop an Avorion .xml here, or open the welcome screen.</p>';
@@ -774,7 +784,7 @@ function renderViewport(body,node){
   if(node.view.interactionMode==='paint'){body.classList.add('painting-tools');renderers.push(mountPaintToolbar(body,node,scene,{palette:()=>brushPalette,color:chooseBrushColor,visibility:(ids,action)=>visibilityStructure(ids,action,node.view),undo:changePaintHistory,cancel:()=>{renderers.find(r=>r.id===node.id)?.cancel();if(scene.paintBusy)cancelPaintTask();},change:()=>{save();refreshStructure();}}));}
   if(node.toolbar&&node.view.interactionMode!=='paint'){
     const toolbar=document.createElement('div');toolbar.className='viewport-toolbar';toolbar.role='toolbar';toolbar.setAttribute('aria-label','Viewport tools');
-    for(const [tool,label] of [['select','Select'],['orbit','Orbit'],['pan','Pan']]){const b=button(label,icon(tool),()=>{node.view.tool=tool;commit();},node.view.tool===tool?'active':'');b.setAttribute('aria-pressed',String(node.view.tool===tool));toolbar.append(b);}
+    for(const [tool,label] of [['select','Select'],['sockets','Select Sockets'],['orbit','Orbit'],['pan','Pan']]){const b=button(label,icon(tool==='sockets'?'socket':tool),()=>{node.view.tool=tool;if(tool==='select')routeAttachmentInspector(leaves(workspace().root),{type:'object'},attachmentInspectorId);commit();},node.view.tool===tool?'active':'');b.setAttribute('aria-pressed',String(node.view.tool===tool));toolbar.append(b);}
     toolbar.append(document.createElement('hr'),button('Frame all',icon('frame'),()=>frameArea(node)));body.append(toolbar);
   }
   const nav=document.createElement('div');nav.className='navigation';
@@ -795,10 +805,14 @@ function renderViewport(body,node){
   const projection=button('Toggle perspective / orthographic',icon('cube'),()=>navigate(node,{action:'projection'}),'icon-button');projection.dataset.projection='';projection.setAttribute('aria-pressed',String(node.view.projection==='perspective'));nav.append(projection);
   nav.append(button('Frame all',icon('frame'),()=>frameArea(node),'icon-button'));body.append(nav);
   if(node.sidebar){
-    const sidebar=document.createElement('aside');sidebar.className='viewport-sidebar';sidebar.style.width=`${node.sidebarWidth}px`;sidebar.setAttribute('aria-label','Viewport sidebar');
-    sidebar.innerHTML=`<div class="region-resizer" role="separator" aria-label="Resize sidebar" aria-orientation="vertical" tabindex="0"></div><div class="sidebar-tabs"><span>Item / View</span></div>${scene.loaded?transformPanel():'<p class="panel-note">No model in the scene.</p>'}`;
+    const sidebar=document.createElement('aside');sidebar.className='viewport-sidebar property-content';sidebar.style.width=`${node.sidebarWidth}px`;sidebar.setAttribute('aria-label','Viewport sidebar');
+    sidebar.innerHTML=`<div class="region-resizer" role="separator" aria-label="Resize sidebar" aria-orientation="vertical" tabindex="0"></div><div class="sidebar-tabs"><span>Item / View</span></div>`;
+    const nativeTransform=mountNativeTransform(sidebar,scene);
     mountEngineState(sidebar,node.view,preferences);
+    mountThrusterState(sidebar,preferences);
     viewportViewPanel(sidebar,node.view,()=>{save();renderers.find(r=>r.id===node.id)?.draw();});
+    const disposeRows=layoutPropertyRows(sidebar);
+    renderers.push({draw:()=>nativeTransform.refresh(),sync:()=>nativeTransform.refresh(),dispose:disposeRows});
     const handle=sidebar.querySelector('.region-resizer');
     const resize=x=>{node.sidebarWidth=clamp(x,140,Math.min(600,Math.max(140,body.clientWidth-60)));sidebar.style.width=`${node.sidebarWidth}px`;body.style.setProperty('--sidebar-width',`${node.sidebarWidth}px`);};
     handle.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();const original=node.sidebarWidth;gesture(e,move=>resize(body.getBoundingClientRect().right-move.clientX),save,()=>resize(original));});
@@ -1066,10 +1080,24 @@ document.addEventListener('keydown',e=>{
     if(search){e.preventDefault();if(match('clearSearch')&&search.value){search.value='';active.propertySearch='';save();const body=areaElement(active.id)?.querySelector('.area-body');if(body)renderProperties(body,active);}search.focus();search.select();return;}
   }
   if(e.target.closest('input,textarea,select,[contenteditable=true]'))return;
+  if(match('assetLibrary')&&!embedded&&!e.target.closest('button,[role=dialog]')){
+    e.preventDefault();if(e.repeat||operation)return;
+    const viewport=captureViewport();if(!viewport)return;
+    // Placement is an Object Mode action. Keep Paint Mode strokes out of this flow.
+    if(viewport.view.interactionMode==='paint'){
+      renderers.find(r=>r.id===viewport.id)?.cancel();cancelPaintTask();
+      viewport.view.interactionMode='object';viewport.view.tool='sockets';commit();
+    }
+    quickAssetLibrary=openQuickAssetLibrary({
+      scene,preferences:()=>preferences.value,kind:quickAssetKind,changed:refreshStructure,
+      closed:(kind,cancelPlacement)=>{quickAssetKind=kind;quickAssetLibrary=null;if(cancelPlacement)renderers.forEach(r=>{if(r.navigating)r.cancel?.();});}
+    });
+    return;
+  }
   if(match('undoPaint')||match('redoPaint')){e.preventDefault();const active=currentArea();
     // Component edits have their own history while component work is in focus.
-    if(!embedded&&(active.editor==='properties'&&active.propertyTab==='components'||active.editor==='assets'&&active.assetKind==='components'||scene.selectedComponentMountId&&['viewport','outliner'].includes(active.editor)||active.editor==='viewport'&&active.view?.interactionMode==='socket'&&scene.selectedComponentSocketId)){componentHistory(scene,match('redoPaint')).catch(error=>{scene.componentMessage=error.message;}).finally(refreshStructure);return;}
-    if(active.view?.interactionMode==='socket'&&active.editor==='viewport'||active.editor==='properties'&&(['turrets','coverage'].includes(active.propertyTab)||!!assetDraft)||active.editor==='outliner'&&scene.selectedTurretId){mountHistory(scene,match('redoPaint'));refreshStructure();}else changePaintHistory(match('redoPaint'));return;}
+    if(!embedded&&(active.editor==='properties'&&active.propertyTab==='components'||active.editor==='assets'&&active.assetKind==='components'||scene.selectedComponentMountId&&['viewport','outliner'].includes(active.editor)||active.editor==='viewport'&&socketToolActive(active.view||{})&&scene.selectedComponentSocketId)){componentHistory(scene,match('redoPaint')).catch(error=>{scene.componentMessage=error.message;}).finally(refreshStructure);return;}
+    if(socketToolActive(active.view||{})&&active.editor==='viewport'||active.editor==='properties'&&(['turrets','coverage'].includes(active.propertyTab)||!!assetDraft)||active.editor==='outliner'&&scene.selectedTurretId){mountHistory(scene,match('redoPaint'));refreshStructure();}else changePaintHistory(match('redoPaint'));return;}
   if(match('preferences')){e.preventDefault();openPreferences();return;}
   if(operation)return;
   const node=currentArea();

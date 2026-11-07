@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 256 256"><title>Select Sockets</title><g transform="translate(21 34) scale(.6)">
+  <path d="M262 203 Q266 201 271 204 L349 252 Q359 258 354 272 Q353 275 350 278 L276 339 Q267 347 258 341 L177 287 Q167 282 171 269 Q172 264 178 258 L254 207 Q258 204 262 203 Z"
+        fill="#080A0D" stroke="#F9F9FB" stroke-width="11" stroke-linejoin="round"/>
+  <ellipse cx="263" cy="259" rx="39.8" ry="23.5" stroke="#DEA466" stroke-width="11.5"/>
+  <circle cx="263" cy="217" r="6.2" fill="#F9F9FB"/>
+  <circle cx="334" cy="261" r="6.2" fill="#F9F9FB"/>
+  <circle cx="263" cy="312" r="6.2" fill="#F9F9FB"/>
+  <circle cx="202" cy="266" r="6.2" fill="#F9F9FB"/>
+</g></svg>

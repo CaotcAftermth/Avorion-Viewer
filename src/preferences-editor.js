@@ -42,6 +42,7 @@ export function mountPreferences(host, store, editorState = {}, assets = {}, opt
     host.querySelectorAll('[data-preference-tip]').forEach(label=>{if(store.value.showTooltips)label.setAttribute('title',label.dataset.preferenceTip);else label.removeAttribute('title');});
     for (const [key, input] of controls) {
       if(input.dataset.binding){if(input.dataset.recording!=='true')input.textContent=shortcutLabel(store.value[key]);continue;}
+      if (/^shaderThrust(?:Front|Back|Left|Right|Top|Bottom)$/.test(key)) input.disabled = !store.value.shaderThrust;
       if (input.type === 'checkbox') input.checked = store.value[key];
       else input.value = key==='viewportTheme'?activeViewportTheme(store.value):store.value[key];
       if(key==='viewportGradientTop')input.disabled=!store.value.viewportGradient;

@@ -68,8 +68,8 @@ fam(WRECK, ...range8(700));
 // Functional blocks
 fam({ ...PLATING, kind: "Engine", albedo: P, normal: `${P}_n`, surface: "engine", tint: true }, 3);
 fam(CARGO, 5);
-fam({ kind: "Thruster", albedo: P, normal: `${P}_n`, surface: "thruster", tint: true }, 7);
-fam({ kind: "Directional thruster", albedo: P, normal: `${P}_n`, surface: "directional-thruster", tint: true }, 13);
+fam({ kind: "Thruster", overlay: "thruster", normalOverlay: "thruster_n", albedo: P, normal: `${P}_n`, surface: "thruster", tint: true }, 7);
+fam({ kind: "Directional thruster", overlay: "thruster", normalOverlay: "thruster_n", albedo: P, normal: `${P}_n`, surface: "directional-thruster", tint: true }, 13);
 fam(FRAMEWORK, 9);
 fam({ ...PLATING, kind: "Hangar", materialOverlay: undefined, albedo: P, normal: `${P}_n`, tint: true, surface: "hangar" }, 10);
 fam(functional("Dock", "dock", { surface: "dock" }), 11);

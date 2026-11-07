@@ -8,7 +8,7 @@ export function choosePlacementTarget(sockets,x,y,currentId,{radius=24,releaseRa
 }
 export function createPlacementStrip(host,{preview,commit,cancelled}){
  const strip=document.createElement('div');strip.className='attachment-placement-strip';strip.setAttribute('role','group');strip.setAttribute('aria-label','Attachment placement');
- Object.assign(strip.style,{position:'absolute',bottom:'32px',left:'50%',transform:'translateX(-50%)',zIndex:8,display:'none',background:'#262626',padding:'8px',border:'1px solid #777',borderRadius:'5px',maxWidth:'95%'});
+ Object.assign(strip.style,{position:'absolute',bottom:'32px',left:'50%',transform:'translateX(-50%)',zIndex:95,display:'none',background:'#262626',padding:'8px',border:'1px solid #777',borderRadius:'5px',maxWidth:'95%'});
  const status=document.createElement('span');status.setAttribute('role','status');strip.append(status);let state=null,busy=false;
  const number=(label,step,update)=>{const wrapper=document.createElement('label');wrapper.textContent=label+' ';const input=document.createElement('input');input.type='number';input.step=step;input.style.width='70px';input.setAttribute('aria-label',label);wrapper.append(input);strip.append(wrapper);input.oninput=()=>{if(!state||!input.value||!Number.isFinite(input.valueAsNumber))return;update(input.valueAsNumber);preview(state);};return input;};
  const size=number('Size / scale',.5,value=>state.size=value),twist=number('Mount rotation',15,value=>state.twist=value);

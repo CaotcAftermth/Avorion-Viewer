@@ -67,13 +67,13 @@ test('viewport pointer lifecycle, modifiers, cancellation, and cursor removal', 
 
   await t.test('coverage does not hide explicitly requested armored-base sockets',()=>{
     const h=setup({...FACTORY_PREFERENCES},{model:makeModel([makeBlock({typeIndex:24})]),showFireCoverage:true,turretSockets:{show:true,through:true,scope:'all'}});
-    try{h.node.view.interactionMode='socket';h.flush();assert.ok(h.calls.some(c=>c.name==='arc'),'armored socket markers remain visible while coverage is enabled');}
+    try{h.node.view.interactionMode='object';h.node.view.tool='sockets';h.flush();assert.ok(h.calls.some(c=>c.name==='arc'),'armored socket markers remain visible while coverage is enabled');}
     finally{h.renderer.dispose();}
   });
   await t.test('thin turret bodies retain sockets and undersized faces remain inspectable',()=>{
     for(const thickness of [0,.4,.5]){
       const h=setup({...FACTORY_PREFERENCES},{model:makeModel([makeBlock({typeIndex:24,size:{x:2,y:thickness,z:2}})]),turretSockets:{show:true,through:true,scope:'all'}});
-      try{h.node.view.showThinBlocks=false;h.node.view.interactionMode='socket';h.flush();assert.equal(h.calls.filter(c=>c.name==='arc').length,6);}
+      try{h.node.view.showThinBlocks=false;h.node.view.interactionMode='object';h.node.view.tool='sockets';h.flush();assert.equal(h.calls.filter(c=>c.name==='arc').length,6);}
       finally{h.renderer.dispose();}
     }
   });
@@ -83,13 +83,13 @@ test('viewport pointer lifecycle, modifiers, cancellation, and cursor removal', 
     for(const block of blocks)placeTurret(scene,asset,blockSockets(block).find(s=>s.normal[1]>.99),.5);
     const h=setup({...FACTORY_PREFERENCES},scene);
     try{
-      h.node.view.interactionMode='socket';h.node.view.tool='select';
+      h.node.view.interactionMode='object';h.node.view.tool='sockets';
       const sweep=ctrlKey=>{h.pointer('pointerdown',{button:0,clientX:0,clientY:0,ctrlKey});h.pointer('pointermove',{button:0,clientX:800,clientY:600,ctrlKey});h.pointer('pointerup',{button:0,clientX:800,clientY:600,ctrlKey});};
       sweep(false);assert.equal(h.scene.selectedTurretIds.size,2);sweep(true);assert.equal(h.scene.selectedTurretIds.size,0);
     }finally{h.renderer.dispose();}
   });
   await t.test('Orbit and Pan toolbar tools drive left-button navigation',()=>{
-    for(const interactionMode of ['object','socket'])for(const tool of ['orbit','pan']){
+    for(const interactionMode of ['object'])for(const tool of ['orbit','pan']){
       const h=setup();h.node.view.tool=tool;h.node.view.interactionMode=interactionMode;const before=structuredClone(h.node.view);
       try{
         h.pointer('pointerdown',{button:0});h.pointer('pointermove',{button:0,clientX:160,clientY:130});h.pointer('pointerup',{button:0,clientX:160,clientY:130});

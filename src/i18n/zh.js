@@ -1,6 +1,10 @@
 // 中文（简体） interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+ "Select Sockets Target Azimuth": "插槽选择目标方位角",
+ "Select Sockets Target Distance": "插槽选择目标距离",
+ "Cycle Object / Paint Mode": "切换物体／绘制模式",
+ "Quick Asset Library": "快捷资产库",
  "Dimension Units": "尺寸单位",
  "Meters": "米",
  "Block Units": "方块单位",
@@ -611,5 +615,15 @@ export default {
  "Connected Fill Target Azimuth": "Connected Fill · 目标方位角",
  "Connected Fill Target Distance": "Connected Fill · 目标距离",
  "Restore Target Azimuth": "Restore · 目标方位角",
- "Restore Target Distance": "Restore · 目标距离"
+ "Restore Target Distance": "Restore · 目标距离",
+ "Active": "启用",
+ "Inactive": "停用",
+ "Thruster plumes are off or full, with fixed lengths for each port size.": "推进器尾焰只有关闭和全功率两种状态，各尺寸喷口的尾焰长度固定。",
+ "Thruster Front": "推进器：前",
+ "Thruster Back": "推进器：后",
+ "Thruster Left": "推进器：左",
+ "Thruster Right": "推进器：右",
+ "Thruster Top": "推进器：上",
+ "Thruster Bottom": "推进器：下",
+ "Activate ports facing this ship direction. Multiple directions can be active together.": "启用朝向船体此方向的喷口。可以同时启用多个方向。",
 };

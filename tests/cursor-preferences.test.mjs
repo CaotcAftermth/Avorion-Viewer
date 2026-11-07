@@ -11,7 +11,7 @@ test('Restore honors the configured target distance instead of a forced minimum'
 
 test('factory cursor targets use the configured offsets for each tool',()=>{
  for(const [key,angle,distance] of [
-  ['select',254,11],['orbit',253,9],['pan-open',0,0],['frame',0,0],['brush',0,0],
+  ['select',254,11],['orbit',253,9],['pan-open',0,0],['brush',0,0],
   ['eyedropper',252,10],['replace',30,24],['fill',33,12],['restore',110,3],
  ]){
   assert.equal(FACTORY_PREFERENCES['cursorAngle_'+key],angle);

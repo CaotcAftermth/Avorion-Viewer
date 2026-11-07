@@ -1,17 +1,17 @@
 import * as THREE from "../../../vendor/three.module.js";
 import { resolvedSecondaryColor } from "../avorion/secondaryColor.js";
 import { localScaleFor, resolveOrientation } from "../avorion/orientation.js";
-import { thrusterPorts } from "./thrusterPorts.js";
+import { thrusterPorts, thrusterTier, DIRECTIONAL_THRUSTER_SIDES } from "./thrusterPorts.js";
 import { createPortObstruction } from "./portObstruction.js";
 import {secondaryColor} from '../../../block-colors.js';
 import { getMaterial } from "../avorion/blockDefinitions.js";
 // Effects are viewer state. The archive supplies the barrier formula. Engine
 // plume lengths come from in-game observation (fixed per engine state, not
-// scaled by engine size); thruster jets and emitter spacing remain defaults.
+// scaled by engine size); thruster geometry uses measured discrete tiers.
 export const HANGAR_TRAVEL_SECONDS = .25;
 export function effectColor(block) {
-    if(block.typeIndex===3||block.typeIndex===10){
-        // Engine plumes default to the engine's material color; hangar barriers stay blue.
+    if([3,7,10,13].includes(block.typeIndex)){
+        // Engines and thrusters use material color; hangar barriers default blue.
         // An explicit secondary color overrides either, weighted by its alpha.
         const material=getMaterial(block.materialIndex).color,base=block.typeIndex===10?[.02,.42,1.0]:[1,3,5].map(i=>parseInt(material.slice(i,i+2),16)/255),raw=secondaryColor(block);
         const weight=/^[0-9a-f]{8}$/i.test(raw||'')?parseInt(raw.slice(0,2),16)/255:0;
@@ -65,7 +65,7 @@ export function buildBlockEffects(blocks, profile, params) {
             append(b, [[-.6, -.6], [.6, -.6], [.6, .6], [-.6, .6]].map(([x, y]) => new THREE.Vector3(x, y, 0)), coords, origin, b.typeIndex === 61 ? 4 : b.typeIndex === 62 ? 5 : b.typeIndex - 57, tint);
         }
         else {
-            const sides = b.typeIndex === 3 ? [4] : b.typeIndex === 13 ? [4, 5] : [0, 1, 2, 3, 4, 5];
+            const sides = b.typeIndex === 3 ? [4] : b.typeIndex === 13 ? DIRECTIONAL_THRUSTER_SIDES : [0, 1, 2, 3, 4, 5];
             for (const side of sides) {
                 const axis = Math.floor(side / 2), sign = side % 2 ? 1 : -1;
                 const direction = new THREE.Vector3().setComponent(axis, sign);
@@ -73,25 +73,34 @@ export function buildBlockEffects(blocks, profile, params) {
                 const v = new THREE.Vector3().crossVectors(direction, u);
                 const faceWidth = size.getComponent((axis + 1) % 3), faceHeight = size.getComponent((axis + 2) % 3);
                 const engine = b.typeIndex === 3;
-                const ports = engine ? [{ x: 0, y: 0, radius: 0 }] : thrusterPorts(faceWidth, faceHeight);
+                const tier = thrusterTier(size.x, size.y, size.z);
+                const ports = engine ? [{ x: 0, y: 0, radius: 0 }] : thrusterPorts(faceWidth, faceHeight, tier);
                 for (const port of ports) {
                     const surface = direction.clone().multiplyScalar(size.getComponent(axis) * .5).addScaledVector(u, port.x).addScaledVector(v, port.y);
                     const worldDirection = direction.clone().applyQuaternion(quaternion);
                     // In game, blocks covering an engine do not hide its plume.
-                    const blockedBy = engine ? [] : obstruction(b.id, world(surface.clone()), worldDirection);
+                    const blockedBy = engine ? [] : obstruction(b.id, world(surface.clone()), worldDirection, u.clone().applyQuaternion(quaternion));
                     const origin = surface.addScaledVector(direction, Math.min(faceWidth, faceHeight) * .0001);
-                    const widthU = engine ? faceWidth * .50 : Math.min(port.radius, faceWidth * .48);
-                    const widthV = engine ? faceHeight * .50 : Math.min(port.radius, faceHeight * .48);
+                    const widthU = engine ? faceWidth * .50 : port.radius;
+                    const widthV = engine ? faceHeight * .50 : port.radius;
                     // Engine plumes are built one unit long and stretched in the shader to the
                     // engine state's length. Thruster reach follows the port size.
-                    const length = engine ? 1 : Math.max(.1, port.radius * 5);
+                    const length = engine ? 1 : port.plumeLength;
                     const start = pos.length / 3;
                     for (let plane = 0; plane < 3; plane++) {
                         const transverse = u.clone().multiplyScalar(Math.cos(plane * Math.PI / 3) * widthU).addScaledVector(v, Math.sin(plane * Math.PI / 3) * widthV);
                         const points = [origin.clone().sub(transverse), origin.clone().add(transverse),
-                            origin.clone().addScaledVector(direction, length).addScaledVector(transverse, engine ? 1.25 : .1),
-                            origin.clone().addScaledVector(direction, length).addScaledVector(transverse, engine ? -1.25 : -.1)];
+                            origin.clone().addScaledVector(direction, length).addScaledVector(transverse, engine ? 1.25 : .75),
+                            origin.clone().addScaledVector(direction, length).addScaledVector(transverse, engine ? -1.25 : -.75)];
                         append(b, points.map(world), coords, world(origin.clone()), engine ? 1 : 2, effectColor(b), worldDirection);
+                    }
+                    // Cross-sections retain a round core when viewed along the port axis.
+                    // They belong to the same emitter, so obstruction/hiding affects the
+                    // whole plume together and the aperture never resizes its geometry.
+                    if(!engine)for(let slice=0;slice<6;slice++){
+                        const t=(slice+.25)/6,reach=length*t,spread=1-.25*t;
+                        const points=[[-1,-1],[1,-1],[1,1],[-1,1]].map(([x,y])=>world(origin.clone().addScaledVector(direction,reach).addScaledVector(u,x*widthU*spread).addScaledVector(v,y*widthV*spread)));
+                        append(b,points,coords,world(origin.clone()),11,effectColor(b),worldDirection,t);
                     }
                     // Soft axial sections fill the rear view where longitudinal planes
                     // become edge-on. They share the same taper and nozzle dimensions.
@@ -134,16 +143,19 @@ export function buildBlockEffects(blocks, profile, params) {
     const material = new THREE.ShaderMaterial({
         glslVersion: THREE.GLSL3, transparent: true, depthWrite: false, side: THREE.DoubleSide,
         blending: THREE.AdditiveBlending, toneMapped: false,
-        uniforms: { uBloomPass: { value: 0 }, uEngineState: { value: params.engineState??0 }, uTime: { value: 0 }, uThrust: { value: params.thrustPreview }, uPlume: { value: params.plumeLength ?? 0 }, uGlow: { value: params.glowStrength }, uBarrier: { value: params.barrierStrength },
+        uniforms: { uBloomPass: { value: 0 }, uEngineState: { value: params.engineState??0 }, uTime: { value: 0 }, uThrustPositive: { value: new THREE.Vector3(...(params.thrustDirections?.positive ?? [1,1,1])) }, uThrustNegative: { value: new THREE.Vector3(...(params.thrustDirections?.negative ?? [1,1,1])) }, uThrust: { value: params.thrustPreview > 0 ? 1 : 0 }, uPlume: { value: params.plumeLength ?? 0 }, uGlow: { value: params.glowStrength }, uBarrier: { value: params.barrierStrength },
             uGlassSplit: { value: 0 }, uGlassDepth: { value: null }, uGlassLogDepth: { value: 0 } },
         defines: { EFFECT_LAYER: 0 },
         vertexShader: `
       #include <common>
       uniform float uGlassSplit,uPlume,uTime,uEngineState;
+      uniform vec3 uThrustPositive,uThrustNegative;
+      flat out float vThrustDirection;
       #include <logdepthbuf_pars_vertex>
       attribute vec3 aRoot; attribute vec3 aColor; attribute vec4 aData; attribute vec3 aDir;
       varying vec2 vUV; flat out vec3 vColor; flat out vec4 vData; varying float vFacing;
       void main(){vUV=uv;vColor=aColor;vData=aData;
+        vThrustDirection=dot(max(aDir,vec3(0.0)),uThrustPositive)+dot(max(-aDir,vec3(0.0)),uThrustNegative);
         vec3 eyeAxis=normalize(mat3(modelViewMatrix)*aDir+vec3(0.0000001));
         vec3 eyeRoot=(modelViewMatrix*vec4(aRoot,1.0)).xyz;
         vec3 eyeRay=isPerspectiveMatrix(projectionMatrix)?normalize(-eyeRoot):vec3(0.0,0.0,1.0);
@@ -170,12 +182,13 @@ export function buildBlockEffects(blocks, profile, params) {
           float radius=max(.015,length(radial)*mix(.16,.28,boost))*(.55+phase);
           p.xy+=vec2(uv.x,uv.y*2.0-1.0)*radius;
         }
-        else if(aData.x>=4.0) p=modelViewMatrix*vec4(aRoot,1.0)+vec4(position.xy,0.0,0.0);
+        else if(aData.x>=4.0&&aData.x<=8.0) p=modelViewMatrix*vec4(aRoot,1.0)+vec4(position.xy,0.0,0.0);
         gl_Position=projectionMatrix*p;
         #include <logdepthbuf_vertex>
       }`,
         fragmentShader: `precision highp float; uniform float uTime,uThrust,uPlume,uGlow,uBarrier,uGlassSplit,uGlassLogDepth,uEngineState,uBloomPass;
       uniform highp sampler2D uGlassDepth;
+      flat in float vThrustDirection;
       #include <logdepthbuf_pars_fragment>
       varying vec2 vUV; flat in vec3 vColor; flat in vec4 vData; varying float vFacing; out vec4 outColor;
       void main(){
@@ -228,13 +241,21 @@ export function buildBlockEffects(blocks, profile, params) {
           a=(core*.32+halo*mix(.12,.22,boost))*tail*density*(1.0-.8*vFacing*vFacing);
           a*=(1.0-smoothstep(.72,1.0,x))*smoothstep(0.0,.035,t);
           c=mix(vColor,vec3(1.0),core*.88)*mix(2.0,2.6,boost);
-        }else if(vData.x<3.0){float run=vData.x==1.0?step(0.001,uPlume):uThrust;if(run<=0.0)discard;
-          float waves=vData.x==1.0?uPlume*6.0:24.0;
-          // MSAA edge samples can extrapolate UVs outside the triangle. A negative
-          // fractional-power base produces NaNs that spread through HDR bloom.
-          float core=pow(max(0.0,1.0-abs(vUV.x)),2.0);float tip=pow(clamp(1.0-vUV.y,0.0,1.0),1.7);
-          float pulse=0.88+0.12*sin(vUV.y*waves-uTime*12.0+vData.z);
-          a=core*tip*pulse*run*.32;c=mix(vColor,vec3(1.0),core*tip*.6)*2.0;
+        }else if(vData.x==2.0||vData.x==11.0){
+          if(uThrust<.5||vThrustDirection<.5)discard;
+          if(vData.x==11.0){
+            vec2 q=vec2(vUV.x,vUV.y*2.0-1.0);float r=length(q);if(r>1.0)discard;
+            float core=exp(-r*r*7.0),halo=exp(-r*r*3.0)*(1.0-smoothstep(.7,1.0,r));
+            a=(core*.28+halo*.10)*(1.0-smoothstep(.25,1.0,vData.w))*pow(vFacing,4.0);
+            c=mix(vColor,vec3(1.0),core*.35)*2.3;
+          }else{
+            float t=clamp(vUV.y,0.0,1.0),x=abs(vUV.x);
+            float core=exp(-x*x*3.0),halo=exp(-x*x*1.5)*(1.0-smoothstep(.7,1.0,x));
+            float tail=1.0-smoothstep(.6,1.0,t);
+            float pulse=.95+.05*sin(t*18.0-uTime*12.0+vData.z);
+            a=(core*.34+halo*.12)*tail*pulse*(1.0-.85*vFacing*vFacing);
+            c=mix(vColor,vec3(1.0),core*.18*(1.0-t))*2.3;
+          }
         }else if(vData.x==3.0){
           // UV Y increases upward; adding time moves bands down four heights/s.
           float band=.5+.5*sin((vUV.y+uTime*${(1/HANGAR_TRAVEL_SECONDS).toFixed(1)})*6.28318530718*7.0);
@@ -287,7 +308,7 @@ export function buildBlockEffects(blocks, profile, params) {
         },
         setTime(time) { material.uniforms.uTime.value = time; },
         setGlassDepth(texture, logDepth) { const u = material.uniforms; u.uGlassSplit.value = texture ? 1 : 0; u.uGlassDepth.value = texture; u.uGlassLogDepth.value = logDepth ? 1 : 0; },
-        setParams(p) { material.uniforms.uEngineState.value=p.engineState??0; material.uniforms.uThrust.value = p.thrustPreview; material.uniforms.uPlume.value = p.plumeLength ?? 0; material.uniforms.uGlow.value = p.glowStrength; material.uniforms.uBarrier.value = p.barrierStrength; },
+        setParams(p) { material.uniforms.uThrustPositive.value.fromArray(p.thrustDirections?.positive ?? [1,1,1]); material.uniforms.uThrustNegative.value.fromArray(p.thrustDirections?.negative ?? [1,1,1]); material.uniforms.uEngineState.value=p.engineState??0; material.uniforms.uThrust.value = p.thrustPreview > 0 ? 1 : 0; material.uniforms.uPlume.value = p.plumeLength ?? 0; material.uniforms.uGlow.value = p.glowStrength; material.uniforms.uBarrier.value = p.barrierStrength; },
         setHidden,
         dispose() { geometry.dispose(); material.dispose(); frontMaterial.dispose(); barrierMaterial.dispose(); barrierFrontMaterial.dispose(); },
     };

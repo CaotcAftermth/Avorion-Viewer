@@ -34,7 +34,7 @@ export function defaults() {
     editorArea('color', { colorEditor: { tab: 'wheel', mode: 'Analogous' } }));
   const armament = split('x', 0.77,
     split('y', 0.7,
-      viewportArea(view(0.8067, 0.4501, 0.05679, 2.953, 13.856, 'perspective', { orthographicDistance: 176.09, interactionMode: 'socket', display: { shading: 'RENDERED', background: 'THEME', objectOutline: false } })),
+      viewportArea(view(0.8067, 0.4501, 0.05679, 2.953, 13.856, 'perspective', { orthographicDistance: 176.09, interactionMode: 'object', tool: 'sockets', display: { shading: 'RENDERED', background: 'THEME', objectOutline: false } })),
       editorArea('assets', { assetKind: 'turrets', panels: { 'assets:object:Components': true, 'assets:object:Ship component sockets': true } })),
     split('y', 0.36, editorArea('outliner', { shipGrouping: 'type' }), editorArea('properties', propertyPanels('turrets', armamentProperties))));
   return { version: 1, active: 'layout', workspaces: [
@@ -96,7 +96,7 @@ export function validateState(state) {
   const validNode = (n, depth = 0) => {
     if (!n || depth > 64 || ++count > 300 || !validId(n.id)) return false;
     if (n.type === 'split') return ['x', 'y'].includes(n.axis) && Number.isFinite(n.ratio) && n.ratio > 0 && n.ratio < 1 && validNode(n.first, depth + 1) && validNode(n.second, depth + 1);
-    return n.type === 'area' && Object.hasOwn(EDITORS, n.editor) && ['toolbar', 'sidebar', 'headerBottom'].every(k => typeof n[k] === 'boolean') && Number.isFinite(n.sidebarWidth) && n.sidebarWidth >= 140 && n.sidebarWidth <= 600 && n.view && ['yaw', 'pitch', 'zoom', 'panX', 'panY'].every(k => Number.isFinite(n.view[k])) && n.view.zoom >= 0.000001 && n.view.zoom <= 5 && Math.abs(n.view.pitch) <= Math.PI / 2 && ['grid', 'wire'].every(k => typeof n.view[k] === 'boolean') && ['select', 'orbit', 'pan'].includes(n.view.tool)
+    return n.type === 'area' && Object.hasOwn(EDITORS, n.editor) && ['toolbar', 'sidebar', 'headerBottom'].every(k => typeof n[k] === 'boolean') && Number.isFinite(n.sidebarWidth) && n.sidebarWidth >= 140 && n.sidebarWidth <= 600 && n.view && ['yaw', 'pitch', 'zoom', 'panX', 'panY'].every(k => Number.isFinite(n.view[k])) && n.view.zoom >= 0.000001 && n.view.zoom <= 5 && Math.abs(n.view.pitch) <= Math.PI / 2 && ['grid', 'wire'].every(k => typeof n.view[k] === 'boolean') && ['select', 'orbit', 'pan', 'sockets'].includes(n.view.tool)
       && (n.view.target === undefined || (Array.isArray(n.view.target) && n.view.target.length === 3 && n.view.target.every(Number.isFinite)))
       && (n.view.roll === undefined || Number.isFinite(n.view.roll))
       && (n.view.projection === undefined || ['orthographic', 'perspective'].includes(n.view.projection))

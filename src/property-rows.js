@@ -35,5 +35,6 @@ function layoutRow(row){
 export function layoutPropertyRows(root){
   const apply=()=>{for(const row of root.querySelectorAll('.field-row:not(.property-data-row),.check-row'))layoutRow(row);};
   apply();
-  new MutationObserver(apply).observe(root,{childList:true,subtree:true});
+  const observer=new MutationObserver(apply);observer.observe(root,{childList:true,subtree:true});
+  return ()=>observer.disconnect();
 }

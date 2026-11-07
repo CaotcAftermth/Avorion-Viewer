@@ -24,7 +24,7 @@ export const DEFAULT_GAME_SHADER = {
     glowStrength: 1.0,
     hologramGlow: 1.5,
     fogStrength: 0.0,
-    thrustPreview: 0.35,
+    thrustPreview: 0,
     plumeLength: 0,
     barrierStrength: 1,
     bloomStrength: 0.3,

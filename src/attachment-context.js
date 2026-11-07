@@ -28,7 +28,7 @@ export function routeAttachmentInspector(nodes,context,preferredId){
  if(!context)return null;
  const eligible=nodes.filter(node=>node.editor==='properties'&&!node.attachmentPin&&!node.propertySearch);
  const target=eligible.find(node=>node.id===preferredId)||eligible[0];
- if(target)target.propertyTab=context.type==='turret'?'turrets':'components';
+ if(target)target.propertyTab=context.type==='object'?'object':context.type==='turret'?'turrets':'components';
  return target;
 }
 export function inspectorScene(scene,context){

@@ -1,3 +1,5 @@
+import {THRUSTER_DIRECTIONS,THRUSTER_DIRECTION_DESCRIPTION} from './thruster-settings.js';
+import {t} from './i18n.js';
 import {propertyDataRow,propertyPanel} from './property-ui.js';
 import {liveBlocks,viewportHiddenIds,isThinBlock} from './ship-structure.js';
 export function modelSummary(scene,view){
@@ -17,6 +19,19 @@ export function mountEngineState(host,view,preferences){
  if(view.display?.shading!=='RENDERED'){
   const note=document.createElement('p');note.className='panel-note';note.textContent='Plumes require Rendered shading.';panel.append(note);
  }
+}
+export function mountThrusterState(host,preferences){
+ const panel=propertyPanel(host,t('Thruster Preview'),true);
+ const row=document.createElement('label');row.className='field-row';row.textContent=t('Thruster Preview');
+ const select=document.createElement('select');select.dataset.thrusterState='';select.setAttribute('aria-label','Scene thruster state');
+ for(const [value,label] of [[0,'Inactive'],[1,'Active']])select.add(new Option(t(label),value));
+ select.value=preferences.value.shaderThrust;select.onchange=()=>preferences.set('shaderThrust',Number(select.value));row.append(select);panel.append(row);
+ for(const {name,key} of THRUSTER_DIRECTIONS){
+  const row=document.createElement('label');row.className='field-row';row.textContent=t(`Thruster ${name}`);
+  const input=document.createElement('input');input.type='checkbox';input.dataset.thrusterDirection=key;input.setAttribute('aria-label',`Scene thruster ${name.toLowerCase()}`);
+  input.checked=preferences.value[key];input.disabled=!preferences.value.shaderThrust;input.onchange=()=>preferences.set(key,input.checked);row.append(input);panel.append(row);
+ }
+ const note=document.createElement('p');note.className='panel-note';note.textContent=t(THRUSTER_DIRECTION_DESCRIPTION);panel.append(note);
 }
 export function mountSceneProperties(host,scene,{getView,capture}){
  host.classList.add('scene-properties');

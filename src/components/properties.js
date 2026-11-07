@@ -117,7 +117,7 @@ export function mountComponentProperties(host,scene,changed,context=scene.attach
  if(manual){
   const apply=next=>changeSetup(scene,{...setup,sockets:setup.sockets.map(s=>s.id===manual.id?next:s)});
   field(ship,'Socket name',manual.name,name=>apply({...manual,name}),'text');
-  note(ship,(manual.blockId?'Position is relative to the mounting block center.':'Position uses the ship’s original XML coordinates.')+' In Socket Mode, drag the X/Y/Z handles to move it and the dashed ring to turn it (Ctrl: 0.5 steps, Shift: free).');
+  note(ship,(manual.blockId?'Position is relative to the mounting block center.':'Position uses the ship’s original XML coordinates.')+' With Select Sockets active, drag the X/Y/Z handles to move it and the dashed ring to turn it (Ctrl: 0.5 steps, Shift: free).');
   frameFields(ship,manual,apply);
   button(ship,'Turn socket 90°',()=>{const normal=new THREE.Vector3(...socket.normal),matrix=new THREE.Matrix4().makeRotationAxis(normal,Math.PI/2).multiply(frame([0,0,0],manual.rotation)),euler=new THREE.Euler().setFromRotationMatrix(matrix,'XYZ');return apply({...manual,rotation:[euler.x,euler.y,euler.z].map(THREE.MathUtils.radToDeg)});});
   button(ship,'Remove socket',()=>{scene.selectedComponentSocketId=null;return changeSetup(scene,{...setup,sockets:setup.sockets.filter(s=>s.id!==manual.id)});},!!mounted);

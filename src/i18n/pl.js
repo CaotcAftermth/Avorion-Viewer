@@ -1,6 +1,10 @@
 // Polski interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+ "Select Sockets Target Azimuth": "Azymut celu wyboru gniazd",
+ "Select Sockets Target Distance": "Odległość celu wyboru gniazd",
+ "Cycle Object / Paint Mode": "Przełącz tryb obiektu / malowania",
+ "Quick Asset Library": "Szybka biblioteka zasobów",
  "Dimension Units": "Jednostki wymiarów",
  "Meters": "Metry",
  "Block Units": "Jednostki bloków",
@@ -611,5 +615,15 @@ export default {
  "Connected Fill Target Azimuth": "Connected Fill · Azymut celu",
  "Connected Fill Target Distance": "Connected Fill · Odległość celu",
  "Restore Target Azimuth": "Restore · Azymut celu",
- "Restore Target Distance": "Restore · Odległość celu"
+ "Restore Target Distance": "Restore · Odległość celu",
+ "Active": "Aktywne",
+ "Inactive": "Nieaktywne",
+ "Thruster plumes are off or full, with fixed lengths for each port size.": "Smugi silników manewrowych są wyłączone lub pełne, o stałej długości dla każdego rozmiaru dyszy.",
+ "Activate ports facing this ship direction. Multiple directions can be active together.": "Włącz dysze skierowane w tę stronę statku. Można włączyć kilka kierunków jednocześnie.",
+ "Thruster Front": "Dysze przednie",
+ "Thruster Back": "Dysze tylne",
+ "Thruster Left": "Dysze lewe",
+ "Thruster Right": "Dysze prawe",
+ "Thruster Top": "Dysze górne",
+ "Thruster Bottom": "Dysze dolne",
 };
