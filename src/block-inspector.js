@@ -1,3 +1,4 @@
+import {thumbnail} from './turrets/thumbnail.js';
 import {styleColorCell} from './color-cells.js';
 import {blockOpacity,supportsOpacity} from './block-opacity.js';
 import {getShadingSpec} from './avorion/lib/textures/shadingMap.js';
@@ -81,7 +82,7 @@ function mountNativeData(panel,b,scene,reveal){
   const pre=document.createElement('pre');pre.className='native-xml';pre.title='Current XML for this block, including any repaints. Saved as-is by File › Save XML.';const code=document.createElement('code');code.textContent=xml;pre.append(code);
   panel.append(head,pre);
 }
-export function mountBlockInspector(host,scene,onChange,{reveal=()=>{},preferences=null}={}) {
+export function mountBlockInspector(host,scene,onChange,{reveal=()=>{},preferences=null,openVariant=()=>{}}={}) {
   const model=scene.model,b=model?.blocks.find(b=>b.id===scene.selectedId)||model?.blocks[0];
   if(!b){host.textContent='No blocks loaded. Use File to load XML, or Help › Developer › Load Block Gallery.';return;}
   const breadcrumb=document.createElement('div');breadcrumb.className='property-breadcrumb';breadcrumb.innerHTML=icon('cube');const name=document.createElement('span');name.textContent=scene.preview?`Block Gallery · ${b.type}`:`${b.type} · ${b.id}`;breadcrumb.append(name);host.append(breadcrumb);
@@ -89,4 +90,15 @@ export function mountBlockInspector(host,scene,onChange,{reveal=()=>{},preferenc
   const native=document.createElement('section');native.className='panel block-inspector object-data';
   const heading=document.createElement('h3');heading.textContent='Object Data';native.append(heading);host.append(native);
   mountNativeData(native,b,scene,reveal);
+  if(isBlockGallery(scene)&&scene.selectedId){
+    const variants=document.createElement('section');variants.className='panel block-variants';const title=document.createElement('h3');title.textContent='Variants';variants.append(title);const list=document.createElement('div');list.className='block-variant-list';list.setAttribute('aria-label','Block variants');variants.append(list);
+    for(const variant of blockVariants(b.typeIndex)){
+      const row=document.createElement('button');row.type='button';row.className='block-variant-row';row.title='Double-click to open '+variant.name;row.setAttribute('aria-label',variant.label+' variant');row.setAttribute('aria-pressed',String(variant.typeIndex===b.typeIndex));row.classList.toggle('active',variant.typeIndex===b.typeIndex);
+      const canvas=document.createElement('canvas'),label=document.createElement('span');label.textContent=variant.label;row.append(canvas,label);list.append(row);
+      const preview={...b,typeIndex:variant.typeIndex,type:variant.name,position:{x:0,y:0,z:0}};thumbnail(canvas,{name:variant.name,blocks:[preview]});
+      row.onclick=()=>{for(const item of list.children){item.classList.toggle('active',item===row);item.setAttribute('aria-pressed',String(item===row));}};
+      row.ondblclick=()=>openVariant(b,variant);row.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();openVariant(b,variant);}};
+    }
+    host.append(variants);
+  }
 }

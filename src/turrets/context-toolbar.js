@@ -1,3 +1,4 @@
+import {rotateSurfaceComponent,detachSurfaceComponent} from '../components/mounting.js';
 import {componentSetup,componentSockets} from '../components/core.js';
 import {componentLibrary,loadComponentLibrary} from '../components/library.js';
 import {beginComponentEdit,endComponentEdit,previewSetup,changeSetup,patchMount,placeComponent,detachComponent} from '../components/mounting.js';
@@ -34,6 +35,13 @@ export function createTurretToolbar(canvas,scene,view,{changed,selected,invalida
  function action(label,fn){const button=document.createElement('button');button.type='button';const glyphs={'Copy pose & size':'<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="9" height="9"/><path d="M11 4V2H2v9h2"/></svg>','Paste pose & size':'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3H2v11h12V3h-3"/><rect x="5" y="1" width="6" height="4"/></svg>','⚙ Properties':'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12M2 12h12M5 2v4M11 10v4M2 8h12M9 6v4"/></svg>'};if(glyphs[label]){button.innerHTML=glyphs[label];button.className='turret-context-icon';}else button.textContent=label;button.title=label;button.setAttribute('aria-label',label);button.onclick=()=>{try{cancel();Promise.resolve(fn()).catch(error=>status.textContent=error.message);}catch(error){status.textContent=error.message;}};bar.append(button);return button;}
  function build(){
   status.textContent='';bar.replaceChildren();
+  if(component){
+   for(const [label,step] of [['−90°',-1],['+90°',1]])action(label,async()=>{const mount=current();if(mount){await changeSetup(scene,rotateSurfaceComponent(scene,mount,step));changed();invalidate();}});
+   action('Edit Socket Position',()=>{const s=socket();close();if(s)window.dispatchEvent(new CustomEvent('component-socket-edit',{detail:s.id}));});
+   action('Detach Component',async()=>{const mount=current();if(mount)await changeSetup(scene,detachSurfaceComponent(scene,mount));close();changed();invalidate();});
+   action('⚙ Properties',()=>{canvas.dispatchEvent(new CustomEvent('turret-open-properties',{bubbles:true,detail:'components'}));close();});bar.append(status);return;
+  }
+
   action('↻ Rotate',()=>{cancel();mode=mode==='rotate'?null:'rotate';scene.attachmentTransform=false;invalidate();});
   const resize=action('↗ Resize',()=>{cancel();mode=mode==='resize'?null:'resize';scene.attachmentTransform=false;invalidate();});resize.disabled=!component&&socketSizeLimit(socket())<.5;
   action('⇄ Replace',async()=>{mode=null;invalidate();const kind=component,requestedId=id,requestedModel=model;

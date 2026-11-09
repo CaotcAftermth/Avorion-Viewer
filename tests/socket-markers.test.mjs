@@ -4,8 +4,8 @@ import {drawSocketMarker,pickSocketMarker,selectSocketMarker} from '../src/socke
 import {drawComponentSockets} from '../src/components/overlay.js';
 import {makeBlock,makeModel} from '../src/block-model.js';
 import {area} from '../src/layout.js';
-const context=()=>({arcs:[],save(){},restore(){},setLineDash(){},beginPath(){},stroke(){},moveTo(){},lineTo(){},arc(...args){this.arcs.push(args);}});
-test('socket glyph is a thin cyan ring with an outward normal, without square markers',()=>{
+const context=()=>({arcs:[],rects:[],rect(...args){this.rects.push(args);},save(){},restore(){},setLineDash(){},beginPath(){},stroke(){},moveTo(){},lineTo(){},arc(...args){this.arcs.push(args);}});
+test('turret socket glyph stays a thin cyan ring with an outward normal',()=>{
  const ctx=context();drawSocketMarker(ctx,[20,30],[20,5]);assert.equal(ctx.strokeStyle,'#75ddff');assert.equal(ctx.lineWidth,2);assert.equal(ctx.arcs.length,1);assert.equal(ctx.arcs[0][2],8);
 });
 test('Select Sockets exposes component sockets without enabling persistent display; filters still apply',()=>{
@@ -22,4 +22,9 @@ test('socket clicks replace stale multi-selection and clear the other attachment
  selectSocketMarker(scene,{id:'c',type:'component'});assert.deepEqual([...scene.selectedComponentMountIds],['new']);assert.equal(scene.selectedTurretId,null);
  selectSocketMarker(scene,{id:'empty',type:'component'});assert.equal(scene.selectedComponentMountIds.size,0);
  selectSocketMarker(scene,{id:'s',type:'turret'});assert.deepEqual([...scene.selectedTurretIds],['t']);assert.equal(scene.selectedComponentSocketId,null);
+});
+
+test('component socket glyph is a square and occupied sockets remain distinguishable',()=>{
+ const ctx=context();drawSocketMarker(ctx,[20,30],[20,5],{shape:'square',occupied:true,color:'#79e695'});
+ assert.equal(ctx.rects.length,1);assert.equal(ctx.arcs.length,0);assert.equal(ctx.strokeStyle,'#79e695');
 });

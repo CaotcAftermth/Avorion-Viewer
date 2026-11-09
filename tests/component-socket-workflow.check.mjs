@@ -1,0 +1,130 @@
+import {chromium} from 'file:///C:/Users/joshu/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import {createServer} from 'node:http';
+import {readFile,mkdir} from 'node:fs/promises';
+import {resolve,sep,extname} from 'node:path';
+import assert from 'node:assert/strict';
+
+// Bind only to loopback and serve the app and test assets from this checkout.
+const root=resolve('.'),server=createServer(async(req,res)=>{
+  const pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
+  const file=resolve(root,'.'+pathname);
+  if(!file.startsWith(root+sep)||!/^\/(src|tests)\//.test(pathname)){res.writeHead(404).end();return;}
+  try{res.setHeader('Content-Type',({'.js':'text/javascript','.html':'text/html','.png':'image/png'})[extname(file)]||'application/octet-stream');res.end(await readFile(file));}
+  catch{res.writeHead(404).end();}
+});
+await new Promise(r=>server.listen(0,'127.0.0.1',r));
+const base=`http://127.0.0.1:${server.address().port}`;
+const browser=await chromium.launch({headless:true,channel:'msedge',args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+try{
+ const page=await browser.newPage({viewport:{width:1100,height:850}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(base+'/tests/image-export.html');await page.addStyleTag({content:await readFile('src/styles.css','utf8')});
+ await page.evaluate(async()=>{
+  const {makeBlock,makeModel}=await import('/src/block-model.js'),{area}=await import('/src/layout.js'),{mountViewport}=await import('/src/viewport.js'),{FACTORY_PREFERENCES}=await import('/src/preferences.js'),{ensureViewportOptions}=await import('/src/viewport-options.js');
+  document.body.replaceChildren();document.body.style.background='#222';const host=document.createElement('div');host.className='viewport';Object.assign(host.style,{position:'relative',width:'900px',height:'700px'});const canvas=document.createElement('canvas');canvas.setAttribute('aria-label','Socket viewport');host.append(canvas);document.body.append(host);
+  const node=area();node.view.tool='sockets';node.view.target=[0,0,0];node.view.yaw=.4;node.view.pitch=.3;node.view.projection='orthographic';node.view.zoom=1;ensureViewportOptions(node.view).showOverlays=true;
+  const scene={model:makeModel([makeBlock({id:'hull',position:{x:0,y:0,z:0},size:{x:3,y:2,z:2}})]),loaded:true,visible:true,revision:1,selectedIds:new Set(),hiddenIds:new Set()};
+  const controller=mountViewport(canvas,node,scene,()=>{},()=>{},()=>({...FACTORY_PREFERENCES,shaderAO:0,shaderBloom:0,shaderSpill:0}));
+  window.fixture={scene,node,controller};
+ });
+ await page.waitForTimeout(500);
+ page.setDefaultTimeout(5000);
+ const canvas=page.getByLabel('Socket viewport'),box=await canvas.boundingBox(),cx=box.x+box.width/2,cy=box.y+box.height/2;
+ await page.mouse.click(cx,cy,{button:'right'});await page.getByRole('button',{name:'Add Component Socket',exact:true}).click();await page.mouse.move(cx,cy);await page.mouse.click(cx,cy,{button:'right'});
+ assert.equal(await page.locator('.socket-edit-strip').isHidden(),true,'right-click cancels creation');assert.equal(await page.locator('.socket-context-menu:visible').count(),0,'cancel does not reopen context menu');
+ await page.mouse.click(cx,cy,{button:'right'});await page.getByRole('button',{name:'Add Component Socket',exact:true}).click();const placement=await canvas.boundingBox();await page.mouse.move(placement.x+placement.width/2,cy);await page.mouse.click(placement.x+placement.width/2,cy);
+ await page.mouse.click(placement.x+placement.width/2,cy);assert.equal(await page.getByRole('button',{name:'Refine Position',exact:true}).isVisible(),false,'direction comes before refinement');await page.getByRole('button',{name:'Confirm Direction',exact:true}).click();await page.getByRole('button',{name:'Refine Position',exact:true}).click();await page.getByLabel('Positioning',{exact:true}).waitFor();await page.getByRole('button',{name:'Place Socket',exact:true}).click();
+ await page.screenshot({path:'test-results/images/socket-created.png'});
+ await page.waitForFunction(()=>window.fixture.scene.model.componentSetup?.sockets.length===1,null,{timeout:5000}).catch(async e=>{console.log('Creation diagnostics',errors,await page.locator('.socket-edit-strip').textContent());await page.screenshot({path:'test-results/images/socket-creation-error.png'});throw e;});
+ const created=await page.evaluate(()=>window.fixture.scene.model.componentSetup.sockets[0]);assert.equal(created.blockId,'hull');assert.ok(Number.isInteger(created.faceId));
+ await page.waitForFunction(()=>document.querySelector('.socket-edit-strip').hidden);await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+ const screen=await page.evaluate(async()=>{const {componentSockets}=await import('/src/components/core.js'),{nativeToView}=await import('/src/block-model.js'),{projectPoint}=await import('/src/navigation.js');const f=window.fixture,s=componentSockets(f.scene)[0];return projectPoint(nativeToView(s.position),f.node.view,900,700);});
+ await page.mouse.click(box.x+screen[0],box.y+screen[1],{button:'right'});await page.getByRole('button',{name:'Edit Position',exact:true}).click();await page.getByLabel('Positioning',{exact:true}).waitFor();
+ await page.screenshot({path:'test-results/images/socket-center-edit.png'});
+ const before=await page.evaluate(()=>JSON.stringify(window.fixture.scene.model.componentSetup));
+ await page.getByLabel('Positioning',{exact:true}).selectOption('grid');await page.getByLabel('Grid density',{exact:true}).selectOption('spacing');await page.getByLabel('Spacing (native units)',{exact:true}).fill('.25');await page.getByLabel('Spacing (native units)',{exact:true}).dispatchEvent('change');
+ const available=await canvas.boundingBox(),pane=await page.locator('.socket-edit-strip').boundingBox();assert.ok(available.x+available.width<=pane.x+.5,'precision pane never overlaps canvas');
+ await page.screenshot({path:'test-results/images/component-socket-precision.png'});
+ await page.mouse.move(available.x+available.width/2+30,cy+20);await page.mouse.click(available.x+available.width/2+30,cy+20);await page.getByRole('button',{name:'Cancel',exact:true}).click();
+ await page.waitForTimeout(120);
+ assert.equal(await page.evaluate(()=>JSON.stringify(window.fixture.scene.model.componentSetup)),before,'Cancel restores exact socket setup');
+ const restored=await page.evaluate(()=>({yaw:fixture.node.view.yaw,pitch:fixture.node.view.pitch}));assert.ok(Math.abs(restored.yaw-.4)<1e-9&&Math.abs(restored.pitch-.3)<1e-9);
+ await page.evaluate(()=>window.dispatchEvent(new CustomEvent('component-socket-edit',{detail:fixture.scene.model.componentSetup.sockets[0].id})));await page.getByLabel('Positioning',{exact:true}).selectOption('free');await page.mouse.move(available.x+available.width/2+20,cy+10);await page.mouse.click(available.x+available.width/2+20,cy+10);await page.getByRole('button',{name:'Apply',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('.socket-edit-strip').hidden);assert.notDeepEqual(await page.evaluate(()=>fixture.scene.model.componentSetup.sockets[0].position),created.position);
+
+ await page.evaluate(async()=>{
+  const {componentHistory}=await import('/src/components/mounting.js');await componentHistory(fixture.scene);fixture.controller.draw();
+ });
+ assert.deepEqual(await page.evaluate(()=>fixture.scene.model.componentSetup.sockets[0].position),created.position,'Apply creates exactly one undo operation');
+ await page.evaluate(async()=>{const {componentHistory}=await import('/src/components/mounting.js');await componentHistory(fixture.scene,true);fixture.controller.draw();});
+ await page.evaluate(async()=>{
+  const {importComponent}=await import('/src/components/core.js'),{addComponentAsset,componentLibrary}=await import('/src/components/library.js'),{mountComponentProperties}=await import('/src/components/properties.js'),{layoutPropertyRows}=await import('/src/property-rows.js');
+  const xml='<plan><item index="0"><block index="2" material="3" look="1" up="3" color="ff696969" lx="-.2" ly="0" lz="-.2" ux=".2" uy=".5" uz=".2"/></item></plan>';
+  const asset=await addComponentAsset(importComponent(xml,'Fixture component'));fixture.asset=asset;componentLibrary.selectedId=asset.id;
+  const host=document.createElement('div');host.className='property-content';Object.assign(host.style,{position:'absolute',left:'910px',top:'10px',width:'180px'});document.body.append(host);
+  const refresh=()=>{fixture.rows?.();host.replaceChildren();mountComponentProperties(host,fixture.scene,refresh,{type:'component',kind:'socket',id:fixture.scene.model.componentSetup.sockets[0].id});fixture.rows=layoutPropertyRows(host);};refresh();fixture.properties=host;fixture.refreshProperties=refresh;
+ });
+ await page.getByRole('button',{name:'Attach Component',exact:true}).click();await page.waitForFunction(()=>fixture.scene.model.componentSetup.mounts.length===1);
+ await page.getByRole('button',{name:'+90°',exact:true}).click();await page.waitForFunction(()=>fixture.scene.model.componentSetup.mounts[0].twist===90);
+ assert.equal(await page.getByRole('button',{name:'Delete Socket',exact:true}).isDisabled(),true);
+ assert.equal(await page.evaluate(()=>fixture.scene.model.componentSetup.mounts[0].scale),1);
+ await page.getByRole('button',{name:'Detach Component',exact:true}).click();await page.waitForFunction(()=>fixture.scene.model.componentSetup.mounts.length===0);
+ assert.equal(await page.evaluate(()=>fixture.scene.model.componentSetup.sockets.length),1,'detaching retains future socket');
+ await page.evaluate(async()=>{
+  const {componentLibrary}=await import('/src/components/library.js'),{componentSockets}=await import('/src/components/core.js'),{nativeToView}=await import('/src/block-model.js'),{projectPoint}=await import('/src/navigation.js');
+  componentLibrary.dragged=fixture.asset;window.dispatchEvent(new Event('component-drag-start'));fixture.controller.draw();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  const canvas=document.querySelector('canvas'),rect=canvas.getBoundingClientRect(),point=projectPoint(nativeToView(componentSockets(fixture.scene)[0].position),fixture.node.view,900,700),dataTransfer=new DataTransfer();
+  for(const type of ['dragover','drop'])canvas.dispatchEvent(new DragEvent(type,{bubbles:true,clientX:rect.left+point[0],clientY:rect.top+point[1],dataTransfer}));
+ });
+ await page.waitForFunction(()=>fixture.scene.model.componentSetup.mounts.length===1);
+ await page.evaluate(async()=>{const {componentLibrary}=await import('/src/components/library.js');componentLibrary.dragged=null;window.dispatchEvent(new Event('component-drag-end'));});
+ const persisted=await page.evaluate(async()=>{
+  const {restoreComponentSetup}=await import('/src/components/storage.js'),{makeModel}=await import('/src/block-model.js');
+  const model=makeModel(structuredClone(fixture.scene.model.blocks),fixture.scene.model.fileName);model.warnings=[];await restoreComponentSetup(model);return {saved:fixture.scene.model.componentSetup,restored:model.componentSetup};
+ });
+ assert.deepEqual(persisted.restored,persisted.saved,'reopening restores socket placement metadata and attached snapshot');
+ await page.evaluate(()=>fixture.refreshProperties());
+ const current=await page.evaluate(async()=>{const {componentSockets}=await import('/src/components/core.js'),{nativeToView}=await import('/src/block-model.js'),{projectPoint}=await import('/src/navigation.js');return projectPoint(nativeToView(componentSockets(fixture.scene)[0].position),fixture.node.view,900,700);});
+ await page.mouse.click(box.x+current[0],box.y+current[1],{button:'right'});await page.screenshot({path:'test-results/images/socket-occupied-menu.png'});assert.equal(await page.getByRole('menu').getByRole('button',{name:'Delete Socket',exact:true}).isDisabled(),true);assert.equal(await page.getByRole('menu').getByRole('button',{name:'Edit Direction',exact:true}).isVisible(),true);
+ await page.getByRole('menu').getByRole('button',{name:'Edit Position',exact:true}).click();await page.getByLabel('Positioning',{exact:true}).selectOption('free');
+ const mountedBefore=await page.evaluate(async()=>{const {componentEntries}=await import('/src/components/core.js');return componentEntries(fixture.scene)[0].matrix.toArray();});
+ await page.mouse.move(available.x+available.width/2+25,cy+15);await page.mouse.click(available.x+available.width/2+25,cy+15);
+ const mountedPreview=await page.evaluate(async()=>{const {componentEntries}=await import('/src/components/core.js');return componentEntries(fixture.scene)[0].matrix.toArray();});assert.notDeepEqual(mountedPreview,mountedBefore,'mounted component follows preview');
+ await page.getByRole('button',{name:'Cancel',exact:true}).click();
+ assert.deepEqual(await page.evaluate(async()=>{const {componentEntries}=await import('/src/components/core.js');return componentEntries(fixture.scene)[0].matrix.toArray();}),mountedBefore,'Cancel restores mounted component');
+ // A sloped socket gets a separate axis-direction step and saves no diagonal rotation.
+ await page.evaluate(async()=>{
+  fixture.properties.remove();fixture.controller.dispose();const {makeBlock,makeModel}=await import('/src/block-model.js'),{socketFaces,socketNormalChoices}=await import('/src/components/socket-face.js');
+  const block=makeBlock({id:'slope',typeIndex:100,size:{x:.3,y:.2,z:.2},position:{x:0,y:0,z:0}});fixture.scene.model=makeModel([block]);fixture.scene.revision++;fixture.scene.selectedIds.clear();fixture.scene.componentSelection=null;
+  const face=socketFaces(block).find(f=>socketNormalChoices(f).length>1);fixture.slopeFace=face.faceId;
+  const {nativeToView}=await import('/src/block-model.js'),n=nativeToView(face.normal);Object.assign(fixture.node.view,{yaw:Math.atan2(n[0],-n[1]),pitch:Math.asin(n[2]),roll:0,target:nativeToView(face.position),zoom:1});const {mountViewport}=await import('/src/viewport.js'),{FACTORY_PREFERENCES}=await import('/src/preferences.js');fixture.controller=mountViewport(document.querySelector('canvas'),fixture.node,fixture.scene,()=>{},()=>{},()=>({...FACTORY_PREFERENCES,shaderAO:0,shaderBloom:0,shaderSpill:0}));fixture.controller.draw();
+ });
+ await page.waitForTimeout(150);
+ const originalCamera=await page.evaluate(()=>JSON.stringify(fixture.node.view));
+ await canvas.dispatchEvent('component-socket-place');await page.waitForTimeout(100);
+ const slopePoint=await page.evaluate(async()=>{const {socketFaces}=await import('/src/components/socket-face.js'),{projectPoint}=await import('/src/navigation.js'),{nativeToView}=await import('/src/block-model.js');const r=document.querySelector('canvas').getBoundingClientRect();return projectPoint(nativeToView(socketFaces(fixture.scene.model.blocks[0]).find(f=>f.faceId===fixture.slopeFace).position),fixture.node.view,r.width,r.height);});
+
+ await page.mouse.move(box.x+slopePoint[0],box.y+slopePoint[1]);await page.waitForTimeout(100);await page.mouse.click(box.x+slopePoint[0],box.y+slopePoint[1]);assert.equal(await page.getByRole('button',{name:'Refine Position',exact:true}).isVisible(),false,'no refinement before direction');
+ await page.getByText('Define Direction',{exact:true}).waitFor().catch(async e=>{await page.screenshot({path:'test-results/images/socket-direction-error.png'});console.log('Direction diagnostics',errors,await page.locator('.socket-edit-strip').textContent(),await page.evaluate(()=>({view:fixture.node.view,setup:fixture.scene.model.componentSetup})));throw e;});assert.equal(await page.getByRole('button',{name:'Confirm Direction',exact:true}).isVisible(),false);assert.equal(await page.evaluate(()=>fixture.scene.model.componentSetup?.sockets.length||0),0,'direction step does not save prematurely');
+ async function boxChoice(index){return page.evaluate(async index=>{const {socketFaces,socketNormalChoices,boundingSocketFaces}=await import('/src/components/socket-face.js'),{projectPoint}=await import('/src/navigation.js'),{nativeToView}=await import('/src/block-model.js');const block=fixture.scene.model.blocks[0],surface=socketFaces(block).find(f=>f.faceId===fixture.slopeFace),choice=socketNormalChoices(surface)[index],face=boundingSocketFaces(block).find(f=>f.normal.every((n,i)=>Math.abs(n-choice.normal[i])<1e-5)),r=document.querySelector('canvas').getBoundingClientRect();return {normal:choice.normal,point:projectPoint(nativeToView(face.position),fixture.node.view,r.width,r.height)};},index);}
+ const zoomBefore=await page.evaluate(()=>({zoom:fixture.node.view.zoom,target:[...fixture.node.view.target],panX:fixture.node.view.panX,panY:fixture.node.view.panY}));assert.ok(zoomBefore.zoom>5,'small block needs close-up zoom beyond normal viewport limit');
+ await canvas.dispatchEvent('wheel',{deltaY:80,deltaMode:0});const zoomOut=await page.evaluate(()=>fixture.node.view.zoom);assert.ok(zoomOut<zoomBefore.zoom&&zoomOut>zoomBefore.zoom*.5,'zoom out is gradual');await canvas.dispatchEvent('wheel',{deltaY:-80,deltaMode:0});assert.ok(Math.abs(await page.evaluate(()=>fixture.node.view.zoom)-zoomBefore.zoom)<1e-7,'zoom in reverses zoom out without clamping');assert.deepEqual(await page.evaluate(()=>({target:fixture.node.view.target,panX:fixture.node.view.panX,panY:fixture.node.view.panY})),{target:zoomBefore.target,panX:zoomBefore.panX,panY:zoomBefore.panY},'zoom preserves pivot and pan');
+ const first=await boxChoice(0);await page.mouse.click(box.x+first.point[0],box.y+first.point[1]);await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));const confirmationBefore=await page.evaluate(()=>({camera:JSON.stringify(fixture.node.view),panel:document.querySelector('.socket-edit-sections').innerHTML.replace(/ style=""/g,''),anchor:document.querySelector('.socket-direction-actions').getAttribute('style')}));await page.screenshot({path:'test-results/images/socket-bounding-direction.png'});await page.getByRole('button',{name:'Confirm Direction',exact:true}).click();const confirmationAfter=await page.evaluate(()=>({camera:JSON.stringify(fixture.node.view),panel:document.querySelector('.socket-edit-sections').innerHTML.replace(/ style=""/g,''),anchor:document.querySelector('.socket-direction-actions').getAttribute('style')}));assert.equal(confirmationAfter.camera,confirmationBefore.camera,'camera unchanged');assert.equal(confirmationAfter.anchor,confirmationBefore.anchor,'menu anchor unchanged');if(confirmationAfter.panel!==confirmationBefore.panel){let i=0;while(confirmationAfter.panel[i]===confirmationBefore.panel[i])i++;throw Error('Panel changed at '+i+': BEFORE '+confirmationBefore.panel.slice(i-60,i+140)+' AFTER '+confirmationAfter.panel.slice(i-60,i+140));}assert.deepEqual(await page.locator('.socket-direction-actions button:visible').allTextContents(),['Back','Place Socket','Refine Position','Cancel']);await page.screenshot({path:'test-results/images/socket-context-actions.png'});assert.equal(await page.getByRole('button',{name:'Refine Position',exact:true}).isVisible(),true);await page.getByRole('button',{name:'Place Socket',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.socket-edit-strip').hidden);
+ const axisNormal=()=>page.evaluate(async()=>{const {componentSockets}=await import('/src/components/core.js');return componentSockets(fixture.scene)[0].normal;});
+ (await axisNormal()).forEach((n,i)=>assert.ok(Math.abs(n-first.normal[i])<1e-6));
+ assert.equal(await page.evaluate(()=>JSON.stringify(fixture.node.view)),originalCamera,'direction selection restores original camera');
+ await page.evaluate(()=>window.dispatchEvent(new CustomEvent('component-socket-edit',{detail:fixture.scene.model.componentSetup.sockets[0].id})));
+ await page.getByLabel('Positioning',{exact:true}).selectOption('center');await page.getByLabel('Center definition',{exact:true}).selectOption('incenter');
+ for(const label of ['Grid density','Cell shape','Divisions','Spacing (native units)']){assert.equal(await page.getByLabel(label,{exact:true}).isVisible(),false);assert.equal(await page.getByLabel(label,{exact:true}).isDisabled(),true);}
+ await page.getByLabel('Positioning',{exact:true}).selectOption('free');assert.equal(await page.getByLabel('Center definition',{exact:true}).isVisible(),false);assert.equal(await page.getByLabel('Center definition',{exact:true}).isDisabled(),true);
+ await page.getByLabel('Positioning',{exact:true}).selectOption('grid');assert.equal(await page.getByLabel('Center definition',{exact:true}).isVisible(),false);assert.equal(await page.getByLabel('Center definition',{exact:true}).isDisabled(),true);await page.getByLabel('Grid density',{exact:true}).selectOption('divisions');assert.equal(await page.getByLabel('Cell shape',{exact:true}).isVisible(),true);assert.equal(await page.getByLabel('Spacing (native units)',{exact:true}).isVisible(),false);
+ await page.getByLabel('Grid density',{exact:true}).selectOption('spacing');assert.equal(await page.getByLabel('Cell shape',{exact:true}).isVisible(),false);assert.equal(await page.getByLabel('Divisions',{exact:true}).isVisible(),false);assert.equal(await page.getByLabel('Spacing (native units)',{exact:true}).isVisible(),true);
+ await page.getByLabel('Positioning',{exact:true}).selectOption('center');await page.getByLabel('Center definition',{exact:true}).selectOption('incenter');await page.evaluate(()=>{fixture.controller.draw();return new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));});await page.screenshot({path:'test-results/images/socket-center-leaders.png'});await page.getByRole('button',{name:'Apply',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.socket-edit-strip').hidden);(await axisNormal()).forEach((n,i)=>assert.ok(Math.abs(n-first.normal[i])<1e-6),'position-only edit preserves direction');await page.evaluate(()=>window.dispatchEvent(new CustomEvent('component-socket-direction',{detail:fixture.scene.model.componentSetup.sockets[0].id})));
+ const second=await boxChoice(1);await page.mouse.click(box.x+second.point[0],box.y+second.point[1]);await page.getByRole('button',{name:'Apply',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.socket-edit-strip').hidden);
+ (await axisNormal()).forEach((n,i)=>assert.ok(Math.abs(n-second.normal[i])<1e-6));assert.equal(await page.evaluate(()=>fixture.scene.model.componentSetup.sockets[0].placement.center),'incenter');
+ await page.evaluate(async()=>{const {componentHistory}=await import('/src/components/mounting.js');await componentHistory(fixture.scene);fixture.controller.draw();});(await axisNormal()).forEach((n,i)=>assert.ok(Math.abs(n-first.normal[i])<1e-6),'Undo restores previous axis');
+ await page.evaluate(()=>window.dispatchEvent(new CustomEvent('component-socket-direction',{detail:fixture.scene.model.componentSetup.sockets[0].id})));await page.mouse.click(box.x+first.point[0],box.y+first.point[1]);await page.getByRole('button',{name:'Cancel',exact:true}).click();(await axisNormal()).forEach((n,i)=>assert.ok(Math.abs(n-first.normal[i])<1e-6),'Cancel preserves saved axis');
+ await page.evaluate(async()=>{const {socketFaces,orientSocket,socketNormalChoices}=await import('/src/components/socket-face.js'),{savedSocket}=await import('/src/components/core.js');const block=fixture.scene.model.blocks[0],face=socketFaces(block).find(f=>f.triangles.length===1),socket=savedSocket(fixture.scene.model,orientSocket(face,socketNormalChoices(face)[0].normal));socket.faceId=face.faceId;fixture.scene.model.componentSetup={...fixture.scene.model.componentSetup,sockets:[...fixture.scene.model.componentSetup.sockets,socket]};window.dispatchEvent(new CustomEvent('component-socket-edit',{detail:socket.id}));});
+ await page.getByLabel('Positioning',{exact:true}).selectOption('grid');await page.getByLabel('Grid edge',{exact:true}).selectOption('1');assert.equal(await page.getByLabel('Grid edge',{exact:true}).isVisible(),true);await page.screenshot({path:'test-results/images/socket-edge-grid.png'});await page.getByRole('button',{name:'Apply',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.socket-edit-strip').hidden);assert.equal(await page.evaluate(()=>fixture.scene.model.componentSetup.sockets.at(-1).placement.edge),1);
+ console.log('Deterministic positioning controls, incenter, sloped creation, box-face axis selection, edit, undo, cancel, and camera restoration passed.');
+ await page.screenshot({path:'test-results/images/component-socket-workflow.png'});assert.deepEqual(errors,[]);console.log('Socket creation, precision Grid/Free, transactional Apply/Cancel/undo, occupied-socket protection, assignment, drag/drop, 90° rotation, and reopening passed.');
+ await page.evaluate(()=>fixture.controller.dispose());
+}finally{await browser.close();await new Promise(r=>server.close(r));}

@@ -46,15 +46,16 @@ export function mountComponentLibrary(host,changed){
   const scrollTop=host.scrollTop,scrollLeft=host.scrollLeft,focused=document.activeElement?.dataset?.componentTool;host.replaceChildren();
   // Search, folder filter and pack import/export.
   const tools=document.createElement('div');tools.className='component-library-tools';host.append(tools);
-  const search=document.createElement('input');search.type='search';search.placeholder='Search name, folder or tag';search.setAttribute('aria-label','Search components');search.value=componentLibrary.query;search.dataset.componentTool='search';search.oninput=()=>{componentLibrary.query=search.value;draw();};
-  const folders=[...new Set(componentLibrary.assets.map(a=>a.folder).filter(Boolean))].sort(),folderSelect=document.createElement('select');folderSelect.setAttribute('aria-label','Component folder');
-  for(const [value,label] of [['','All folders'],...folders.map(f=>[f,f]),['\0unfiled','Unfiled']])folderSelect.add(new Option(label,value));folderSelect.value=folders.includes(componentLibrary.folder)||componentLibrary.folder==='\0unfiled'?componentLibrary.folder:'';folderSelect.onchange=()=>{componentLibrary.folder=folderSelect.value;draw();};
+  const search=document.createElement('input');search.type='search';search.placeholder='Search components';search.setAttribute('aria-label','Search components');search.value=componentLibrary.query;search.dataset.componentTool='search';search.oninput=()=>{componentLibrary.query=search.value;draw();};
   const exportPack=document.createElement('button');exportPack.type='button';exportPack.textContent='Export pack';exportPack.title='Save the components shown here as a pack file';exportPack.disabled=!componentLibrary.assets.length;
   exportPack.onclick=()=>{const list=filteredComponents();const url=URL.createObjectURL(new Blob([componentPackFile(list)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='avorion-components.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
   const importPack=document.createElement('button');importPack.type='button';importPack.textContent='Import pack';importPack.title='Add components from a pack file';
   const packInput=document.createElement('input');packInput.type='file';packInput.accept='.json';packInput.hidden=true;importPack.onclick=()=>packInput.click();
   packInput.onchange=async()=>{const file=packInput.files[0];if(!file)return;busy=true;error='';draw();try{const {added,skipped}=await importComponentPack(await file.text());error=`Imported ${added} component${added===1?'':'s'}${skipped?`, skipped ${skipped} already in the library`:''}.`;changed();}catch(e){error=e.message;}finally{busy=false;draw();}};
-  tools.append(search,folderSelect,exportPack,importPack,packInput);if(focused==='search'){search.focus();search.setSelectionRange(search.value.length,search.value.length);}
+  componentLibrary.folder='';
+  exportPack.textContent='Export Shown Components (.json)';importPack.textContent='Import Component Pack (.json)';
+  const files=document.createElement('details');files.className='component-library-files';const title=document.createElement('summary');title.textContent='Library Files';files.append(title,exportPack,importPack,packInput);
+  tools.append(search,files);if(focused==='search'){search.focus();search.setSelectionRange(search.value.length,search.value.length);}
   const shown=filteredComponents(),groups=new Map();for(const asset of shown){const key=asset.folder||'';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(asset);}
   const keys=[...groups.keys()].sort((a,b)=>a===''?1:b===''?-1:a.localeCompare(b)),grouped=keys.length>1||keys[0]&&keys[0]!=='';
   let grid;const newGrid=label=>{if(label!==undefined){const heading=document.createElement('h3');heading.className='component-folder-heading';heading.textContent=label;host.append(heading);}grid=document.createElement('div');grid.className='turret-asset-grid';host.append(grid);};
@@ -95,9 +96,9 @@ export function mountComponentLibrary(host,changed){
   }
   if(!grid)newGrid();
   if(!shown.length&&componentLibrary.assets.length){const none=document.createElement('p');none.className='panel-note';none.textContent='No components match.';grid.before(none);}
-  const add=document.createElement('button');add.type='button';add.className='turret-asset-tile turret-import';add.textContent='+';add.title='Import component XML';add.setAttribute('aria-label','Import component XML');add.disabled=busy;grid.append(add);
+  const add=document.createElement('button');add.type='button';add.className='turret-asset-tile turret-import';add.textContent='Add XML';add.title='Add Component XML and set its attachment point';add.setAttribute('aria-label','Import component XML');add.disabled=busy;grid.append(add);
   const input=document.createElement('input');input.type='file';input.accept='.xml';input.hidden=true;host.append(input);add.onclick=()=>input.click();
-  input.onchange=async()=>{const file=input.files[0];if(!file)return;busy=true;error='';draw();try{const asset=importComponent(await file.text(),file.name.replace(/\.xml$/i,''));const saved=await addComponentAsset(asset);componentLibrary.selectedId=saved.id;if(saved.id!==asset.id)error='Already imported: '+saved.name;changed();}catch(e){error=e.message;}finally{busy=false;draw();}};
+  input.onchange=async()=>{const file=input.files[0];if(!file)return;busy=true;error='';draw();try{const asset=importComponent(await file.text(),file.name.replace(/\.xml$/i,''));const saved=await addComponentAsset(asset);componentLibrary.selectedId=saved.id;if(saved.id!==asset.id)error='Already imported: '+saved.name;changed();if(saved.id===asset.id)openComponentWorkspace(saved,async next=>{await updateComponentAsset(next);changed();});}catch(e){error=e.message;}finally{busy=false;draw();}};
   const status=document.createElement('p');status.className='panel-note';status.setAttribute('role','status');status.textContent=error||componentLibrary.error||(busy?'Importing component…':'Component assets · Saved in this browser');host.append(status);host.scrollTop=scrollTop;host.scrollLeft=scrollLeft;
  };
  listeners.add(draw);draw();loadComponentLibrary().catch(e=>{error=e.message;draw();});

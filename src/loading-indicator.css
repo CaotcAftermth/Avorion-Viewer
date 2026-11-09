@@ -3,7 +3,7 @@
 .progress-ring svg{width:100%;height:100%;transform:rotate(-90deg);fill:none;stroke:none}
 .progress-ring circle{fill:none;stroke-width:10}
 .progress-ring-track{stroke:#d6e4f7}
-.progress-ring-arc{stroke:#3d8df5;transition:stroke-dashoffset .25s ease}
+.progress-ring-arc{stroke:#3d8df5}
 .progress-ring-value{position:absolute;font-size:calc(var(--ring-size) * .22);font-variant-numeric:tabular-nums;letter-spacing:.2px;line-height:1}
 .progress-ring.indeterminate svg{animation:progress-ring-spin 1.1s linear infinite}
 @keyframes progress-ring-spin{from{transform:rotate(-90deg)}to{transform:rotate(270deg)}}

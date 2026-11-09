@@ -14,7 +14,7 @@ export function drawComponentSockets(ctx,scene,view,width,height,visible){
   const screen=projectPoint(nativeToView(socket.position),view,width,height);if(!socketOnScreen(screen,width,height)||!visible(socket))continue;
   const occupied=componentSetup(scene.model||{}).mounts.some(m=>m.socketId===socket.id);
   const tip=projectPoint(nativeToView(socket.position.map((v,i)=>v+socket.normal[i]*.5)),view,width,height);
-  if(!occupied)drawSocketMarker(ctx,screen,tip,{color:'#79e695',selected:socket.id===scene.selectedComponentSocketId,target:socket.id===scene.componentDropTarget,occupied,warning:clashing.has(socket.id)});
+  drawSocketMarker(ctx,screen,tip,{shape:'square',color:'#79e695',selected:socket.id===scene.selectedComponentSocketId,target:socket.id===scene.componentDropTarget,occupied,warning:clashing.has(socket.id)});
   hits.push({...socket,screen,occupied,exposed:true});
  }ctx.restore();return hits.sort((a,b)=>a.screen[2]-b.screen[2]);
 }

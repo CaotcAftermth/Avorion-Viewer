@@ -8,8 +8,8 @@ import {sceneSockets,surfaceSockets} from '../turrets/sockets.js';
 import {componentSetup,componentSockets} from './core.js';
 import {changeSetup,previewSetup} from './mounting.js';
 
-// Viewport helpers for components: the move/rotate gizmo on a selected free socket,
-// and (in the component window) the attachment point marker and face picking.
+// Attachment-face picking and markers in asset workspaces, plus the existing
+// turret transform gizmo. Component sockets use the constrained surface editor.
 const AXES=[['x',[1,0,0],'#ff5a5a'],['y',[0,1,0],'#7bd35b'],['z',[0,0,1],'#5a9bff']];
 const HANDLE=70,RING=46;
 const add=(a,b,s=1)=>a.map((v,i)=>v+b[i]*s);
@@ -19,14 +19,12 @@ export function createComponentTools(scene,view,getPreferences){
  function selectedFreeSocket(){
   const draft=scene.componentAttachmentDraft||scene.turretEditorAsset;
   if(draft&&scene.editAttachment)return {kind:'asset',asset:draft,manual:structuredClone(draft.attachment),live:{...draft.attachment,normal:new THREE.Vector3(0,1,0).transformDirection(frame([0,0,0],draft.attachment.rotation)).toArray()}};
-  if(scene.attachmentTransform){
+  if(scene.attachmentTransform&&!scene.selectedComponentMountId){
    const kind=scene.selectedComponentMountId?'component':'turret',setup=componentSetup(scene.model||{}),list=kind==='component'?setup.mounts:mounts(scene),mount=list.find(m=>m.id===(kind==='component'?scene.selectedComponentMountId:scene.selectedTurretId));
    const socket=mount&&(kind==='component'?componentSockets(scene):sceneSockets(scene)).find(s=>s.id===mount.socketId);
    if(socket){const matrix=frame(socket.position,socket.rotation).multiply(frame(mount.offset||[0,0,0],mount.rotation||[0,0,0])),position=new THREE.Vector3().setFromMatrixPosition(matrix).toArray(),euler=new THREE.Euler().setFromRotationMatrix(matrix);return {kind,mount,setup,list,basis:frame([0,0,0],socket.rotation),manual:{position:mount.offset||[0,0,0],rotation:mount.rotation||[0,0,0]},live:{position,rotation:[euler.x,euler.y,euler.z].map(THREE.MathUtils.radToDeg),normal:new THREE.Vector3(0,1,0).transformDirection(matrix).toArray()}};}
   }
-  if(!socketToolActive(view)||!scene.model?.componentSetup)return null;
-  const setup=componentSetup(scene.model),manual=setup.sockets.find(s=>s.id===scene.selectedComponentSocketId);if(!manual)return null;
-  const live=componentSockets(scene).find(s=>s.id===manual.id);return live?{kind:'socket',manual,live,setup}:null;
+  return null;
  }
  function drawGizmo(ctx,w,h){
   handles=null;const target=selectedFreeSocket();if(!target)return;

@@ -22,14 +22,26 @@ export function createProgressRing({size=72}={}){
   svg.append(track,arc);
   const label=document.createElement('span');label.className='progress-ring-value';
   root.append(svg,label);
-  function set(percent){
+  let displayed=0,target=0,frame=0,last=0,elapsed=0,start=0;
+  const reducedMotion=()=>globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const paint=p=>{arc.style.strokeDashoffset=String(ringOffset(p));label.textContent=`${Math.round(p)}%`;root.setAttribute('aria-valuenow',String(Math.round(p)));};
+  function animate(time){
+    frame=0;
+    // Long parsing/build frames must not turn the next painted frame into a jump.
+    elapsed+=last?Math.min(32,Math.max(0,time-last)):0;last=time;
+    const t=Math.min(1,elapsed/600);displayed=start+(target-start)*(1-(1-t)**3);paint(displayed);
+    if(t<1)frame=requestAnimationFrame(animate);
+  }
+  function set(percent,{immediate=false}={}){
     const indeterminate=percent===null||percent===undefined||!Number.isFinite(Number(percent));
     root.classList.toggle('indeterminate',indeterminate);
-    if(indeterminate){arc.style.strokeDashoffset=String(CIRCUMFERENCE*.72);label.textContent='';root.removeAttribute('aria-valuenow');return;}
-    const p=Math.round(Math.min(100,Math.max(0,Number(percent))));
-    arc.style.strokeDashoffset=String(ringOffset(p));label.textContent=`${p}%`;root.setAttribute('aria-valuenow',String(p));
+    if(indeterminate){cancelAnimationFrame(frame);frame=0;arc.style.strokeDashoffset=String(CIRCUMFERENCE*.72);label.textContent='';root.removeAttribute('aria-valuenow');return;}
+    const p=Math.min(100,Math.max(0,Number(percent)));
+    if(immediate||reducedMotion()){cancelAnimationFrame(frame);frame=0;displayed=target=p;paint(p);return;}
+    if(p===target&&label.textContent)return;
+    cancelAnimationFrame(frame);target=p;start=displayed;elapsed=0;last=0;frame=requestAnimationFrame(animate);
   }
-  set(0);
+  set(0,{immediate:true});
   return {element:root,set};
 }
 
@@ -48,7 +60,7 @@ export function ringForProgress(progress,{size=40,anchor=progress}={}){
 
 // One app-wide overlay. Several tasks may overlap (textures and a model from
 // the same drop); the newest one is shown and the overlay hides when all end.
-let overlay,ring,title,detail,showTimer=0;
+let overlay,ring,title,detail,showTimer=0,shownTask;
 const tasks=[];
 function ensureOverlay(){
   if(overlay)return;
@@ -63,7 +75,7 @@ function ensureOverlay(){
 function present(){
   const task=tasks.at(-1);
   if(!task){clearTimeout(showTimer);showTimer=0;if(overlay&&!overlay.hidden){overlay.hidden=true;try{overlay.hidePopover?.();}catch{}}return;}
-  ensureOverlay();ring.set(task.percent);title.textContent=task.label;detail.textContent=task.message||'';detail.hidden=!task.message;
+  ensureOverlay();if(shownTask!==task){shownTask=task;ring.set(0,{immediate:true});}ring.set(task.percent);title.textContent=task.label;detail.textContent=task.message||'';detail.hidden=!task.message;
   // Short work finishes before the ring would flash; reveal it after a beat.
   if(overlay.hidden&&!showTimer){if(task.delay>0)showTimer=setTimeout(reveal,task.delay);else reveal();}
 }
@@ -77,8 +89,18 @@ function reveal(){
 export function startLoading(label,{percent=0,message='',delay=120}={}){
   const task={label,percent,message,delay};tasks.push(task);present();
   return {
-    update(nextPercent,nextMessage){if(!tasks.includes(task))return;task.percent=nextPercent;if(nextMessage!==undefined)task.message=nextMessage;present();},
-    done(){const i=tasks.indexOf(task);if(i<0)return;tasks.splice(i,1);present();},
+    update(nextPercent,nextMessage){
+      if(!tasks.includes(task)||task.finished)return;
+      if(nextPercent===null||nextPercent===undefined)task.percent=nextPercent;
+      else if(Number.isFinite(Number(nextPercent)))task.percent=Math.max(Number(task.percent)||0,Math.min(100,Math.max(0,Number(nextPercent))));
+      if(nextMessage!==undefined)task.message=nextMessage;present();
+    },
+    done(){
+      if(!tasks.includes(task)||task.finished)return;task.finished=true;
+      const remove=()=>{const i=tasks.indexOf(task);if(i>=0)tasks.splice(i,1);present();};
+      if(task===tasks.at(-1)&&overlay&&!overlay.hidden){task.percent=100;present();setTimeout(remove,750);}
+      else remove();
+    },
   };
 }
 

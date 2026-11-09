@@ -24,7 +24,7 @@ import {mountAttachmentLibrary,ASSET_KINDS} from './attachment-library.js';
 import {restoreComponentSetup} from './components/storage.js';
 import {mountComponentProperties} from './components/properties.js';
 import {mountComponentOutliner} from './components/outliner.js';
-import {componentHistory,detachComponent,changeSetup} from './components/mounting.js';
+import {componentHistory,detachSurfaceComponent,changeSetup} from './components/mounting.js';
 import {componentSetup} from './components/core.js';
 import {validateComponent} from './components/core.js';
 import {mountTurretProperties} from './turrets/properties.js';
@@ -167,7 +167,7 @@ function refreshStructure(){
   const priorAttachment=scene.attachmentContext;
   const context=syncAttachmentContext(scene,{turretAssetId:turretLibrary.selectedId,componentAssetId:componentLibrary.selectedId});
   const coverageNodes=leaves(workspace().root).filter(n=>n.editor==='properties'&&n.propertyTab==='coverage');
-  routeAttachmentInspector(leaves(workspace().root),context,attachmentInspectorId);
+  if(priorAttachment?.type!==context?.type||priorAttachment?.kind!==context?.kind||priorAttachment?.id!==context?.id)routeAttachmentInspector(leaves(workspace().root),context,attachmentInspectorId);
   if(context?.type!=='component'||priorAttachment?.type===context.type&&priorAttachment?.id===context.id)for(const node of coverageNodes)node.propertyTab='coverage';
   assetPersistence.changed();crashGuard.track();
   reconcileStructure(scene);
@@ -191,13 +191,14 @@ function regionPick(selected,meta){
 function selectStructure(ids,additive=false,fromViewport=false){scene.attachmentContext=null;scene.selectedTurretId=null;scene.selectedTurretIds=new Set();scene.selectedComponentMountId=null;scene.selectedComponentSocketId=null;if(scene.turretSockets)scene.turretSockets.selectedId=null;selectBlocks(scene,ids,additive);routeAttachmentInspector(leaves(workspace().root),{type:'object'},attachmentInspectorId);if(fromViewport){scene.outlinerRevealId=ids.findLast(id=>scene.selectedIds.has(id))||null;scene.outlinerRevealRevision=(scene.outlinerRevealRevision||0)+1;}refreshStructure();}
 function viewportPie(event,node){
   lastViewportId=node.id;
-  const ids=[...scene.selectedIds];if(!ids.length)return;
+  const ids=[...scene.selectedIds];if(!scene.loaded)return;
   menu(event.clientX,event.clientY,'Selection',[
-    {label:'Focus',action:()=>focusStructure(ids)},
-    {label:'Isolate',action:()=>visibilityStructure(ids,'isolate')},
-    {label:'Hide',action:()=>visibilityStructure(ids,'hide')},
+    {label:'Focus',disabled:!ids.length,action:()=>focusStructure(ids)},
+    {label:'Isolate',disabled:!ids.length,action:()=>visibilityStructure(ids,'isolate')},
+    {label:'Hide',disabled:!ids.length,action:()=>visibilityStructure(ids,'hide')},
     {label:'Show Last',disabled:!scene.visibilityHistory?.length,disabledReason:'Hide or isolate blocks first to restore the previous visibility.',action:()=>visibilityStructure([],'last')},
-    {label:'Show All',disabled:!scene.hiddenIds.size&&node.view.showThinBlocks!==false,disabledReason:'All blocks are already visible.',action:()=>visibilityStructure([],'all')}
+    {label:'Show All',disabled:!scene.hiddenIds.size&&node.view.showThinBlocks!==false,disabledReason:'All blocks are already visible.',action:()=>visibilityStructure([],'all')},
+    {label:'Add Socket',disabled:!!(scene.componentAttachmentDraft||scene.turretEditorAsset),action:()=>{node.view.tool='sockets';node.view.interactionMode='object';const canvas=areaElement(node.id)?.querySelector('canvas');save();for(const b of areaElement(node.id)?.querySelectorAll('.viewport-toolbar button')||[]){const label=b.getAttribute('aria-label')||b.title;if(['Select','Select Sockets'].includes(label)){const selected=label==='Select Sockets';b.classList.toggle('active',selected);b.setAttribute('aria-pressed',String(selected));}}canvas?.dispatchEvent(new Event('component-socket-place'));canvas?.focus();}}
   ]);
   const el=$('#menu');el.classList.add('pie-menu');
   el.style.left=clamp(event.clientX-el.offsetWidth/2,6,Math.max(6,innerWidth-el.offsetWidth-6))+'px';
@@ -236,15 +237,19 @@ function revealStructure(ids,{focus=true,kind}={}){
 }
 
 // Double-clicking a Block Gallery block opens it alone in a workspace window.
-function openGalleryBlock(node){
-  if(embedded||!isBlockGallery(scene)||interactionMode(node.view.interactionMode)!=='object'||socketToolActive(node.view))return;
-  const block=scene.model.blocks.find(b=>b.id===scene.selectedId);if(!block)return;
-  openBlockWorkspace(block,edited=>{
+function editGalleryVariant(block,variant){
+  const preview=variant?{...block,typeIndex:variant.typeIndex,type:variant.name}:block;
+  openBlockWorkspace(preview,edited=>{
     applyGalleryEdit(block,edited);
     scene.model={...makeModel(scene.model.blocks,scene.model.fileName),turretMounts:scene.model.turretMounts,componentSetup:scene.model.componentSetup,placementOffset:scene.model.placementOffset};
     scene.revision++;scene.appearanceRevision=(scene.appearanceRevision||0)+1;
     commit(`${block.type} updated in the Block Gallery.`);
   });
+}
+function openGalleryBlock(node){
+  if(embedded||!isBlockGallery(scene)||interactionMode(node.view.interactionMode)!=='object'||socketToolActive(node.view))return;
+  const block=scene.model.blocks.find(b=>b.id===scene.selectedId);if(!block)return;
+  editGalleryVariant(block);
 }
 function loadModel(model,preview=false){
   cancelPaintTask();scopeCache=null;scene.paintSample=null;scene.paintMessage='';
@@ -784,7 +789,7 @@ function renderViewport(body,node){
   if(node.view.interactionMode==='paint'){body.classList.add('painting-tools');renderers.push(mountPaintToolbar(body,node,scene,{palette:()=>brushPalette,color:chooseBrushColor,visibility:(ids,action)=>visibilityStructure(ids,action,node.view),undo:changePaintHistory,cancel:()=>{renderers.find(r=>r.id===node.id)?.cancel();if(scene.paintBusy)cancelPaintTask();},change:()=>{save();refreshStructure();}}));}
   if(node.toolbar&&node.view.interactionMode!=='paint'){
     const toolbar=document.createElement('div');toolbar.className='viewport-toolbar';toolbar.role='toolbar';toolbar.setAttribute('aria-label','Viewport tools');
-    for(const [tool,label] of [['select','Select'],['sockets','Select Sockets'],['orbit','Orbit'],['pan','Pan']]){const b=button(label,icon(tool==='sockets'?'socket':tool),()=>{node.view.tool=tool;if(tool==='select')routeAttachmentInspector(leaves(workspace().root),{type:'object'},attachmentInspectorId);commit();},node.view.tool===tool?'active':'');b.setAttribute('aria-pressed',String(node.view.tool===tool));toolbar.append(b);}
+    for(const [tool,label] of [['select','Select'],['sockets','Select Sockets'],['orbit','Orbit'],['pan','Pan']]){const b=button(label,icon(tool==='sockets'?'socket':tool),()=>{if(renderers.find(r=>r.id===node.id)?.socketEditing)return;node.view.tool=tool;if(tool==='select')routeAttachmentInspector(leaves(workspace().root),{type:'object'},attachmentInspectorId);commit();},node.view.tool===tool?'active':'');b.setAttribute('aria-pressed',String(node.view.tool===tool));toolbar.append(b);}
     toolbar.append(document.createElement('hr'),button('Frame all',icon('frame'),()=>frameArea(node)));body.append(toolbar);
   }
   const nav=document.createElement('div');nav.className='navigation';
@@ -823,6 +828,7 @@ function renderViewport(body,node){
 function frameArea(node){navigate(node,{action:'frame'});}
 function setView(node,name){navigate(node,{action:'align',value:name});}
 function navigate(node,command){
+  if(renderers.find(r=>r.id===node.id)?.socketEditing)return;
   if(command.interrupt!==false)scene.turretStudio?.manualCamera();
   const renderer=renderers.find(r=>r.id===node.id),canvas=areaElement(node.id)?.querySelector('canvas');
   if(!renderer||!canvas)return;
@@ -890,7 +896,7 @@ function mountPropertyTab(tab,content,node,searching=false){
   const context=node.attachmentPin||scene.attachmentContext;
   const attachmentScene=node.attachmentPin?inspectorScene(scene,context):scene;
   if(['turrets','components','coverage'].includes(tab)&&node.attachmentPin&&(inspectorPins.get(node)!==scene.model||!resolveAttachmentContext(scene,context,{turret:turretLibrary,component:componentLibrary}))){content.textContent='Pinned attachment is no longer available. Unpin to follow selection.';return;}
-  if(tab==='object')mountBlockInspector(content,scene,(change)=>{if(change?.appearance){refreshStructure();return;}scene.model={...makeModel(scene.model.blocks,scene.model.fileName),turretMounts:scene.model.turretMounts,componentSetup:scene.model.componentSetup,placementOffset:scene.model.placementOffset};scene.revision++;render();},{reveal:revealStructure,preferences});
+  if(tab==='object')mountBlockInspector(content,scene,(change)=>{if(change?.appearance){refreshStructure();return;}scene.model={...makeModel(scene.model.blocks,scene.model.fileName),turretMounts:scene.model.turretMounts,componentSetup:scene.model.componentSetup,placementOffset:scene.model.placementOffset};scene.revision++;render();},{reveal:revealStructure,preferences,openVariant:editGalleryVariant});
   const showCoverageView=(direction,bounds)=>{const viewport=captureViewport();if(viewport){if(direction==='coverage'){viewport.view.target=nativeToView(bounds.center);viewport.view.zoom=3/Math.max(.1,bounds.radius);viewport.view.panX=viewport.view.panY=0;save();renderers.find(r=>r.id===viewport.id)?.draw();}else{viewport.view.projection='orthographic';setView(viewport,direction);}}};
   if(tab==='coverage')mountCoverageControls(content,attachmentScene,refreshStructure,showCoverageView,()=>{node.propertyTab='turrets';node.panelOpen??={};node.panelOpen['turrets:Aiming Configuration']=true;commit();});
   if(tab==='turrets')mountTurretProperties(content,attachmentScene,refreshStructure,socket=>{const node=leaves(workspace().root).find(n=>n.editor==='viewport');const canvas=node&&areaElement(node.id)?.querySelector('canvas');return !!canvas&&socketExposed(scene,node.view,canvas.clientWidth,canvas.clientHeight,socket,preferences.value);});
@@ -1066,7 +1072,7 @@ document.addEventListener('turret-open-properties',event=>{
 });
 document.addEventListener('property-history',event=>{if(event.target.closest('.property-search-group[data-tab=components]')||currentArea().propertyTab==='components')componentHistory(scene,event.detail.redo).finally(refreshStructure);else{mountHistory(scene,event.detail.redo);refreshStructure();}});
 document.addEventListener('keydown',e=>{
-  if(e.defaultPrevented||document.querySelector('dialog[open]'))return;
+  if(e.defaultPrevented||document.querySelector('dialog[open]')||renderers.some(r=>r.socketEditing))return;
   const match=id=>matchesBinding(id,e,preferences.value);
   if(match('cancel')){
     e.preventDefault();const navigating=renderers.find(r=>r.navigating);
@@ -1103,7 +1109,7 @@ document.addEventListener('keydown',e=>{
   const node=currentArea();
   if(e.key==='Delete'&&!embedded&&scene.selectedComponentMountId&&['viewport','outliner'].includes(node.editor)&&scene.model){
     const mount=componentSetup(scene.model).mounts.find(m=>m.id===scene.selectedComponentMountId);
-    if(mount){e.preventDefault();changeSetup(scene,detachComponent(scene,mount)).then(()=>log(`${mount.name||mount.asset.name} detached.`)).catch(error=>{scene.componentMessage=error.message;}).finally(refreshStructure);return;}
+    if(mount){e.preventDefault();changeSetup(scene,detachSurfaceComponent(scene,mount)).then(()=>log(`${mount.name||mount.asset.name} detached.`)).catch(error=>{scene.componentMessage=error.message;}).finally(refreshStructure);return;}
   }
   if(node.editor==='preferences'&&(match('searchPreferences')||match('clearSearch'))){e.preventDefault();renderers.find(r=>r.preferenceAreaId===node.id)?.focusSearch(match('clearSearch'));return;}
   if(match('maximize')||match('focus')){e.preventDefault();closeMenu();toggleMaximize(node.id,match('focus'));return;}

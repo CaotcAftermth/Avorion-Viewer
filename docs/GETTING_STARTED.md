@@ -37,6 +37,27 @@ Choose **Select Sockets** to pick turret mounting points without selecting hull 
 
 Select a turret asset in the **Asset Library**, choose an available socket, and use **Attach selected asset**. Pose and size controls let you explore how a mounted turret sits on the ship. This is useful for comparing placements and checking how barrels line up with nearby hull sections.
 
+### Place components with the Socket tool
+
+1. In **Asset Library > Components**, choose **Add XML**. In the component workspace, use **Set Attachment Point**, click the joining face, then **Save asset**. You can reopen this step from the component's Properties.
+2. In the ship viewport, activate **Select Sockets**. Right-click the model and choose **Add Component Socket**. Hover to preview the actual face, then left-click to set its socket position. Define the direction first by choosing an outward bounding-box face. Action buttons appear beside the cursor. **Confirm Direction** preserves the view and changes only those buttons to **Back**, **Place Socket**, **Refine Position**, and **Cancel**, in that order. Choose **Place Socket**, or optionally **Refine Position** with Center, Grid, or Free placement before saving. Escape or right-click cancels placement. Empty sockets remain available for future components.
+3. Drag a library component onto a socket, or select the socket and choose a component in **Properties > Components**. Components retain their imported dimensions. Use **−90° / +90°** to rotate around the socket axis.
+4. Right-click a socket and choose **Edit Position** for precision placement. The view aligns with its mounting face and dims surrounding geometry. Only controls relevant to the current positioning mode are available. Selecting a socket opens Components once; you can switch Properties tabs without changing tools or clearing selection. Position edits preserve the established socket direction. Use the separate **Edit Direction** context-menu action to change the bounding-box axis; the socket does not tilt with the slope. Toolbar tools and the navigation gizmo are locked while editing, but wheel zoom remains available. **Apply** saves one undoable change; **Cancel** restores the socket and mounted component. Both restore the previous camera.
+
+Precision modes:
+
+- **Center:** choose the true area-based **Face Center**, **Block Center Projection**, or **Incenter** (the center of the largest circle that fits inside the face). A projection outside the face is unavailable. The preferred center definition is remembered. Separate leader labels identify all three candidates, even when their points coincide.
+- **Grid:** choose exact native-unit spacing or an edge division count. Divisions split the selected edge itself, including both endpoints as valid socket positions. **Square Cells** uses that edge length divided by the count for both axes. On triangles, **Equal Divisions** subdivides the base and both apex sides, forming a triangular lattice with valid points on every side and at the apex. Grid lines and placement remain clipped to the face. On non-quad faces, **Grid edge** chooses the orientation edge; **Edge 1** is the floor edge in the aligned view, with numbers outside the face.
+- **Free:** click anywhere on the selected surface. This does not create a free-floating socket.
+
+Socket controls use collapsible panels with the same two-column formatting as Properties. Under **Socket Position**, **Display** opens expanded by default to change grid and shaded-background colors and opacities (0–100%). Opacity uses the same blue fill as the app sliders and the same drag/type controls as Properties, including fine adjustment and Escape to cancel. Grid display settings are available only in Grid mode; background settings remain available in the other refinement modes. These preferences are saved locally. The face uses a neutral, unlit drafting surface: background opacity adjusts its tint rather than exposing the lit ship material, so scene lighting cannot wash out the guides. Refinement actions remain at the bottom of the separate control pane; direction confirmation and initial placement actions stay beside the cursor.
+
+In **Help > Developer > Load Block Gallery**, selecting a block shows **Variants** below **Object Data**. Each variant has a geometry preview; double-click one to open that variant in the block workspace. **Apply to gallery** updates the selected gallery block.
+
+Occupied sockets must be detached before deletion. Editing a socket previews its attached component moving with it. Existing setups with legacy offsets or scales remain readable; new assignment uses imported size and quarter-turn rotation.
+
+Components and ship setups are separate files. **Library Files** imports/exports reusable component packs (`.json`); it does not import XML designs. **Ship Component Files** backs up the current ship's sockets and attachments as JSON, or writes a game-readable XML copy. Native XML baking requires the combined orientation to resolve to 90° steps; incompatible legacy or slanted arrangements report an error instead of silently changing their geometry.
+
 ## Choose how the ship looks
 
 Use the shading buttons in the viewport header. Hover over a button to see its name.

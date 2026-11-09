@@ -14,9 +14,9 @@ function enqueue(model,operation){const next=(pending.get(model)||Promise.resolv
 export function changeSetup(scene,next,{previous}={}){
  const model=scene.model;if(!model)return Promise.reject(Error('Load a ship first.'));
  if(numericEdits.has(model)){previewSetup(scene,next);return Promise.resolve();}
- const expected=componentSetup(model);
+ const expected=model.componentSetup;
  return enqueue(model,async()=>{
-  if(componentSetup(model)!==expected&&!previous)throw Error('Another component edit finished first. Retry this edit against the updated setup.');
+  if(model.componentSetup!==expected&&!previous)throw Error('Another component edit finished first. Retry this edit against the updated setup.');
   const before=previous||componentSetup(model);model.componentSaveState='Saving…';
   try{await saveComponentSetup(model,next);delete model.componentSaveDraft;model.componentSaveState='Saved locally';}
   catch(error){model.componentSaveDraft=next;model.componentSaveState='Save failed: '+error.message;throw error;}
@@ -113,3 +113,16 @@ export function addSockets(scene,saved,socket){
  return setup;
 }
 export const snapTwist=(value,snap)=>snap?Math.round(value/90)*90:value;
+
+// The viewport-first workflow edits one socket at imported size. Legacy setup
+// transforms remain readable, but are not offered by the new placement UI.
+export function assignComponent(scene,asset,socket){
+ if(!asset)throw Error('Choose a component in the Asset Library.');if(socket?.type!=='component')throw Error('Choose a component socket.');
+ const setup=componentSetup(scene.model),existing=setup.mounts.find(m=>m.socketId===socket.id);
+ const mount={...(existing||{id:crypto.randomUUID(),socketId:socket.id}),asset:structuredClone(asset),source:assetProvenance(asset),scale:1,twist:Math.round((existing?.twist||0)/90)*90,offset:[0,0,0],rotation:[0,0,0]};
+ return {...setup,mounts:existing?setup.mounts.map(m=>m.id===existing.id?mount:m):[...setup.mounts,mount]};
+}
+export function detachSurfaceComponent(scene,mount){const setup=componentSetup(scene.model);return {...setup,mounts:setup.mounts.filter(m=>m.id!==mount.id)};}
+export function rotateSurfaceComponent(scene,mount,step){
+ const setup=componentSetup(scene.model);return {...setup,mounts:setup.mounts.map(m=>m.id===mount.id?{...m,twist:Math.round((m.twist||0)/90)*90+(step<0?-90:90)}:m)};
+}

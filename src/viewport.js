@@ -1,3 +1,4 @@
+import {createSocketEditor} from './components/socket-editor.js';
 import {socketToolActive} from './interaction-modes.js';
 import {createTurretToolbar} from './turrets/context-toolbar.js';
 import {pickSocketMarker,selectSocketMarker} from './socket-markers.js';
@@ -5,7 +6,7 @@ import {choosePlacementTarget,createPlacementStrip} from './attachments/placemen
 import {drawComponentSockets} from './components/overlay.js';
 import {componentLibrary} from './components/library.js';
 import {componentSetup} from './components/core.js';
-import {changeSetup,placeComponent} from './components/mounting.js';
+import {changeSetup,assignComponent} from './components/mounting.js';
 import {createComponentTools} from './components/viewport-tools.js';
 import {visibleTurretBlocks} from './turrets/posed-blocks.js';
 import {drawCoverageLegend} from './turrets/coverage-render.js';
@@ -47,6 +48,8 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   let socketHits=[],componentSocketHits=[];
   const componentTools=createComponentTools(scene,view,getPreferences);
   const turretToolbar=createTurretToolbar(canvas,scene,view,{changed:()=>{onSelect({socketId:scene.turretSockets?.selectedId||null});onChange();},selected:onSelect,invalidate:()=>invalidate()});
+  activePlacementViewport??=area.id;
+  const socketEditor=createSocketEditor(canvas,scene,view,{pick:(x,y)=>pickGamePoint(scene,view,width,height,x,y,getPreferences()),invalidate:()=>invalidate(),changed:()=>{onSelect({componentSocketId:scene.selectedComponentSocketId});onChange();},active:()=>activePlacementViewport===area.id,visible:s=>socketExposed(scene,view,width,height,s,getPreferences())});
   const events = new AbortController();
   const listen = (target, type, handler, options = {}) => target.addEventListener(type, handler, { ...options, signal: events.signal });
   const invalidate = () => { if (!frame) frame = requestAnimationFrame(draw); };
@@ -70,7 +73,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     const socket=componentDropSocket(event),asset=componentLibrary.dragged;event.dataTransfer.dropEffect=socket?'copy':'none';
     if(scene.componentDropTarget!==(socket?.id||null)){
       const current=socket&&componentSetup(scene.model||{}).mounts.find(m=>m.socketId===socket.id);
-      scene.componentDropTarget=socket?.id||null;scene.componentPreview=socket?{asset,socket,scale:current?.scale??1,twist:current?.twist??0}:null;invalidate();
+      scene.componentDropTarget=socket?.id||null;scene.componentPreview=socket?{asset,socket,scale:1,twist:Math.round((current?.twist||0)/90)*90}:null;invalidate();
     }
   });
   listen(canvas,'dragleave',()=>{scene.componentPreview=null;invalidate();});
@@ -81,7 +84,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     async commit(state){
       if(scene.model!==state.model)throw Error('The ship changed. Cancel placement and choose a socket again.');
       if(state.kind==='component'){
-        const next=placeComponent(scene,state.asset,state.socket);const mount=next.mounts.find(m=>m.socketId===state.socket.id);mount.scale=state.size;mount.twist=state.twist;
+        const next=assignComponent(scene,state.asset,state.socket);const mount=next.mounts.find(m=>m.socketId===state.socket.id);mount.scale=1;mount.twist=Math.round(state.twist/90)*90;
         await changeSetup(scene,next);scene.selectedComponentSocketId=state.socket.id;scene.selectedComponentMountId=mount.id;onSelect({componentSocketId:state.socket.id});
       }else{
         const instance=(state.occupied?replaceTurret:placeTurret)(scene,state.asset,state.socket,state.size);const mount=mounts(scene).find(m=>m.id===instance.id);mount.twist=state.twist;selectTurrets(scene,instance.id);scene.turretSockets??={};scene.turretSockets.selectedId=state.socket.id;socketsChanged();
@@ -94,7 +97,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   function startPlacement(kind,asset,socket){if(!scene.model)return;placement.start({kind,asset,socket,model:scene.model,size:kind==='turret'?(socket?.fitSize||asset.sourceSize||1):1,occupied:occupied(kind,socket)});}
   listen(canvas,'drop',event=>{const kind=componentLibrary.dragged?'component':'turret',asset=componentLibrary.dragged||turretLibrary.dragged;if(!asset||view.interactionMode==='paint')return;event.preventDefault();const socket=kind==='component'?componentDropSocket(event):dragSocket(event);if(!socket)return;startPlacement(kind,asset,socket);if(!occupied(kind,socket))placement.accept();});
   listen(window,'attachment-place',event=>{if(activePlacementViewport&&activePlacementViewport!==area.id)return;activePlacementViewport=area.id;const {kind,asset}=event.detail||{};if(asset&&['turret','component'].includes(kind)){startPlacement(kind,asset,null);canvas.focus();}});
-  listen(window,'blur',()=>{placement.cancel();});
+  listen(window,'blur',()=>{placement.cancel();socketEditor.cancel();});
   listen(canvas,'pointermove',event=>{if(!placement.state)return;const state=placement.state,[x,y]=position(event),socket=choosePlacementTarget(state.kind==='turret'?socketHits.filter(s=>s.fitSize):componentSocketHits,x,y,state.socket?.id);placement.target(socket,occupied(state.kind,socket));});
   listen(canvas,'pointerdown',event=>{if(!placement.state||event.button!==0)return;event.preventDefault();event.stopImmediatePropagation();if(placement.state.socket&&!placement.state.occupied)placement.accept();});
   listen(window,'keydown',event=>{if(!placement.state||!body.contains(document.activeElement))return;if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();placement.cancel();}else if(event.key==='Enter'&&event.target===canvas){event.preventDefault();placement.accept();}});
@@ -163,7 +166,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     drawDimensions(ctx,scene,view,width,height,preferences,dimensionCache);
     socketHits=drawSockets(ctx,scene,view,width,height,editorTheme(preferences,'viewport').accent,s=>socketExposed(scene,view,width,height,s,preferences));
     componentSocketHits=drawComponentSockets(ctx,scene,view,width,height,s=>socketExposed(scene,view,width,height,s,preferences));
-    componentTools.draw(ctx,width,height);turretToolbar.draw(ctx);
+    componentTools.draw(ctx,width,height);turretToolbar.draw(ctx);socketEditor.draw(ctx,width,height);
     drawCoverageLegend(ctx,scene,view,width,height);
     drawMagnifier();
     drawPaintPreview();
@@ -263,7 +266,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     return { x: Math.min(drag.startX,drag.x), y: Math.min(drag.startY,drag.y), width: Math.abs(drag.x-drag.startX), height: Math.abs(drag.y-drag.startY) };
   }
   function position(event) { const rect=canvas.getBoundingClientRect();return [event.clientX-rect.left,event.clientY-rect.top]; }
-  function updateCursor(){if(canvas.style)canvas.style.cursor=cursorCSS(viewportCursor(view,drag?.mode,rightHeld,regionMode),view.paint?.radius,getPreferences());}
+  function updateCursor(){if(canvas.style)canvas.style.cursor=socketEditor.cursor||cursorCSS(viewportCursor(view,drag?.mode,rightHeld,regionMode),view.paint?.radius,getPreferences());}
   function trackButtons(event){rightHeld=!!(event.buttons&2);updateCursor();}
   function release() {
     const pointerId=drag?.pointerId;drag=null;updateCursor();
@@ -280,6 +283,8 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     release();regionMode=false;body.classList.remove('region-zoom');invalidate();onChange();return true;
   }
   function down(event, forcedMode, capture=true) {
+    if(forcedMode&&socketEditor.locked){event.preventDefault();return;}
+    if(!forcedMode&&socketEditor.down(event,...position(event))){event.preventDefault();return;}
     if(!forcedMode&&view.interactionMode==='paint'&&event.button===2&&!drag&&!regionMode){suppressContext=true;startMagnifier(event);return;}
     if(magnifier){event.preventDefault();return;}
     if(event.button===2)suppressContext=!!(drag||regionMode);
@@ -349,6 +354,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     if(drag.subtract&&!scene.regionEdit){const remove=new Set(ids);return [...scene.selectedIds||[]].filter(id=>!remove.has(id));}return ids;
   }
   function move(event) {
+    if(!drag&&socketEditor.move(...position(event)))return;
     if(!drag&&scene.showFireCoverage&&coverageOptions(scene).inspect&&!scene.turretDragging&&view.interactionMode!=='paint'&&!socketToolActive(view)){scene.coverageHover=pickWeaponCoverage(scene,view,width,height,...position(event),getPreferences());invalidate();}
     if(view.interactionMode==='paint'){paintPointer=position(event);invalidate();}
     if(magnifier){lensPaint(...position(event));return;}
@@ -487,7 +493,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     if(!touches.size)multiTouch=false;
     updateCursor();
   }
-  listen(canvas,'pointerdown',event=>{trackButtons(event);scene.turretStudio?.manualCamera();if(handlesTouch(event))touchDown(event);else down(event);updateCursor();});
+  listen(canvas,'pointerdown',event=>{trackButtons(event);scene.turretStudio?.manualCamera();if(socketEditor.locked&&handlesTouch(event)){down(event);return;}if(handlesTouch(event))touchDown(event);else down(event);updateCursor();});
   // Mouse events report button chords; pointerdown/up only report first/last buttons.
   listen(canvas,'mousedown',event=>{
     trackButtons(event);
@@ -506,6 +512,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   listen(canvas,'contextmenu',event=>{event.preventDefault();if(handlesTouch(event)||touches.size)return;if(magnifier)return;if(drag||regionMode){if(drag?.button!==2&&matchesBinding('cancelMouse',event,getPreferences(),'Mouse2'))cancel();return;}if(!suppressContext)openViewportContext(event);});
   function openViewportContext(event){
    const [x,y]=position(event);
+   if(socketEditor.context(event,x,y,componentSocketHits)){event.preventDefault();return;}
    if(view.interactionMode!=='paint'){
     const hit=pickComponent(scene,view,width,height,x,y,getPreferences()),marker=pickSocketMarker(componentSocketHits,x,y);
     const component=componentSetup(scene.model||{}).mounts.find(m=>m.id===hit?.componentMountId||marker&&m.socketId===marker.id);
@@ -518,6 +525,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   // expose trackpad magnification as Ctrl+wheel. Scope both to this canvas.
   let nativeGesture=null;
   listen(canvas,'gesturestart',event=>{
+    if(socketEditor.locked){event.preventDefault();return;}
     if(!getPreferences().trackpadNavigation||touches.size||drag||regionMode||magnifier)return;
     event.preventDefault();scene.turretStudio?.manualCamera();
     nativeGesture={scale:1,rotation:0};
@@ -527,6 +535,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     event.preventDefault();
     if(!getPreferences().trackpadNavigation||drag||regionMode||magnifier){nativeGesture=null;return;}
     const p=getPreferences(),scale=Number(event.scale),rotation=Number(event.rotation);
+    if(socketEditor.locked){if(Number.isFinite(scale)&&scale>0)socketEditor.wheel({deltaY:-Math.log(scale/nativeGesture.scale)*1000},1,p);nativeGesture.scale=scale;return;}
     if(Number.isFinite(scale)&&scale>0){zoom(view,Math.pow(scale/nativeGesture.scale,p.zoomSensitivity*(p.invertZoom?-1:1)));nativeGesture.scale=scale;}
     if(Number.isFinite(rotation)){view.roll=(view.roll||0)+(rotation-nativeGesture.rotation)*Math.PI/180;nativeGesture.rotation=rotation;}
     invalidate();onChange();
@@ -536,6 +545,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   listen(canvas,'wheel',event=>{
     event.preventDefault();
     const unit=event.deltaMode===1?16:event.deltaMode===2?height:1,p=getPreferences();
+    if(socketEditor.wheel(event,unit,p))return;
     if(magnifier){
       const options=paintOptions(view);
       if(event.ctrlKey||!['brush','restore'].includes(options.tool))return;
@@ -570,10 +580,11 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   }
   return {
     id: area.id, draw: invalidate, cancel,
+    get socketEditing(){return socketEditor.locked;},
     get statusActivity() { return statusActivity(); },
     get navigating() { return !!drag || regionMode || !!magnifier; },
     startRegion() {cancel();regionMode=true;body.classList.add('region-zoom');canvas.focus({preventScroll:true});invalidate();},
-    dispose() {turretToolbar.dispose();if(activePlacementViewport===area.id)activePlacementViewport=null;placement.cancel();placement.dispose();releaseViewportResources(view);cancel();events.abort();observer.disconnect();cancelAnimationFrame(frame);hoverLabel?.remove?.();if(canvas.style)canvas.style.cursor=originalCursor;}
+    dispose() {socketEditor.dispose();turretToolbar.dispose();if(activePlacementViewport===area.id)activePlacementViewport=null;placement.cancel();placement.dispose();releaseViewportResources(view);cancel();events.abort();observer.disconnect();cancelAnimationFrame(frame);hoverLabel?.remove?.();if(canvas.style)canvas.style.cursor=originalCursor;}
   };
 }
 
