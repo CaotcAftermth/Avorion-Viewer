@@ -69,7 +69,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   function componentDropSocket(event){const [x,y]=position(event);return choosePlacementTarget(componentSocketHits,x,y,scene.componentDropTarget);}
   listen(window,'component-drag-end',()=>{if(!placement.state)scene.componentPreview=null;invalidate();});
   listen(canvas,'dragover',event=>{
-    if(!componentLibrary.dragged||view.interactionMode==='paint')return;event.preventDefault();
+    if(!componentLibrary.dragged?.attachment||view.interactionMode==='paint')return;event.preventDefault();
     const socket=componentDropSocket(event),asset=componentLibrary.dragged;event.dataTransfer.dropEffect=socket?'copy':'none';
     if(scene.componentDropTarget!==(socket?.id||null)){
       const current=socket&&componentSetup(scene.model||{}).mounts.find(m=>m.socketId===socket.id);
@@ -94,8 +94,8 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     }
   });
   const occupied=(kind,socket)=>!!socket&&(kind==='turret'?mounts(scene):componentSetup(scene.model||{}).mounts).some(m=>m.socketId===socket.id);
-  function startPlacement(kind,asset,socket){if(!scene.model)return;placement.start({kind,asset,socket,model:scene.model,size:kind==='turret'?(socket?.fitSize||asset.sourceSize||1):1,occupied:occupied(kind,socket)});}
-  listen(canvas,'drop',event=>{const kind=componentLibrary.dragged?'component':'turret',asset=componentLibrary.dragged||turretLibrary.dragged;if(!asset||view.interactionMode==='paint')return;event.preventDefault();const socket=kind==='component'?componentDropSocket(event):dragSocket(event);if(!socket)return;startPlacement(kind,asset,socket);if(!occupied(kind,socket))placement.accept();});
+  function startPlacement(kind,asset,socket){if(!scene.model||kind==='component'&&!asset.attachment)return false;placement.start({kind,asset,socket,model:scene.model,size:kind==='turret'?(socket?.fitSize||asset.sourceSize||1):1,occupied:occupied(kind,socket)});return true;}
+  listen(canvas,'drop',event=>{const kind=componentLibrary.dragged?'component':'turret',asset=componentLibrary.dragged||turretLibrary.dragged;if(!asset||view.interactionMode==='paint')return;event.preventDefault();const socket=kind==='component'?componentDropSocket(event):dragSocket(event);if(!socket||!startPlacement(kind,asset,socket))return;if(!occupied(kind,socket))placement.accept();});
   listen(window,'attachment-place',event=>{if(activePlacementViewport&&activePlacementViewport!==area.id)return;activePlacementViewport=area.id;const {kind,asset}=event.detail||{};if(asset&&['turret','component'].includes(kind)){startPlacement(kind,asset,null);canvas.focus();}});
   listen(window,'blur',()=>{placement.cancel();socketEditor.cancel();});
   listen(canvas,'pointermove',event=>{if(!placement.state)return;const state=placement.state,[x,y]=position(event),socket=choosePlacementTarget(state.kind==='turret'?socketHits.filter(s=>s.fitSize):componentSocketHits,x,y,state.socket?.id);placement.target(socket,occupied(state.kind,socket));});

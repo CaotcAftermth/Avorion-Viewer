@@ -1,3 +1,5 @@
+import {componentBranchIds} from './components/socket-ids.js';
+import {componentRayHit} from './components/world-blocks.js';
 import { thrusterDirectionVectors } from './thruster-settings.js';
 import {socketToolActive} from './interaction-modes.js';
 import {createSelectionOutline} from './selection-outline.js';
@@ -426,19 +428,22 @@ export function pickGame(scene,view,width,height,x,y,p=FACTORY_PREFERENCES) {
 }
 export function releaseGameModel(){selectionOutline?.dispose();selectionOutline=null;studioEffects?.dispose();studioEffects=null;if(studioTarget){studioTarget.removeFromParent();studioTarget.geometry.dispose();studioTarget.material.dispose();studioTarget=null;}releaseAssetGuides();releaseCoverage();pendingBuild?.cancel();pendingBuild=null;if(rendered){world.remove(rendered.group);rendered.dispose();rendered=null;}for(const bounds of boundsOverlays.values()){world?.remove(bounds.object);bounds.dispose();}boundsOverlays.clear();activeBounds=null;if(dimensionCage){world?.remove(dimensionCage.object);dimensionCage.dispose();dimensionCage=null;}source=null;depthModel=null;revision=-1;}
 
+const socketOcclusionCache=new WeakMap();
 export function socketExposed(scene,view,width,height,socket,p=FACTORY_PREFERENCES){
-  if(!rendered||!scene.loaded||!scene.visible)return false;
+  if(!rendered||!scene.loaded||!scene.visible||socket.ancestorHidden)return false;
   const camera=cameraFor(view,width,height,p),point=new THREE.Vector3(...socket.position),screen=point.clone().project(camera);
   raycaster.setFromCamera(new THREE.Vector2(screen.x,screen.y),camera);
   if(new THREE.Vector3(...socket.normal).dot(raycaster.ray.direction)>=-1e-6)return false;
   const hidden=viewportHiddenIds(scene,view);
-  const hit=raycaster.intersectObjects(rendered.group.children.filter(c=>c.userData.textured),false).find(h=>!hidden.has(h.blockId));
+  let hit=raycaster.intersectObjects(rendered.group.children.filter(c=>c.userData.textured),false).find(h=>!hidden.has(h.blockId));
+  let ignoreMounts=null;const setup=scene.model?.componentSetup;if(socket.type==='component'&&setup){let cached=socketOcclusionCache.get(setup);if(!cached){cached=new Map();socketOcclusionCache.set(setup,cached);}if(!cached.has(socket.id)){const occupant=setup.mounts.find(m=>m.socketId===socket.id);cached.set(socket.id,occupant?componentBranchIds(setup.mounts,[occupant.id]):null);}ignoreMounts=cached.get(socket.id);}
+  const componentHit=componentRayHit(scene,raycaster.ray,ignoreMounts);if(componentHit&&(!hit||componentHit.distance<hit.distance))hit=componentHit;
   const tolerance=Math.max(1e-4,point.length()*1e-6);
   if(socket.type==='component')return !hit||hit.distance>=raycaster.ray.origin.distanceTo(point)-tolerance;
   // Thin-block filtering hides the body, not its attachment surface. Other visible
   // hull geometry must still occlude the socket; manual hiding remains authoritative.
   if(hidden.has(socket.blockId)&&!scene.hiddenIds?.has(socket.blockId))return !hit||hit.distance>=raycaster.ray.origin.distanceTo(point)-tolerance;
-  return !!hit&&hit.blockId===socket.blockId&&hit.point.distanceTo(point)<tolerance;
+  return !!hit&&hit.blockId===(socket.componentBlockId||socket.blockId)&&hit.point.distanceTo(point)<tolerance;
 }
 
 // A mounted component under the cursor, unless the hull is in front of it.

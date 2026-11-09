@@ -10,7 +10,7 @@ export function drawComponentSockets(ctx,scene,view,width,height,visible){
  // Sockets whose component may overlap something are drawn red.
  const clashes=componentClashes(scene),clashing=new Set(componentSetup(scene.model||{}).mounts.filter(m=>clashes.has(m.id)).map(m=>m.socketId));
  for(const socket of componentSockets(scene)){
-  if(view.socketFilter==='turrets'||scene.hiddenIds?.has(socket.blockId))continue;
+  if(socket.ancestorHidden||view.socketFilter==='turrets'||scene.hiddenIds?.has(socket.blockId))continue;
   const screen=projectPoint(nativeToView(socket.position),view,width,height);if(!socketOnScreen(screen,width,height)||!visible(socket))continue;
   const occupied=componentSetup(scene.model||{}).mounts.some(m=>m.socketId===socket.id);
   const tip=projectPoint(nativeToView(socket.position.map((v,i)=>v+socket.normal[i]*.5)),view,width,height);

@@ -1,3 +1,4 @@
+import {mountedSocketReference} from './socket-ids.js';
 import {openSessionStore} from '../session-persistence.js';
 import {validateSetup,validateComponent,componentSetup} from './core.js';
 const store=openSessionStore(),keys=new WeakMap();
@@ -25,8 +26,9 @@ export function remapSetup(model,saved){
   let dropped=0;
   const sockets=saved.setup.sockets.flatMap(s=>{if(!s.blockId)return [s];const id=map.get(s.blockId);if(!id){dropped++;return [];}return [{...s,blockId:id}];});
   const kept=new Set(sockets.map(s=>s.id));
-  const mounts=saved.setup.mounts.flatMap(m=>{const auto=autoSocket.exec(m.socketId);if(auto){const id=map.get(auto[1]);if(!id){dropped++;return [];}return [{...m,socketId:`component:${id}:${auto[2]}`}];}if(!kept.has(m.socketId)){dropped++;return [];}return [m];});
-  return {setup:validateSetup({...saved.setup,sockets,mounts}),dropped};
+  const mounts=saved.setup.mounts.flatMap(m=>{const auto=autoSocket.exec(m.socketId);if(auto){const id=map.get(auto[1]);if(!id){dropped++;return [];}return [{...m,socketId:`component:${id}:${auto[2]}`}];}if(!kept.has(m.socketId)&&!mountedSocketReference(m.socketId)){dropped++;return [];}return [m];});
+  let valid=mounts;while(true){const ids=new Set(valid.map(m=>m.id)),next=valid.filter(m=>{const parent=mountedSocketReference(m.socketId)?.mountId;return !parent||ids.has(parent);});if(next.length===valid.length)break;dropped+=valid.length-next.length;valid=next;}
+  return {setup:validateSetup({...saved.setup,sockets,mounts:valid}),dropped};
 }
 export async function restoreComponentSetup(model){
   try{

@@ -1,3 +1,4 @@
+import {assetAttachment} from './asset-sockets.js';
 import {socketToolActive} from '../interaction-modes.js';
 import {mounts,editTurrets} from '../turrets/mounts.js';
 import * as THREE from '../vendor/three.module.js';
@@ -18,7 +19,7 @@ export function createComponentTools(scene,view,getPreferences){
  const project=(p,w,h)=>projectPoint(nativeToView(p),view,w,h);
  function selectedFreeSocket(){
   const draft=scene.componentAttachmentDraft||scene.turretEditorAsset;
-  if(draft&&scene.editAttachment)return {kind:'asset',asset:draft,manual:structuredClone(draft.attachment),live:{...draft.attachment,normal:new THREE.Vector3(0,1,0).transformDirection(frame([0,0,0],draft.attachment.rotation)).toArray()}};
+  if(draft?.attachment&&!scene.componentAttachmentDraft&&scene.editAttachment)return {kind:'asset',asset:draft,manual:structuredClone(draft.attachment),live:{...draft.attachment,normal:new THREE.Vector3(0,1,0).transformDirection(frame([0,0,0],draft.attachment.rotation)).toArray()}};
   if(scene.attachmentTransform&&!scene.selectedComponentMountId){
    const kind=scene.selectedComponentMountId?'component':'turret',setup=componentSetup(scene.model||{}),list=kind==='component'?setup.mounts:mounts(scene),mount=list.find(m=>m.id===(kind==='component'?scene.selectedComponentMountId:scene.selectedTurretId));
    const socket=mount&&(kind==='component'?componentSockets(scene):sceneSockets(scene)).find(s=>s.id===mount.socketId);
@@ -44,8 +45,9 @@ export function createComponentTools(scene,view,getPreferences){
  }
  function drawAttachment(ctx,w,h){
   const asset=scene.componentAttachmentDraft||scene.turretEditorAsset;if(!asset||scene.showAttachmentMarker===false||!scene.model)return;
+  const attachment=scene.componentAttachmentDraft?assetAttachment(scene):asset.attachment;if(!attachment)return;
   const {min,max}=scene.model.bounds,length=Math.max(.5,.35*Math.max(max.x-min.x,max.y-min.y,max.z-min.z));
-  const m=frame(asset.attachment.position,asset.attachment.rotation),origin=asset.attachment.position,o=project(origin,w,h);if(!o)return;
+  const m=frame(attachment.position,attachment.rotation),origin=attachment.position,o=project(origin,w,h);if(!o)return;
   ctx.save();ctx.lineWidth=2.5;ctx.font='11px sans-serif';
   AXES.forEach(([axis,vector,color])=>{const d=new THREE.Vector3(...vector).transformDirection(m).toArray(),tip=project(add(origin,d,length),w,h);if(!tip)return;ctx.strokeStyle=ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(o[0],o[1]);ctx.lineTo(tip[0],tip[1]);ctx.stroke();ctx.fillText(axis==='y'?'+Y into component':axis.toUpperCase(),tip[0]+4,tip[1]-4);});
   ctx.fillStyle='#fff';ctx.strokeStyle='#000';ctx.beginPath();ctx.arc(o[0],o[1],5,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillText('Attachment point',o[0]+8,o[1]+14);
@@ -83,7 +85,7 @@ export function createComponentTools(scene,view,getPreferences){
  function cancel(){if(!active)return false;const done=active;active=null;if(done.model!==scene.model)return true;if(done.kind==='asset')done.asset.attachment=done.manual;else if(done.kind==='turret'){scene.model.turretMounts=done.list;scene.appearanceRevision=(scene.appearanceRevision||0)+1;}else previewSetup(scene,done.setup);if(done.playing)scene.turretStudio?.play();return true;}
  // Component window: click a block face to make it the attachment face.
  function pickAttachment(pick){
-  const asset=scene.componentAttachmentDraft||scene.turretEditorAsset;if(!asset||!scene.pickAttachment||!pick)return false;
+  const asset=scene.turretEditorAsset;if(!asset||!scene.pickAttachment||!pick)return false;
   const block=scene.model.blocks.find(b=>b.id===pick.blockId);if(!block)return false;
   const point=new THREE.Vector3(...pick.point),ray=new THREE.Vector3(...pick.direction);
   const faces=surfaceSockets(block).filter(f=>new THREE.Vector3(...f.normal).dot(ray)<0);

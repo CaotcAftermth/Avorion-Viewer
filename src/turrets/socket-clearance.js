@@ -20,8 +20,8 @@ export function createSocketClearance(blocks){
    const box=new THREE.Box3(new THREE.Vector3(-size/2+epsilon,epsilon,-size/2+epsilon),new THREE.Vector3(size/2-epsilon,size-epsilon,size/2-epsilon));
    const worldBox=box.clone().applyMatrix4(matrix),center=box.getCenter(new THREE.Vector3()).applyMatrix4(matrix);
    for(const entry of entries){
-    if(entry.block.id===socket.blockId||!entry.box.intersectsBox(worldBox))continue;
-    if(!entry.points){const p=blockSurfaceGeometry(entry.block,profile).positions;entry.points=[];for(let i=0;i<p.length;i+=3)entry.points.push(new THREE.Vector3().fromArray(p,i));}
+    if(entry.block.id===(socket.componentBlockId||socket.blockId)||!entry.box.intersectsBox(worldBox))continue;
+    if(!entry.points){const p=entry.block.attachmentPositions||blockSurfaceGeometry(entry.block,profile).positions;entry.points=[];for(let i=0;i<p.length;i+=3)entry.points.push(new THREE.Vector3().fromArray(p,i));}
     const triangle=new THREE.Triangle();
     for(let i=0;i<entry.points.length;i+=3){
      triangle.set(...entry.points.slice(i,i+3).map(p=>p.clone().applyMatrix4(inverse)));

@@ -1,3 +1,4 @@
+import {mountedBlockId} from './socket-ids.js';
 import * as THREE from '../vendor/three.module.js';
 import {exportPaintedXml} from '../color-workshop.js';
 import {parseAvorionXml} from '../block-model.js';
@@ -25,7 +26,7 @@ export function axisAlignedTransform(matrix){
 export function bakedBlocks(scene){
  const offset=scene.model.placementOffset||{x:0,y:0,z:0},problems=[],blocks=[];
  for(const entry of componentEntries(scene)){
-  if(entry.instance.hidden)continue;
+  if(entry.instance.hidden||entry.socket.ancestorHidden)continue;
   const label=(entry.instance.name||entry.asset.name)+' on '+entry.socket.name;
   const transform=axisAlignedTransform(entry.matrix);
   if(!transform){problems.push(label+': rotation is not a multiple of 90°');continue;}
@@ -33,7 +34,7 @@ export function bakedBlocks(scene){
    const center=new THREE.Vector3(block.position.x,block.position.y,block.position.z).applyMatrix4(entry.matrix);
    const size=transform.rotate([block.size.x,block.size.y,block.size.z]).map(v=>Math.abs(v)*transform.scale);
    const look=axisIndex(transform.rotate(AXIS_VECTORS[block.look])),up=axisIndex(transform.rotate(AXIS_VECTORS[block.up]));
-   blocks.push({block,parentBlockId:entry.socket.blockId,center:[center.x-offset.x,center.y-offset.y,center.z-offset.z],size,look,up});
+   blocks.push({block,worldBlockId:mountedBlockId(entry.instance.id,block.id),parentBlockId:entry.socket.componentBlockId||entry.socket.blockId,center:[center.x-offset.x,center.y-offset.y,center.z-offset.z],size,look,up});
   }
  }
  return {blocks,problems};
@@ -51,6 +52,7 @@ export function bakeComponentsXml(scene){
  let next=Math.max(-1,...items.map(el=>Number(el.getAttribute('index'))).filter(Number.isFinite))+1;
  const root=items.find(el=>!el.hasAttribute('parent'))?.getAttribute('index')??items[0]?.getAttribute('index');
  const parentIndex=new Map(model.blocks.map(b=>[b.id,b.itemEl?.getAttribute('index')]));
+ for(const [index,baked] of blocks.entries())parentIndex.set(baked.worldBlockId,String(next+index));
  const ns=plan.namespaceURI;
  for(const baked of blocks){
   const item=doc.createElementNS(ns,'item'),el=doc.createElementNS(ns,'block'),{block}=baked;

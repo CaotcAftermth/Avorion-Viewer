@@ -1,3 +1,4 @@
+import {assetSocketSetup,snapshotComponentAsset} from './components/asset-sockets.js';
 import {mountNativeTransform} from './native-transform.js';
 import {openQuickAssetLibrary} from './quick-asset-library.js';
 import {coverageOptions} from './turrets/coverage-sampling.js';
@@ -198,7 +199,7 @@ function viewportPie(event,node){
     {label:'Hide',disabled:!ids.length,action:()=>visibilityStructure(ids,'hide')},
     {label:'Show Last',disabled:!scene.visibilityHistory?.length,disabledReason:'Hide or isolate blocks first to restore the previous visibility.',action:()=>visibilityStructure([],'last')},
     {label:'Show All',disabled:!scene.hiddenIds.size&&node.view.showThinBlocks!==false,disabledReason:'All blocks are already visible.',action:()=>visibilityStructure([],'all')},
-    {label:'Add Socket',disabled:!!(scene.componentAttachmentDraft||scene.turretEditorAsset),action:()=>{node.view.tool='sockets';node.view.interactionMode='object';const canvas=areaElement(node.id)?.querySelector('canvas');save();for(const b of areaElement(node.id)?.querySelectorAll('.viewport-toolbar button')||[]){const label=b.getAttribute('aria-label')||b.title;if(['Select','Select Sockets'].includes(label)){const selected=label==='Select Sockets';b.classList.toggle('active',selected);b.setAttribute('aria-pressed',String(selected));}}canvas?.dispatchEvent(new Event('component-socket-place'));canvas?.focus();}}
+    {label:'Add Socket',disabled:!!scene.turretEditorAsset,action:()=>{node.view.tool='sockets';node.view.interactionMode='object';const canvas=areaElement(node.id)?.querySelector('canvas');save();for(const b of areaElement(node.id)?.querySelectorAll('.viewport-toolbar button')||[]){const label=b.getAttribute('aria-label')||b.title;if(['Select','Select Sockets'].includes(label)){const selected=label==='Select Sockets';b.classList.toggle('active',selected);b.setAttribute('aria-pressed',String(selected));}}canvas?.dispatchEvent(new Event('component-socket-place'));canvas?.focus();}}
   ]);
   const el=$('#menu');el.classList.add('pie-menu');
   el.style.left=clamp(event.clientX-el.offsetWidth/2,6,Math.max(6,innerWidth-el.offsetWidth-6))+'px';
@@ -1194,16 +1195,16 @@ export async function configureComponentWorkspace(asset, textureFiles=[], shared
  releaseGameModel();
  if(!textureLibrary.adopt(sharedTextures)&&textureFiles.length)await textureLibrary.loadFiles(textureFiles,{retainUndecoded:true});
  if(textureLibrary.loadedCount)textureStatus=`${textureLibrary.loadedCount} texture maps · shared from the viewer`;
- const draft=structuredClone(asset),viewport=area(),properties=area('properties');ensureViewportOptions(viewport.view).shading='RENDERED';properties.propertyTab='components';
+ const draft=structuredClone(asset),viewport=area(),properties=area('properties');ensureViewportOptions(viewport.view).shading='RENDERED';viewport.view.tool='sockets';properties.propertyTab='components';
  // The window's Properties › Components edits this draft's attachment point.
  scene.componentAttachmentDraft=draft;scene.showAttachmentMarker=true;scene.pickAttachment=false;
  state={version:1,active:'component',workspaces:[{id:'component',name:'Component',root:split('x',.72,viewport,split('y',.36,area('outliner'),properties))}]};
  maximized=null;hovered=null;document.body.classList.add('embedded-asset-workspace');
  // Keep the component's own coordinates so its attachment point stays valid.
- scene.model=makeModel(draft.blocks,draft.name);Object.assign(scene,{preview:false,loaded:true,visible:true,selected:false,selectedId:null,selectedIds:new Set(),hiddenIds:new Set(),revision:scene.revision+1});
+ scene.model=makeModel(draft.blocks,draft.name);scene.model.componentSetup=assetSocketSetup(draft);Object.assign(scene,{preview:false,loaded:true,visible:true,selected:false,selectedId:null,selectedIds:new Set(),hiddenIds:new Set(),revision:scene.revision+1});
  render();
  for(const node of leaves(workspace().root))if(node.editor==='viewport')navigate(node,{action:'frame',interrupt:false});
  renderers.forEach(r=>r.draw?.());
- return {snapshot(){return validateComponent({...draft,blocks:scene.model.blocks.filter(b=>!b.deleted).map(({el,itemEl,...b})=>structuredClone(b))});},dispose(){renderers.forEach(r=>r.dispose());renderers=[];releaseGameModel();}};
+ return {snapshot(){return snapshotComponentAsset(scene);},dispose(){renderers.forEach(r=>r.dispose());renderers=[];releaseGameModel();}};
 }
 if(embeddedComponent)window.componentWorkspace={configure:configureComponentWorkspace};

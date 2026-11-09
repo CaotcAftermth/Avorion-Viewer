@@ -37,7 +37,7 @@ try{
 
  });
  async function opacity(label,value){const input=page.getByLabel(label,{exact:true});await input.dblclick();await input.fill(value);await input.press('Enter');assert.equal(await input.getAttribute('readonly'),'');}
- await page.getByLabel('Positioning',{exact:true}).selectOption('grid');
+ await page.getByLabel('Positioning',{exact:true}).selectOption('grid');await page.evaluate(()=>document.fonts.ready);await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
  const light=await page.evaluate(()=>{fixture.underlay='#ffffff';return fixture.sample();}),dark=await page.evaluate(()=>{fixture.underlay='#000000';return fixture.sample();});assert.deepEqual(light,dark,'drafting surface and guides are identical under bright and dark scene lighting');
  assert.equal(await page.locator('.socket-appearance-settings').evaluate(el=>el.open),true,'Display defaults expanded');
  for(const [label,value] of [['Grid color','#ff8844'],['Background color','#334466']]){await page.getByLabel(label,{exact:true}).fill(value);await page.getByLabel(label,{exact:true}).dispatchEvent('input');}

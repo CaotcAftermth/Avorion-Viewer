@@ -65,11 +65,11 @@ export function mountComponentLibrary(host,changed){
    const card=document.createElement('div');card.className='turret-asset-card';
    const tile=document.createElement('button');tile.type='button';tile.className='turret-asset-tile';tile.dataset.assetId=asset.id;tile.setAttribute('aria-label',asset.name);tile.setAttribute('aria-pressed',String(asset.id===componentLibrary.selectedId));tile.draggable=true;
    tile.title=[asset.folder&&'Folder: '+asset.folder,asset.tags?.length&&'Tags: '+asset.tags.join(', '),'Click to edit in Properties › Components · Double-click to open · Drag onto a component socket in the viewport'].filter(Boolean).join('\n');
-   const preview=document.createElement('canvas');preview.width=120;preview.height=80;tile.append(preview);
+   const preview=document.createElement('canvas');preview.width=120;preview.height=80;tile.append(preview);if(!asset.attachment){const badge=document.createElement('span');badge.className='component-attachment-missing';badge.textContent='Attachment point not assigned';tile.append(badge);tile.draggable=false;}
    try{thumbnail(preview,asset);}catch{}
    const dragCanvas=document.createElement('canvas');dragCanvas.width=120;dragCanvas.height=80;dragCanvas.getContext('2d').drawImage(preview,0,0,120,80);
    const dragImage=new Image();dragImage.src=dragCanvas.toDataURL('image/png');
-   tile.ondragstart=e=>{componentLibrary.dragged=asset;e.dataTransfer.setData('application/x-avorion-component',asset.id);e.dataTransfer.effectAllowed='copy';if(dragImage.complete&&dragImage.naturalWidth)e.dataTransfer.setDragImage(dragImage,dragImage.naturalWidth/2,dragImage.naturalHeight/2);window.dispatchEvent(new Event('component-drag-start'));};
+   tile.ondragstart=e=>{if(!asset.attachment){e.preventDefault();return;}componentLibrary.dragged=asset;e.dataTransfer.setData('application/x-avorion-component',asset.id);e.dataTransfer.effectAllowed='copy';if(dragImage.complete&&dragImage.naturalWidth)e.dataTransfer.setDragImage(dragImage,dragImage.naturalWidth/2,dragImage.naturalHeight/2);window.dispatchEvent(new Event('component-drag-start'));};
    tile.ondragend=()=>{componentLibrary.dragged=null;window.dispatchEvent(new Event('component-drag-end'));};
    tile.onclick=()=>{selectComponent(asset.id);changed();};
    tile.ondblclick=()=>openComponentWorkspace(asset,async draft=>{await updateComponentAsset(draft);changed();});
@@ -82,7 +82,7 @@ export function mountComponentLibrary(host,changed){
     const finish=async(cancel=false)=>{
      if(finished)return;finished=true;
      const value=input.value.trim();
-     if(cancel||!value||value===asset.name){input.replaceWith(name);editing=false;tile.draggable=true;name.focus();return;}
+     if(cancel||!value||value===asset.name){input.replaceWith(name);editing=false;tile.draggable=!!asset.attachment;name.focus();return;}
      input.disabled=true;
      try{await updateComponentAsset({...asset,name:value});changed();}catch(e){error=e.message;draw();}
     };
@@ -96,7 +96,7 @@ export function mountComponentLibrary(host,changed){
   }
   if(!grid)newGrid();
   if(!shown.length&&componentLibrary.assets.length){const none=document.createElement('p');none.className='panel-note';none.textContent='No components match.';grid.before(none);}
-  const add=document.createElement('button');add.type='button';add.className='turret-asset-tile turret-import';add.textContent='Add XML';add.title='Add Component XML and set its attachment point';add.setAttribute('aria-label','Import component XML');add.disabled=busy;grid.append(add);
+  const add=document.createElement('button');add.type='button';add.className='turret-asset-tile turret-import';add.textContent='+';add.title='Import component XML';add.setAttribute('aria-label','Import component XML');add.disabled=busy;grid.append(add);
   const input=document.createElement('input');input.type='file';input.accept='.xml';input.hidden=true;host.append(input);add.onclick=()=>input.click();
   input.onchange=async()=>{const file=input.files[0];if(!file)return;busy=true;error='';draw();try{const asset=importComponent(await file.text(),file.name.replace(/\.xml$/i,''));const saved=await addComponentAsset(asset);componentLibrary.selectedId=saved.id;if(saved.id!==asset.id)error='Already imported: '+saved.name;changed();if(saved.id===asset.id)openComponentWorkspace(saved,async next=>{await updateComponentAsset(next);changed();});}catch(e){error=e.message;}finally{busy=false;draw();}};
   const status=document.createElement('p');status.className='panel-note';status.setAttribute('role','status');status.textContent=error||componentLibrary.error||(busy?'Importing component…':'Component assets · Saved in this browser');host.append(status);host.scrollTop=scrollTop;host.scrollLeft=scrollLeft;

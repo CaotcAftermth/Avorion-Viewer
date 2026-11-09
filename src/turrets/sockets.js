@@ -1,3 +1,6 @@
+import {componentEntries} from '../components/core.js';
+import {worldComponentBlocks} from '../components/world-blocks.js';
+import {mountedTurretSocketId,mountedBlockId} from '../components/socket-ids.js';
 import {socketToolActive} from '../interaction-modes.js';
 import {drawSocketMarker} from '../socket-markers.js';
 import {mounts} from './mounts.js';
@@ -22,9 +25,17 @@ export function surfaceSockets(block){
   }
   return [...groups.values()].map((g,i)=>{const position=g.center.divideScalar(g.area).toArray(),normal=g.normal.toArray();const socket=socketAtFace(position,normal,`turret:${block.id}:${i}`);return {...socket,fitSize:faceFit(g.vertices,socket),type:'turret',blockId:block.id,faceId:i,name:`Face ${i+1}`,normal};});
 }
-const cache=new WeakMap();
+const cache=new WeakMap(),mountedCache=new WeakMap();
 export function sceneSockets(scene){
-  const blocks=liveBlocks(scene);let sockets=cache.get(blocks);if(!sockets){const clearance=createSocketClearance(blocks);sockets=blocks.filter(isTurretBlock).flatMap(blockSockets).map(s=>({...s,fitSize:clearance(s)}));cache.set(blocks,sockets);}return sockets;
+  const blocks=liveBlocks(scene);let sockets=cache.get(blocks);if(!sockets){const clearance=createSocketClearance(blocks);sockets=blocks.filter(isTurretBlock).flatMap(blockSockets).map(s=>({...s,fitSize:clearance(s)}));cache.set(blocks,sockets);}
+ const entries=componentEntries(scene);if(!entries.length)return sockets;let mounted=mountedCache.get(entries);
+ if(!mounted){const clearance=createSocketClearance([...blocks,...worldComponentBlocks(scene)]);mounted=sockets.map(s=>({...s,fitSize:clearance(s)}));
+  for(const entry of entries)for(const block of entry.asset.blocks.filter(isTurretBlock))for(const local of blockSockets(block)){
+   const matrix=entry.matrix.clone().multiply(frame(local.position,local.rotation)),p=new THREE.Vector3(),q=new THREE.Quaternion(),scale=new THREE.Vector3();matrix.decompose(p,q,scale);const euler=new THREE.Euler().setFromQuaternion(q,'XYZ');
+   const socket={...local,id:mountedTurretSocketId(entry.instance.id,block.id,local.faceId),parentMountId:entry.instance.id,componentBlockId:mountedBlockId(entry.instance.id,block.id),blockId:entry.socket.blockId,position:p.toArray(),rotation:[euler.x,euler.y,euler.z].map(THREE.MathUtils.radToDeg),normal:new THREE.Vector3(0,1,0).applyQuaternion(q).toArray(),fitSize:local.fitSize==null?null:Math.min(10,Math.floor((local.fitSize*Math.abs(scale.x)+1e-5)*2)/2),ancestorHidden:!!entry.instance.hidden||!!entry.socket.ancestorHidden,name:(entry.instance.name||entry.asset.name)+' / '+local.name};socket.fitSize=clearance(socket);mounted.push(socket);
+  }mountedCache.set(entries,mounted);
+ }
+ return mounted;
 }
 export function drawSockets(ctx,scene,view,width,height,color,visible=()=>true){
   const targeting=socketToolActive(view)||scene.turretDragging;
@@ -34,7 +45,7 @@ export function drawSockets(ctx,scene,view,width,height,color,visible=()=>true){
   for(const socket of sceneSockets(scene)){
     if(view.socketFilter==='components')continue;
     const occupied=mounts(scene).some(m=>m.socketId===socket.id),invalid=socket.fitSize==null;
-    if(hidden.has(socket.blockId))continue;
+    if(socket.ancestorHidden||hidden.has(socket.blockId))continue;
     const p=projectPoint(nativeToView(socket.position),view,width,height);if(!p||p[0]<0||p[1]<0||p[0]>width||p[1]>height)continue;
     const exposed=visible(socket,p);if(!exposed&&(!scene.turretSockets?.through||scene.turretDragging))continue;
     const q=projectPoint(nativeToView(socket.position.map((v,i)=>v+socket.normal[i]*.5)),view,width,height);

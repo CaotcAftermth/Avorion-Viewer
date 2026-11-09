@@ -1,7 +1,8 @@
+import {componentBranchIds,mountedSocketReference} from './socket-ids.js';
 import {assetProvenance} from '../attachments/lifecycle.js';
 import * as THREE from '../vendor/three.module.js';
 import {frame} from '../turrets/core.js';
-import {componentSetup,componentSockets} from './core.js';
+import {componentSetup,componentSockets,validateSetup} from './core.js';
 import {saveComponentSetup} from './storage.js';
 
 // Every component setup change goes through here so it is saved, undoable and redrawn.
@@ -11,6 +12,11 @@ const pending=new WeakMap(),numericEdits=new WeakMap();
 export function beginComponentEdit(scene){if(scene.model&&!numericEdits.has(scene.model))numericEdits.set(scene.model,componentSetup(scene.model));}
 export async function endComponentEdit(scene,cancel=false){const model=scene.model,before=numericEdits.get(model);if(!before)return;const next=componentSetup(model);numericEdits.delete(model);if(cancel){previewSetup(scene,before);return;}if(JSON.stringify(before)===JSON.stringify(next))return;try{await changeSetup(scene,next,{previous:before});}catch(error){previewSetup(scene,before);throw error;}}
 function enqueue(model,operation){const next=(pending.get(model)||Promise.resolve()).then(operation);pending.set(model,next.catch(()=>{}));return next;}
+function transitionTurrets(model,before,next,restore=[]){
+ const remaining=new Set(next.mounts.map(m=>m.id)),removedParents=new Set(before.mounts.filter(m=>!remaining.has(m.id)).map(m=>m.id)),current=model.turretMounts||[],removed=current.filter(m=>removedParents.has(mountedSocketReference(m.socketId)?.mountId)),kept=current.filter(m=>!removed.includes(m));
+ for(const mount of restore)if(remaining.has(mountedSocketReference(mount.socketId)?.mountId)&&!kept.some(m=>m.id===mount.id||m.socketId===mount.socketId))kept.push(mount);
+ if(removed.length||restore.length)model.turretMounts=kept;return removed;
+}
 export function changeSetup(scene,next,{previous}={}){
  const model=scene.model;if(!model)return Promise.reject(Error('Load a ship first.'));
  if(numericEdits.has(model)){previewSetup(scene,next);return Promise.resolve();}
@@ -18,9 +24,9 @@ export function changeSetup(scene,next,{previous}={}){
  return enqueue(model,async()=>{
   if(model.componentSetup!==expected&&!previous)throw Error('Another component edit finished first. Retry this edit against the updated setup.');
   const before=previous||componentSetup(model);model.componentSaveState='Saving…';
-  try{await saveComponentSetup(model,next);delete model.componentSaveDraft;model.componentSaveState='Saved locally';}
+  try{if(scene.componentAttachmentDraft){validateSetup(next);model.componentSetup=next;}else await saveComponentSetup(model,next);delete model.componentSaveDraft;model.componentSaveState='Saved locally';}
   catch(error){model.componentSaveDraft=next;model.componentSaveState='Save failed: '+error.message;throw error;}
-  const h=historyOf(model);h.undo.push(before);if(h.undo.length>LIMIT)h.undo.shift();h.redo=[];settle(scene,model);
+  const removed=transitionTurrets(model,before,next);const h=historyOf(model);h.undo.push({setup:before,restoreTurrets:removed});if(h.undo.length>LIMIT)h.undo.shift();h.redo=[];settle(scene,model);
  });
 }
 export function retryComponentSave(scene){const draft=scene.model?.componentSaveDraft;if(!draft)return Promise.resolve();return changeSetup(scene,draft);}
@@ -28,10 +34,10 @@ export function componentHistory(scene,redo=false){
  const model=scene.model;if(!model)return Promise.resolve(false);
  return enqueue(model,async()=>{
   const h=historyOf(model),from=redo?h.redo:h.undo,to=redo?h.undo:h.redo;if(!from.length)return false;
-  const target=from.at(-1),before=componentSetup(model);model.componentSaveState='Saving…';
-  try{await saveComponentSetup(model,target);model.componentSaveState='Saved locally';}
+  const entry=from.at(-1),target=entry.setup||entry,before=componentSetup(model);model.componentSaveState='Saving…';
+  try{if(scene.componentAttachmentDraft){validateSetup(target);model.componentSetup=target;}else await saveComponentSetup(model,target);model.componentSaveState='Saved locally';}
   catch(error){model.componentSaveState='Save failed: '+error.message;throw error;}
-  from.pop();to.push(before);settle(scene,model);return true;
+  const removed=transitionTurrets(model,before,target,entry.restoreTurrets||[]);from.pop();to.push({setup:before,restoreTurrets:removed});settle(scene,model);return true;
  });
 }
 export const canComponentHistory=(scene,redo=false)=>!!scene.model&&!!histories.get(scene.model)?.[redo?'redo':'undo'].length;
@@ -89,7 +95,7 @@ function placeOne(setup,asset,socketId,{scale=1,twist=0}={}){
 }
 // Attach to a socket, or swap the component already there (scale and twist are kept).
 export function placeComponent(scene,asset,socket){
- if(!asset)throw Error('Choose a component in the Asset Library.');if(socket?.type!=='component')throw Error('Choose a component socket.');
+ if(!asset)throw Error('Choose a component in the Asset Library.');if(!asset.attachment)throw Error('Assign an attachment point to the component before mounting it.');if(socket?.type!=='component')throw Error('Choose a component socket.');
  let setup=componentSetup(scene.model);const base=setup.mounts.find(m=>m.socketId===socket.id);
  setup=placeOne(setup,asset,socket.id,base);
  for(const target of mirrorTargets(scene,socket)){
@@ -99,7 +105,7 @@ export function placeComponent(scene,asset,socket){
  return setup;
 }
 export function detachComponent(scene,mount){
- const ids=new Set([mount.id,...mirroredMounts(scene,mount).map(m=>m.mount.id)]),setup=componentSetup(scene.model);
+ const setup=componentSetup(scene.model),ids=componentBranchIds(setup.mounts,[mount.id,...mirroredMounts(scene,mount).map(m=>m.mount.id)]);
  return {...setup,mounts:setup.mounts.filter(m=>!ids.has(m.id))};
 }
 export function patchMount(scene,mount,values){
@@ -117,12 +123,12 @@ export const snapTwist=(value,snap)=>snap?Math.round(value/90)*90:value;
 // The viewport-first workflow edits one socket at imported size. Legacy setup
 // transforms remain readable, but are not offered by the new placement UI.
 export function assignComponent(scene,asset,socket){
- if(!asset)throw Error('Choose a component in the Asset Library.');if(socket?.type!=='component')throw Error('Choose a component socket.');
+ if(!asset)throw Error('Choose a component in the Asset Library.');if(!asset.attachment)throw Error('Assign an attachment point to the component before mounting it.');if(socket?.type!=='component')throw Error('Choose a component socket.');
  const setup=componentSetup(scene.model),existing=setup.mounts.find(m=>m.socketId===socket.id);
  const mount={...(existing||{id:crypto.randomUUID(),socketId:socket.id}),asset:structuredClone(asset),source:assetProvenance(asset),scale:1,twist:Math.round((existing?.twist||0)/90)*90,offset:[0,0,0],rotation:[0,0,0]};
  return {...setup,mounts:existing?setup.mounts.map(m=>m.id===existing.id?mount:m):[...setup.mounts,mount]};
 }
-export function detachSurfaceComponent(scene,mount){const setup=componentSetup(scene.model);return {...setup,mounts:setup.mounts.filter(m=>m.id!==mount.id)};}
+export function detachSurfaceComponent(scene,mount){const setup=componentSetup(scene.model),ids=componentBranchIds(setup.mounts,[mount.id]);return {...setup,mounts:setup.mounts.filter(m=>!ids.has(m.id))};}
 export function rotateSurfaceComponent(scene,mount,step){
  const setup=componentSetup(scene.model);return {...setup,mounts:setup.mounts.map(m=>m.id===mount.id?{...m,twist:Math.round((m.twist||0)/90)*90+(step<0?-90:90)}:m)};
 }

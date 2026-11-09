@@ -29,7 +29,7 @@ export function syncTurrets(world,scene,view,configureDepth,textureOptions){
         }
         if(positions.length){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));const edgeGeometry=new THREE.BufferGeometry();edgeGeometry.setAttribute('position',new THREE.Float32BufferAttribute(edges,3));g.userData.blueprintEdges=edgeGeometry;parts.set(part,g);}
       }geometryCache.set(key,parts);}
-      holder.userData.hidden=e.instance.hidden;
+      holder.userData.hidden=e.instance.hidden||e.socket.ancestorHidden;
       const material=new THREE.MeshBasicMaterial({vertexColors:true,transparent:!!e.ghost,opacity:e.ghost?.55:1,depthWrite:!e.ghost});
       const highlight={value:0};material.userData.highlight=highlight;
       material.onBeforeCompile=shader=>{

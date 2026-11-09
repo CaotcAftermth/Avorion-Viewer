@@ -716,3 +716,9 @@ input.color-cell-readout,.property-content input.color-cell-readout{background:v
 .socket-direction-actions .socket-edit-actions button{margin:0;text-align:left;width:100%}
 
 .socket-edit-strip{--numeric-fill:var(--slider-fill);--numeric-track:var(--slider-track)}
+
+.socket-name-value{padding:4px 7px;min-height:22px;cursor:text;background:#454545;border-radius:3px;color:var(--text);overflow-wrap:anywhere}
+.component-attachment-missing{display:block;padding:3px 5px;color:#ffd39a;background:#33291ee8;font-size:10px;line-height:1.3;white-space:normal}
+.socket-context-menu button:hover:not(:disabled),.socket-context-menu button:focus-visible:not(:disabled),.socket-direction-actions .socket-edit-actions button:hover:not(:disabled),.socket-direction-actions .socket-edit-actions button:focus-visible:not(:disabled){background:#5e80b9;color:#fff;outline-color:#a0bce6}
+
+.socket-readonly-value{display:block;padding:4px 7px;min-height:22px;background:#454545;border-radius:3px;color:var(--text);overflow-wrap:anywhere}

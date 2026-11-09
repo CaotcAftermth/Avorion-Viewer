@@ -1,3 +1,5 @@
+import {planSocketBatch} from './socket-batch.js';
+import {withoutSocket} from './asset-sockets.js';
 import {enhanceNumericFields,numericEditing} from '../numeric-field.js';
 import {SOCKET_APPEARANCE_KEY,socketAppearance,appearanceColor,draftingBackground} from './socket-appearance.js';
 import {layoutPropertyRows} from '../property-rows.js';
@@ -6,7 +8,7 @@ import {nativeToView} from '../block-model.js';
 import {projectPoint} from '../navigation.js';
 import {socketToolActive} from '../interaction-modes.js';
 import {pickSocketMarker,drawSocketMarker,selectSocketMarker} from '../socket-markers.js';
-import {componentSetup,componentSockets,savedSocket} from './core.js';
+import {componentSetup,componentSockets,componentEntries,savedSocket} from './core.js';
 import {changeSetup,previewSetup,assignComponent,detachSurfaceComponent} from './mounting.js';
 import {componentLibrary,loadComponentLibrary} from './library.js';
 import {socketFaces,faceForHit,faceCenter,snapToFace,faceGrid,boundingSocketFaces,socketNormalChoices,orientSocket,faceBoundary,faceEdgeLabels} from './socket-face.js';
@@ -56,13 +58,13 @@ export function createSocketEditor(canvas,scene,view,{pick,invalidate,changed,ac
  const refine=action(buttons,'Refine Position',()=>{state.directionCamera=Object.fromEntries(cameraKeys.map(k=>[k,structuredClone(view[k])]));state.stage='position';state.hover=null;state.actionAnchor=null;alignFace();configure();invalidate();});
  const back=action(buttons,'Back',()=>{
   if(state.kind==='create'){
-   if(state.stage==='review'){state.stage='direction';configureActions();return;}
+   if(state.stage==='review'){if(state.choices?.length===1){state.stage='pick';state.actionAnchor=null;restoreCamera();configure();invalidate();}else beginDirection();return;}
    if(state.directionCamera)for(const key of cameraKeys)view[key]=structuredClone(state.directionCamera[key]);
    state.stage='review';state.hover=null;state.actionAnchor=state.directionAnchor;configure();invalidate();return;
   }
   state.stage='position';state.hover=null;state.actionAnchor=null;alignFace();configure();invalidate();
  });back.hidden=true;
- const apply=action(buttons,'Apply',()=>accept()),dismiss=action(buttons,'Cancel',()=>cancel());apply.classList.add('socket-primary-action');
+ const apply=action(buttons,'Apply',()=>accept()),makePrimary=action(buttons,'Make Attachment Point',()=>{state.makeAttachmentPoint=true;return commit();}),dismiss=action(buttons,'Cancel',()=>cancel());apply.classList.add('socket-primary-action');
  const disposeRows=typeof MutationObserver==='undefined'?()=>{}:layoutPropertyRows(panel);
  if(typeof HTMLInputElement!=='undefined')enhanceNumericFields(appearancePanel,{refresh:invalidate});
  function closeMenu(){menu?.remove();menu=null;}
@@ -71,10 +73,11 @@ export function createSocketEditor(canvas,scene,view,{pick,invalidate,changed,ac
  function configureActions(){
   if(!state){actionMenu.hidden=true;return;}
   const direction=state.stage==='direction',review=state.stage==='review',positioning=state.stage==='position',floating=directionView();
-  refine.hidden=!(state.kind==='create'&&review);back.hidden=state.kind==='create'?!review&&!positioning:!direction||state.directionOnly;
-  apply.hidden=state.stage==='pick';apply.disabled=busy||!state.point||direction&&!state.normal;
+  refine.hidden=!(state.kind==='create'&&review&&state.blockType===undefined);back.hidden=state.kind==='create'?!review&&!positioning:!direction||state.directionOnly;
+  apply.hidden=state.stage==='pick';apply.disabled=busy||!state.point||direction&&!state.normal||!!state.batchError;
   apply.textContent=direction?(state.kind==='create'?'Confirm Direction':'Apply'):state.kind==='create'?'Place Socket':state.normal?'Apply':'Next: Direction';
-  buttons.append(back,apply,refine,dismiss);
+  makePrimary.hidden=!(scene.componentAttachmentDraft&&state.kind==='create'&&review&&state.blockType===undefined);
+  buttons.append(back,apply,makePrimary,refine,dismiss);
   if(floating){
    actionMenu.append(buttons);actionMenu.hidden=!state.actionAnchor;buttons.hidden=false;
    if(state.actionAnchor){actionMenu.style.left=state.actionAnchor[0]+'px';actionMenu.style.top=state.actionAnchor[1]+'px';}
@@ -95,9 +98,9 @@ export function createSocketEditor(canvas,scene,view,{pick,invalidate,changed,ac
   edge.value=Number.isInteger(s.edge)?String(s.edge):'0';controlsHidden(edge,!positioning||s.mode!=='grid'||boundary?.length===4);
   if(positioning&&s.mode==='grid'&&boundary?.length!==4&&!Number.isInteger(s.edge))s.edge=0;
   appearancePanel.hidden=direction||!positioning&&!review;for(const row of gridAppearanceRows)row.hidden=s.mode!=='grid';for(const input of appearanceControls)input.disabled=appearancePanel.hidden||busy||s.mode!=='grid'&&input.getAttribute('aria-label').startsWith('Grid');
-  configureActions();
+  updateBatch();configureActions();
   heading.textContent=direction?'Define Direction':picking?'Place Component Socket':'Socket Position';
-  message.textContent=direction?'Click a highlighted bounding-box face to choose the outward socket direction. Confirm when ready.':picking?'Click a highlighted face. Esc or right-click cancels.':review?'Direction set. Place the socket or refine its position first.':s.mode==='grid'?'Grid starts on the selected edge. Equal divisions follow the triangle apex; Square uses square cells. Click a grid point.':s.mode==='free'?'Click to position on this face.':'Choose a center definition.';
+  message.textContent=state.blockType!==undefined&&!picking&&state.normal?(state.batchError||`Create ${state.batch?.sockets.length||0} sockets on matching faces; ${state.batch?.duplicates||0} duplicates skipped. Confirm placement.`):direction?'Click a highlighted bounding-box face to choose the outward socket direction. Confirm when ready.':picking?(state.blockType!==undefined?'Select a face on the chosen block type.':state.pickBlockId?'Select a face on the selected block.':'Select a block face. Esc or right-click cancels.'):review?'Direction set. Place the socket or refine its position first.':s.mode==='grid'?'Grid starts on the selected edge. Equal divisions follow the triangle apex; Square uses square cells. Click a grid point.':s.mode==='free'?'Click to position on this face.':'Choose a center definition.';
  }
  function saveCamera(){state.camera??=Object.fromEntries(cameraKeys.map(k=>[k,structuredClone(view[k])]));}
  function alignFace(){
@@ -115,29 +118,43 @@ export function createSocketEditor(canvas,scene,view,{pick,invalidate,changed,ac
  }
  function accept(){
   if(!state?.point||busy||state.stage==='direction'&&!state.actionAnchor)return;
-  if(state.stage==='direction'&&state.kind==='create'){if(!state.normal)return;state.stage='review';configureActions();return;}
+  if(state.stage==='direction'&&state.kind==='create'){if(!state.normal)return;state.stage='review';if(state.blockType===undefined)configureActions();else configure();return;}
   if(!state.normal){beginDirection();return;}
   return commit();
  }
- function choosePosition(){
-  if(!state.face||!state.point)return;saveCamera();const choices=socketNormalChoices(state.face);state.normal=choices.length===1?choices[0].normal:null;beginDirection(true);
+ function updateBatch(){
+  if(state.blockType===undefined||!state.normal||!state.face)return;
+  try{state.batch=planSocketBatch(scene.model,state.blockType,state.face,state.normal);state.batchError=state.batch.sockets.length?null:'All matching faces already have sockets.';}catch(error){state.batch=null;state.batchError=error.message;}
+ }
+ function choosePosition(x,y){
+  if(!state.face||!state.point)return;saveCamera();const choices=socketNormalChoices(state.face);state.choices=choices;state.normal=choices.length===1?choices[0].normal:null;
+  if(choices.length===1){state.stage='review';configure();openDirectionActions(x,y);invalidate();}else beginDirection(true);
  }
  function restoreCamera(){if(!state?.camera)return;for(const key of cameraKeys)if(state.camera[key]===undefined)delete view[key];else view[key]=structuredClone(state.camera[key]);}
  function cancel(){
   if(busy)return;closeMenu();if(state?.kind==='edit'&&scene.model===state.model&&componentSetup(scene.model)===state.preview)previewSetup(scene,state.before);
   if(scene.model===state?.model)restoreCamera();state=null;actionMenu.hidden=true;panel.append(buttons);showPanel(false);invalidate();changed();
  }
+ function focusSocket(socket){
+  let normal=socket.normal,block=scene.model.blocks.find(b=>b.id===socket.blockId);
+  if(socket.parentMountId){
+   const entry=componentEntries(scene).find(e=>e.instance.id===socket.parentMountId),saved=entry?.asset.sockets?.find(s=>s.id===socket.sourceSocketId);
+   block=entry?.asset.blocks.find(b=>b.id===saved?.blockId);const face=block&&socketFaces(block).find(f=>f.faceId===saved.faceId);
+   if(face)normal=new THREE.Vector3(...face.normal).transformDirection(entry.matrix).toArray();
+  }else if(block){const face=socketFaces(block).find(f=>f.faceId===socket.faceId&&f.contains(socket.position))||socketFaces(block).find(f=>f.contains(socket.position)&&f.normal.every((n,i)=>Math.abs(n-socket.normal[i])<1e-5));if(face)normal=face.normal;}
+  const back=nativeToView(normal);view.yaw=Math.hypot(back[0],back[1])<1e-7?0:Math.atan2(back[0],-back[1]);view.pitch=Math.asin(Math.max(-1,Math.min(1,back[2])));view.roll=0;view.target=nativeToView(socket.position);view.panX=view.panY=0;invalidate();
+ }
  function selectSocket(socket){selectSocketMarker(scene,socket);changed();}
  async function commit(){
-  if(!state?.point||busy)return;const current=state;if(scene.model!==current.model){cancel();return;}
+  if(!state?.point||busy)return;updateBatch();if(state.batchError){configure();return;}const current=state;if(scene.model!==current.model){cancel();return;}
   const socket={...orientSocket({...current.socket,position:[...current.point]},current.normal),faceId:current.face.faceId,placement:{...current.settings}};
   const saved=current.kind==='create'?savedSocket(scene.model,socket,'Socket '+(componentSetup(scene.model).sockets.length+1)):{...current.manual,position:socket.position.map((n,i)=>n-current.block.position['xyz'[i]]),faceId:socket.faceId,placement:socket.placement};
   saved.faceId=socket.faceId;saved.placement=socket.placement;saved.rotation=[...socket.rotation];
   const before=current.kind==='edit'?current.before:componentSetup(scene.model);
-  const next={...before,sockets:current.kind==='edit'?before.sockets.map(s=>s.id===saved.id?saved:s):[...before.sockets,saved]};
+  const next={...before,...(current.makeAttachmentPoint?{attachmentSocketId:current.batch?.sockets[0]?.id||saved.id}:{}),sockets:current.kind==='edit'?before.sockets.map(s=>s.id===saved.id?saved:s):[...before.sockets,...(current.batch?.sockets||[saved])]};
   if(current.kind==='edit'&&componentSetup(scene.model)!==current.preview){message.textContent='Socket setup changed; cancel and reopen this edit.';return;}
   busy=true;panel.querySelectorAll('input,select,button').forEach(el=>el.disabled=true);buttons.querySelectorAll('button').forEach(el=>el.disabled=true);
-  try{if(current.kind==='edit')previewSetup(scene,before);await changeSetup(scene,next);restoreCamera();state=null;actionMenu.hidden=true;panel.append(buttons);showPanel(false);selectSocket({...socket,id:saved.id,type:'component'});}
+  try{if(current.kind==='edit')previewSetup(scene,before);await changeSetup(scene,next);restoreCamera();state=null;actionMenu.hidden=true;panel.append(buttons);showPanel(false);selectSocket(componentSockets(scene).find(s=>s.id===(current.batch?.sockets[0]?.id||saved.id))||{...socket,id:saved.id,type:'component'});}
   catch(error){if(scene.model===current.model){previewSetup(scene,current.kind==='edit'?current.preview:before);}message.textContent=error.message;throw error;}
   finally{busy=false;panel.querySelectorAll('input,select,button').forEach(el=>el.disabled=false);buttons.querySelectorAll('button').forEach(el=>el.disabled=false);configure();invalidate();}
  }
@@ -150,7 +167,7 @@ export function createSocketEditor(canvas,scene,view,{pick,invalidate,changed,ac
   invalidate();
  }
  function reposition(){if(!state?.face||state.stage==='direction')return;state.hover=null;const point=snapToFace(state.face,state.point||state.face.position,state.settings);if(point)preview(point);else message.textContent='No valid point at that location on this face.';}
- function startCreate(){closeMenu();cancel();view.tool='sockets';view.interactionMode='object';state={stage:'pick',kind:'create',model:scene.model,revision:scene.revision,settings:{mode:'center',center:preference,density:'divisions',divisions:10,spacing:.1,square:true,edgeOrder:1},point:null,face:null};showPanel(true);configure();canvas.focus();invalidate();}
+ function startCreate(event){closeMenu();cancel();view.tool='sockets';view.interactionMode='object';state={pickBlockId:event?.detail?.blockId,blockType:event?.detail?.blockType,makeAttachmentPoint:!!scene.componentAttachmentDraft&&!!event?.detail?.attachmentPoint,stage:'pick',kind:'create',model:scene.model,revision:scene.revision,settings:{mode:'center',center:preference,density:'divisions',divisions:10,spacing:.1,square:true,edgeOrder:1},point:null,face:null};showPanel(true);configure();canvas.focus();invalidate();}
  function startEdit(socket,directionOnly=false){
   closeMenu();cancel();view.interactionMode='object';view.tool='sockets';const manual=componentSetup(scene.model).sockets.find(s=>s.id===socket.id),block=scene.model.blocks.find(b=>b.id===manual?.blockId);
   if(!block){message.textContent='This legacy socket has no mounting face. Create a surface socket instead.';showPanel(true);return;}
@@ -167,10 +184,12 @@ export function createSocketEditor(canvas,scene,view,{pick,invalidate,changed,ac
   action(menu,'Attach Component',async()=>{const asset=componentLibrary.assets.find(a=>a.id===choice.value);if(!asset)return;await changeSetup(scene,assignComponent(scene,asset,socket));selectSocket(socket);closeMenu();invalidate();},!componentLibrary.assets.length);
   if(!componentLibrary.assets.length)menu.append(el('p','Add a component XML in the Asset Library first.'));action(menu,'Cancel',closeMenu);
  }
+ function syncSize(){const rect=canvas.getBoundingClientRect();width=rect.width;height=rect.height;}
  function context(event,x,y,hits){
+  syncSize();
   if(eatContext){eatContext=false;return true;}
   if(state){cancel();return true;}
-  if(!socketToolActive(view)||view.interactionMode==='paint'||!scene.model||scene.componentAttachmentDraft||scene.turretEditorAsset)return false;
+  if(!socketToolActive(view)||view.interactionMode==='paint'||!scene.model||scene.turretEditorAsset)return false;
   const candidates=componentSockets(scene).filter(s=>!scene.hiddenIds?.has(s.blockId)).map(s=>({...s,screen:projectPoint(nativeToView(s.position),view,width,height)})).filter(s=>s.screen&&Math.hypot(s.screen[0]-x,s.screen[1]-y)<=12&&visible(s));
   const socket=pickSocketMarker(candidates,x,y),hit=socket?null:pick(x,y);if(!socket&&!hit)return false;
   closeMenu();menu=el('div');menu.className='socket-context-menu';menu.setAttribute('role','menu');menu.style.left=Math.max(4,Math.min(width-210,x))+'px';menu.style.top=Math.max(4,Math.min(height-150,y))+'px';host.append(menu);
@@ -178,8 +197,9 @@ export function createSocketEditor(canvas,scene,view,{pick,invalidate,changed,ac
    const setup=componentSetup(scene.model),mount=setup.mounts.find(m=>m.socketId===socket.id),manual=setup.sockets.find(s=>s.id===socket.id);selectSocket(socket);
    action(menu,'Edit Position',()=>startEdit(socket),!manual);
    action(menu,'Edit Direction',()=>startEdit(socket,true),!manual);
-   if(mount)action(menu,'Detach Component',async()=>{await changeSetup(scene,detachSurfaceComponent(scene,mount));closeMenu();changed();invalidate();});else action(menu,'Attach Component',()=>attach(socket));
-   action(menu,'Delete Socket',async()=>{await changeSetup(scene,{...setup,sockets:setup.sockets.filter(s=>s.id!==socket.id)});closeMenu();changed();invalidate();},!!mount||!manual);
+   if(scene.componentAttachmentDraft)action(menu,'Make Attachment Point',async()=>{await changeSetup(scene,{...setup,attachmentSocketId:socket.id});closeMenu();changed();invalidate();},!manual||setup.attachmentSocketId===socket.id);
+   else if(mount)action(menu,'Detach Component',async()=>{await changeSetup(scene,detachSurfaceComponent(scene,mount));closeMenu();changed();invalidate();});else action(menu,'Attach Component',()=>attach(socket));
+   action(menu,'Delete Socket',async()=>{await changeSetup(scene,withoutSocket(setup,socket.id));closeMenu();changed();invalidate();},!!mount||!manual);
   }else action(menu,'Add Component Socket',startCreate);
   canvas.focus();return true;
  }
@@ -190,11 +210,11 @@ export function createSocketEditor(canvas,scene,view,{pick,invalidate,changed,ac
   }).map(t=>({face,depth:t.reduce((sum,p)=>sum+p[2],0)/3}))).sort((a,b)=>a.depth-b.depth)[0]?.face||null;
  }
  function move(x,y){
-  if(!state||busy)return false;
+  if(!state||busy)return false;syncSize();
   if(state.stage==='direction'){state.hoverBox=pickBox(x,y);invalidate();return true;}
   if(state.stage==='review')return true;
   if(state.stage==='pick'){
-   const hit=pick(x,y),block=scene.model?.blocks.find(b=>b.id===hit?.blockId),face=block&&faceForHit(block,hit);if(state.block!==block)state.blockFaces=block?socketFaces(block):[];state.face=face||null;state.block=block;
+   const hit=pick(x,y),block=scene.model?.blocks.find(b=>b.id===hit?.blockId),face=block&&(!state.pickBlockId||block.id===state.pickBlockId)&&(state.blockType===undefined||block.typeIndex===state.blockType)&&faceForHit(block,hit);if(state.block!==block)state.blockFaces=block?socketFaces(block):[];state.face=face||null;state.block=block;
    state.point=face?faceCenter(face,state.settings.center):null;state.socket=face;configure();if(face&&!state.point)message.textContent='Selected center is unavailable on this face. Choose another center.';invalidate();return true;
   }
   const face=state.face,o=projectPoint(nativeToView(face.world([0,0])),view,width,height),u=projectPoint(nativeToView(face.world([1,0])),view,width,height),v=projectPoint(nativeToView(face.world([0,1])),view,width,height);
@@ -204,7 +224,7 @@ export function createSocketEditor(canvas,scene,view,{pick,invalidate,changed,ac
  function down(event,x,y){
   if(menu&&event.button===0){closeMenu();return true;}if(!state)return false;
   if(event.button===2){cancel();eatContext=true;return true;}
-  if(event.button===0&&!event.altKey){move(x,y);if(state.stage==='direction'){if(state.hoverBox){state.normal=[...state.hoverBox.normal];if(state.kind==='edit')preview(state.point);configure();openDirectionActions(x,y);invalidate();}return true;}if(state.stage==='pick')choosePosition();else if(state.stage==='position'&&state.hover)preview(state.hover);return true;}
+  if(event.button===0&&!event.altKey){move(x,y);if(state.stage==='direction'){if(state.hoverBox){state.normal=[...state.hoverBox.normal];if(state.kind==='edit')preview(state.point);configure();openDirectionActions(x,y);invalidate();}return true;}if(state.stage==='pick')choosePosition(x,y);else if(state.stage==='position'&&state.hover)preview(state.hover);return true;}
   return state.stage!=='pick';
  }
  function draw(ctx,w,h){
@@ -212,7 +232,7 @@ export function createSocketEditor(canvas,scene,view,{pick,invalidate,changed,ac
   if(scene.model!==state.model||scene.revision!==state.revision||!socketToolActive(view)){cancel();return;}
   const face=state.face;if(!face)return;
   const project=p=>projectPoint(nativeToView(p),view,w,h);
-  if(directionView()){
+  if(directionView()&&state.boxFaces){
    ctx.save();ctx.fillStyle='rgba(0,0,0,.8)';ctx.fillRect(0,0,w,h);
    const faces=state.blockFaces.map(face=>({face,triangles:boxPolygon(face)})).sort((a,b)=>b.triangles[0][0][2]-a.triangles[0][0][2]);
    const paint=(face,fill,stroke)=>{
@@ -261,7 +281,8 @@ export function createSocketEditor(canvas,scene,view,{pick,invalidate,changed,ac
  canvas.addEventListener('component-socket-place',startCreate,{signal:events.signal});
  window.addEventListener('keydown',e=>{if(!state&&!menu)return;if(e.key==='Escape'&&panel.contains?.(e.target)&&numericEditing())return;if(state&&e.target===canvas&&(['Delete','Backspace'].includes(e.key)||(e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z')){e.preventDefault();e.stopImmediatePropagation();if(e.key.toLowerCase()==='z')cancel();else message.textContent='Apply or cancel socket editing before deleting.';return;}if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();cancel();}else if(e.key==='Enter'&&state&&state.stage!=='pick'&&e.target===canvas){e.preventDefault();Promise.resolve(accept()).catch(e=>{message.textContent=e.message;});}},{capture:true,signal:events.signal});
  window.addEventListener('component-socket-direction',e=>{if(!active())return;const socket=componentSockets(scene).find(s=>s.id===e.detail);if(socket)startEdit(socket,true);},{signal:events.signal});
- window.addEventListener('component-socket-select',e=>{if(!active())return;const socket=componentSockets(scene).find(s=>s.id===e.detail);if(socket)selectSocket(socket);},{signal:events.signal});
+ window.addEventListener('component-socket-add',e=>{if(active())startCreate(e);},{signal:events.signal});
+ window.addEventListener('component-socket-select',e=>{if(!active())return;const id=typeof e.detail==='object'?e.detail?.id:e.detail,socket=componentSockets(scene).find(s=>s.id===id);if(socket){if(e.detail?.focus)focusSocket(socket);selectSocket(socket);}},{signal:events.signal});
  window.addEventListener('component-socket-edit',e=>{if(!active())return;const socket=componentSockets(scene).find(s=>s.id===e.detail);if(socket)startEdit(socket);},{signal:events.signal});
  function wheel(event,unit,preferences){if(!state||state.stage==='pick')return false;const direction=preferences.invertZoom?-1:1;view.zoom=Math.max(.000001,Math.min(1e6,view.zoom*Math.exp(-event.deltaY*unit*.001*preferences.zoomSensitivity*direction)));invalidate();return true;}
  return {draw,move,down,wheel,context,cancel,get locked(){return !!state&&state.stage!=='pick';},get active(){return !!state;},get cursor(){return state?'crosshair':null;},dispose(){cancel();events.abort();disposeRows();closeMenu();actionMenu.remove();panel.remove();}};

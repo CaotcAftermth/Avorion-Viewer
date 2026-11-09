@@ -11,7 +11,7 @@ import {mounts} from './mounts.js';
 export function posedTurretBlocks(scene,include=()=>true){return posedAttachments(scene,include,false);}
 export function posedComponentBlocks(scene,include=()=>true){return posedAttachments(scene,include,true);}
 function posedAttachments(scene,include,components){
- const result=[],sockets=sceneSockets(scene),profile=defaultOrientationProfile();
+ const result=[],sockets=components?[]:sceneSockets(scene),profile=defaultOrientationProfile();
  const entries=components?componentEntries(scene):mounts(scene).map(instance=>({instance,socket:sockets.find(s=>s.id===instance.socketId)}));
  for(const {instance:mount,socket,matrix} of entries){if(!socket||!include(mount,socket))continue;
   const matrices=components?{base:matrix}:partMatrices(mount.asset,socket,mount);
@@ -20,11 +20,11 @@ function posedAttachments(scene,include,components){
    const points=[];for(let i=0;i<positions.length;i+=3)points.push(new THREE.Vector3().fromArray(positions,i).applyMatrix4(matrices[part]));
    const box=new THREE.Box3().setFromPoints(points),center=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3());
    const {el,itemEl,...plain}=block;
-   result.push({...plain,id:`${components?'component':'turret'}:${mount.id}:${block.id}`,mountId:mount.id,parentId:socket.blockId,position:{x:center.x,y:center.y,z:center.z},size:{x:size.x,y:size.y,z:size.z},exportPositions:Float32Array.from(points.flatMap(p=>p.sub(center).toArray()))});
+   result.push({...plain,id:`${components?'component':'turret'}:${mount.id}:${block.id}`,mountId:mount.id,parentId:socket.componentBlockId||socket.blockId,position:{x:center.x,y:center.y,z:center.z},size:{x:size.x,y:size.y,z:size.z},exportPositions:Float32Array.from(points.flatMap(p=>p.sub(center).toArray()))});
   }
  }
  return result;
 }
-export const visibleTurretBlocks=scene=>posedTurretBlocks(scene,(m,s)=>!m.hidden&&!scene.hiddenIds?.has(s.blockId));
+export const visibleTurretBlocks=scene=>posedTurretBlocks(scene,(m,s)=>!m.hidden&&!s.ancestorHidden&&!scene.hiddenIds?.has(s.blockId));
 
-export const visibleComponentBlocks=scene=>posedComponentBlocks(scene,(m,s)=>!m.hidden&&!scene.hiddenIds?.has(s.blockId));
+export const visibleComponentBlocks=scene=>posedComponentBlocks(scene,(m,s)=>!m.hidden&&!s.ancestorHidden&&!scene.hiddenIds?.has(s.blockId));
