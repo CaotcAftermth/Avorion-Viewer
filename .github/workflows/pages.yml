@@ -26,10 +26,12 @@ jobs:
       - run: npm test
       - run: npm run build
       - uses: actions/configure-pages@v5
+      # Keep reruns distinct; previous attempts retain their uploaded artifacts.
       - uses: actions/upload-pages-artifact@v4
         with:
           name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: dist
+      # Upload completion can precede visibility in the Actions artifact API.
       - name: Wait for Pages artifact metadata
         uses: actions/github-script@v7
         env:
