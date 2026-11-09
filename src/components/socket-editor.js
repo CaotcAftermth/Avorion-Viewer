@@ -5,7 +5,7 @@ import {SOCKET_APPEARANCE_KEY,socketAppearance,appearanceColor,draftingBackgroun
 import {layoutPropertyRows} from '../property-rows.js';
 import * as THREE from '../vendor/three.module.js';
 import {nativeToView} from '../block-model.js';
-import {projectPoint} from '../navigation.js';
+import {projectPoint,basis} from '../navigation.js';
 import {socketToolActive} from '../interaction-modes.js';
 import {pickSocketMarker,drawSocketMarker,selectSocketMarker} from '../socket-markers.js';
 import {componentSetup,componentSockets,componentEntries,savedSocket} from './core.js';
@@ -136,13 +136,15 @@ export function createSocketEditor(canvas,scene,view,{pick,invalidate,changed,ac
   if(scene.model===state?.model)restoreCamera();state=null;actionMenu.hidden=true;panel.append(buttons);showPanel(false);invalidate();changed();
  }
  function focusSocket(socket){
-  let normal=socket.normal,block=scene.model.blocks.find(b=>b.id===socket.blockId);
+  let normal=socket.normal,points=[],block=scene.model.blocks.find(b=>b.id===socket.blockId);
   if(socket.parentMountId){
    const entry=componentEntries(scene).find(e=>e.instance.id===socket.parentMountId),saved=entry?.asset.sockets?.find(s=>s.id===socket.sourceSocketId);
    block=entry?.asset.blocks.find(b=>b.id===saved?.blockId);const face=block&&socketFaces(block).find(f=>f.faceId===saved.faceId);
-   if(face)normal=new THREE.Vector3(...face.normal).transformDirection(entry.matrix).toArray();
-  }else if(block){const face=socketFaces(block).find(f=>f.faceId===socket.faceId&&f.contains(socket.position))||socketFaces(block).find(f=>f.contains(socket.position)&&f.normal.every((n,i)=>Math.abs(n-socket.normal[i])<1e-5));if(face)normal=face.normal;}
-  const back=nativeToView(normal);view.yaw=Math.hypot(back[0],back[1])<1e-7?0:Math.atan2(back[0],-back[1]);view.pitch=Math.asin(Math.max(-1,Math.min(1,back[2])));view.roll=0;view.target=nativeToView(socket.position);view.panX=view.panY=0;invalidate();
+   if(face){normal=new THREE.Vector3(...face.normal).transformDirection(entry.matrix).toArray();points=face.triangles.flat().map(p=>new THREE.Vector3(...p).applyMatrix4(entry.matrix).toArray());}
+  }else if(block){const face=socketFaces(block).find(f=>f.faceId===socket.faceId&&f.contains(socket.position))||socketFaces(block).find(f=>f.contains(socket.position)&&f.normal.every((n,i)=>Math.abs(n-socket.normal[i])<1e-5));if(face){normal=face.normal;points=face.triangles.flat();}}
+  const back=nativeToView(normal);view.yaw=Math.hypot(back[0],back[1])<1e-7?0:Math.atan2(back[0],-back[1]);view.pitch=Math.asin(Math.max(-1,Math.min(1,back[2])));view.roll=0;view.projection='orthographic';view.target=nativeToView(socket.position);view.panX=view.panY=0;
+  const axes=basis(view),span=points.length?2*Math.max(...points.flatMap(p=>{const delta=nativeToView(p).map((n,i)=>n-view.target[i]);return [axes.right,axes.up].map(axis=>Math.abs(delta.reduce((sum,n,i)=>sum+n*axis[i],0)));})):Math.max(...Object.values(block?.size||{x:1,y:1,z:1}));
+  fitCamera(span);invalidate();
  }
  function selectSocket(socket){selectSocketMarker(scene,socket);changed();}
  async function commit(){

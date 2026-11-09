@@ -32,14 +32,14 @@ export function createTurretToolbar(canvas,scene,view,{changed,selected,invalida
  }
  function cancel(){if(!gesture)return;gesture=null;finish(true);invalidate();changed();}
  function close(){cancel();bar.hidden=true;id=null;mode=null;geometry=null;}
- function action(label,fn){const button=document.createElement('button');button.type='button';const glyphs={'Copy pose & size':'<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="9" height="9"/><path d="M11 4V2H2v9h2"/></svg>','Paste pose & size':'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3H2v11h12V3h-3"/><rect x="5" y="1" width="6" height="4"/></svg>','⚙ Properties':'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12M2 12h12M5 2v4M11 10v4M2 8h12M9 6v4"/></svg>'};if(glyphs[label]){button.innerHTML=glyphs[label];button.className='turret-context-icon';}else button.textContent=label;button.title=label;button.setAttribute('aria-label',label);button.onclick=()=>{try{cancel();Promise.resolve(fn()).catch(error=>status.textContent=error.message);}catch(error){status.textContent=error.message;}};bar.append(button);return button;}
+ function action(label,fn){const button=document.createElement('button');button.type='button';const glyphs={'Copy pose & size':'<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="9" height="9"/><path d="M11 4V2H2v9h2"/></svg>','Paste pose & size':'<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3H2v11h12V3h-3"/><rect x="5" y="1" width="6" height="4"/></svg>'};if(glyphs[label]){button.innerHTML=glyphs[label];button.className='turret-context-icon';}else button.textContent=label;button.title=label;button.setAttribute('aria-label',label);button.onclick=()=>{try{cancel();Promise.resolve(fn()).catch(error=>status.textContent=error.message);}catch(error){status.textContent=error.message;}};bar.append(button);return button;}
  function build(){
   status.textContent='';bar.replaceChildren();
   if(component){
    for(const [label,step] of [['−90°',-1],['+90°',1]])action(label,async()=>{const mount=current();if(mount){await changeSetup(scene,rotateSurfaceComponent(scene,mount,step));changed();invalidate();}});
    action('Edit Socket Position',()=>{const s=socket();close();if(s)window.dispatchEvent(new CustomEvent('component-socket-edit',{detail:s.id}));});
    action('Detach Component',async()=>{const mount=current();if(mount)await changeSetup(scene,detachSurfaceComponent(scene,mount));close();changed();invalidate();});
-   action('⚙ Properties',()=>{canvas.dispatchEvent(new CustomEvent('turret-open-properties',{bubbles:true,detail:'components'}));close();});bar.append(status);return;
+   bar.append(status);return;
   }
 
   action('↻ Rotate',()=>{cancel();mode=mode==='rotate'?null:'rotate';scene.attachmentTransform=false;invalidate();});
@@ -73,7 +73,7 @@ export function createTurretToolbar(canvas,scene,view,{changed,selected,invalida
    else copyTurretPose(scene);build();});
   const paste=action('Paste pose & size',async()=>{const m=current(),s=socket();
    if(component){if(m&&scene.componentPoseClipboard){await changeSetup(scene,patchMount(scene,m,structuredClone(scene.componentPoseClipboard)));changed();invalidate();}return;}if(!m||!scene.turretClipboard)return;const size=fittedSize(scene.turretClipboard.turretSize,s);if(size===null)throw Error('Socket has no clearance for a turret.');editTurrets(scene,[id],{...scene.turretClipboard,turretSize:size});changed();invalidate();});paste.disabled=component?!scene.componentPoseClipboard:!scene.turretClipboard||socketSizeLimit(socket())<.5;
-  action('⚙ Properties',()=>{if(!current())return;canvas.dispatchEvent(new CustomEvent('turret-open-properties',{bubbles:true,detail:component?'components':'turrets'}));close();});bar.append(status);
+  bar.append(status);
  }
  function open(m,isComponent=false){cancel();id=m.id;model=scene.model;mode=null;component=isComponent;
   bar.setAttribute('aria-label',component?'Component context tools':'Turret context tools');
