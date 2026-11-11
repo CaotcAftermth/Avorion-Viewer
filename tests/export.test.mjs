@@ -22,6 +22,11 @@ test('export thin filter matches viewport threshold across scopes without deleti
  for(const scope of ['all','visible','selected','region']){const snapshot=captureExport(scene,{showThinBlocks:true},{scope,regionId:'all',excludeThin:true});assert.deepEqual(snapshot.blocks.map(b=>b.id),['edge','solid']);assert.equal(snapshot.excludedThinBlocks,2);const r=await prepareExport(snapshot,options);assert.equal(r.summary['Excluded zero/thin blocks'],2);}
  const snapshot=captureExport(scene,{}, {excludeThin:true,excludedIds:['thin','solid']});assert.equal(snapshot.excludedThinBlocks,2);assert.equal(snapshot.excludedProblemBlocks,1);assert.deepEqual(snapshot.blocks.map(b=>b.id),['edge']);
  await assert.rejects(prepareExport(captureExport(scene,{}, {excludeThin:false}),options),e=>e.issueIds.includes('flat'));
+ scene.thinBlockThreshold=.005;
+ const legacy=captureExport(scene,{showThinBlocks:true},{excludeThin:true});
+ assert.deepEqual(legacy.blocks.map(b=>b.id),['thin','edge','solid']);
+ assert.match(legacy.warnings[0],/below 0\.005 native units/);
+ assert.deepEqual(captureExport(scene,{showThinBlocks:false},{scope:'visible'}).blocks.map(b=>b.id),['thin','edge','solid']);
  assert.equal(JSON.stringify(blocks),before);
 });
 

@@ -1,6 +1,8 @@
 // Deutsch interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+ "Thin Block Threshold": "Schwellenwert für dünne Blöcke",
+ "A block is thin if any dimension is below this cutoff in native units.": "Ein Block gilt als dünn, wenn eine seiner Abmessungen in nativen Einheiten unter diesem Grenzwert liegt.",
  "Select Sockets Target Azimuth": "Sockelauswahl-Zielwinkel",
  "Select Sockets Target Distance": "Sockelauswahl-Zielabstand",
  "Cycle Object / Paint Mode": "Objekt- / Malmodus wechseln",

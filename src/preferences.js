@@ -77,6 +77,7 @@ export const PREFERENCE_SECTIONS = [
   ] },
   { id: 'system', label: 'System', panels: [
     { label: 'Viewport Rendering', fields: [
+      { key: 'thinBlockThreshold', label: 'Thin Block Threshold', type: 'select', numeric: true, options: [[0.01,'0.01'],[0.005,'0.005']], default: 0.01, description: 'A block is thin if any dimension is below this cutoff in native units.' },
       { key: 'simplifyThreshold', label: 'Simplified Rendering Threshold', type: 'number', min: 1, max: 1000000, step: 1, default: 50000, suffix: 'blocks', description: 'Above this live block count, disable animated block effects. Block selection and focus remain available. Textures, shader settings, and visibility controls remain available.' },
       { key: 'pixelRatio', label: 'Resolution Limit', type: 'select', numeric: true, options: [[1,'1× · Performance'],[1.5,'1.5× · Balanced'],[2,'2× · Quality']], default: 2, description: 'Maximum canvas pixels per display pixel, limited by your screen. Higher values use more memory.' }
     ] }

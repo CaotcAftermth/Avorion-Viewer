@@ -1,6 +1,8 @@
 // 中文（简体） interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+ "Thin Block Threshold": "薄方块阈值",
+ "A block is thin if any dimension is below this cutoff in native units.": "如果方块的任一尺寸以原生单位计低于此阈值，则视为薄方块。",
  "Select Sockets Target Azimuth": "插槽选择目标方位角",
  "Select Sockets Target Distance": "插槽选择目标距离",
  "Cycle Object / Paint Mode": "切换物体／绘制模式",

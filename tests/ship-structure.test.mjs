@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeBlock,makeModel } from '../src/block-model.js';
-import { isThinBlock,viewportHiddenIds,isIsolated,liveBlocks,groupedBlocks,selectBlocks,setBlockVisibility,contextTargets,simplified,reconcileStructure,blockParentIds,blockChildIds,blockLabel } from '../src/ship-structure.js';
+import { isThinBlock,viewportHiddenIds,engineEffectHiddenIds,isIsolated,liveBlocks,groupedBlocks,selectBlocks,setBlockVisibility,contextTargets,simplified,reconcileStructure,blockParentIds,blockChildIds,blockLabel } from '../src/ship-structure.js';
 const setup=()=>({loaded:true,model:makeModel([
   makeBlock({id:'b123',typeIndex:8,materialIndex:1}),makeBlock({id:'b5',typeIndex:2,materialIndex:0}),makeBlock({id:'b6',typeIndex:8,materialIndex:0}),
   {...makeBlock({id:'b7'}),deleted:true},{...makeBlock({id:'b8'}),el:{isConnected:false}}
@@ -56,6 +56,24 @@ test('thin block filter covers every dimension without changing manual visibilit
   assert.deepEqual([...viewportHiddenIds(s,{showThinBlocks:true})],['b5']);
   assert.deepEqual([...s.hiddenIds],['b5']);
 });
+test('changing the cutoff invalidates viewport and engine visibility without changing manual hides',()=>{
+  const s=setup(),[below,edge,legacy]=s.model.blocks,view={showThinBlocks:false};
+  s.revision=1;
+  below.typeIndex=3;below.size.x=.00499;
+  edge.size.y=.005;
+  legacy.size.z=.007;
+  s.hiddenIds.add('b5');
+  assert.deepEqual([...viewportHiddenIds(s,view)],['b5',below.id,legacy.id]);
+  s.thinBlockThreshold=.005;
+  assert.equal(isThinBlock(edge,.005),false);
+  assert.deepEqual([...viewportHiddenIds(s,view)],['b5',below.id]);
+  assert.deepEqual([...engineEffectHiddenIds(s,view,false)],['b5',below.id]);
+  assert.deepEqual([...engineEffectHiddenIds(s,view,true)],['b5']);
+  s.thinBlockThreshold=.01;
+  assert.deepEqual([...viewportHiddenIds(s,view)],['b5',below.id,legacy.id]);
+  assert.deepEqual([...s.hiddenIds],['b5']);
+});
+
 test('native hierarchy resolves live parents and children, and labels blocks readably',()=>{
   const s=setup();const [a,b,c]=s.model.blocks;b.parentId='b123';c.parentId='b123';a.parentId='b7';s.model.blocks[4].parentId='b123';
   assert.deepEqual(blockParentIds(s,['b5','b6']),['b123']);assert.deepEqual(blockParentIds(s,['b123']),[]);

@@ -148,7 +148,7 @@ export function mountShipStructure(host,node,scene,{getPreferences,getView=()=>(
     membership=new Map();for(const g of groups)for(const id of g.ids)membership.set(id,g);lastSignature=[];sync(true);
   }
   function sync(force=false){
-    const live=liveBlocks(scene),signature=[live,scene.selectedIds,scene.hiddenIds,getView().showThinBlocks,getPreferences().simplifyThreshold,scene.outlinerRevealRevision];
+    const live=liveBlocks(scene),signature=[live,scene.selectedIds,scene.hiddenIds,getView().showThinBlocks,getPreferences().simplifyThreshold,scene.outlinerRevealRevision,thinBlockThreshold(scene)];
     if(!force&&signature.every((v,i)=>v===lastSignature[i]))return;
     if(!force&&live!==lastSignature[0]&&(live.length!==rootIds.length||live.some((b,i)=>b.id!==rootIds[i]))){render();return;}
     const nextPinned=scene.selectedIds?.has(scene.outlinerRevealId)?blocksById.get(scene.outlinerRevealId):null;
@@ -182,15 +182,16 @@ export function mountShipStructure(host,node,scene,{getPreferences,getView=()=>(
   return {outlinerId:node.id,search:render,sync,dispose(){observer.disconnect();host.removeEventListener('scroll',scroll);}};
 }
 
-export function isThinBlock(block){return ['x','y','z'].some(axis=>Math.abs(block.size?.[axis])<0.01);}
+export function thinBlockThreshold(scene){return scene.thinBlockThreshold??0.01;}
+export function isThinBlock(block,threshold=0.01){return ['x','y','z'].some(axis=>Math.abs(block.size?.[axis])<threshold);}
 const hiddenCache=new WeakMap();
 export function viewportHiddenIds(scene,view){
   if(view.showThinBlocks!==false)return scene.hiddenIds||new Set();
-  const live=liveBlocks(scene),old=hiddenCache.get(scene);
-  if(scene.revision!==undefined&&old?.live===live&&old.hidden===scene.hiddenIds)return old.result;
+  const live=liveBlocks(scene),old=hiddenCache.get(scene),threshold=thinBlockThreshold(scene);
+  if(scene.revision!==undefined&&old?.live===live&&old.hidden===scene.hiddenIds&&old.threshold===threshold)return old.result;
   const hidden=new Set(scene.hiddenIds||[]);
-  if(view.showThinBlocks===false)for(const block of liveBlocks(scene))if(isThinBlock(block))hidden.add(block.id);
-  hiddenCache.set(scene,{live,hidden:scene.hiddenIds,result:hidden});return hidden;
+  for(const block of live)if(isThinBlock(block,threshold))hidden.add(block.id);
+  hiddenCache.set(scene,{live,hidden:scene.hiddenIds,threshold,result:hidden});return hidden;
 }
 
 const effectHiddenCache=new WeakMap();
@@ -199,6 +200,7 @@ export function engineEffectHiddenIds(scene,view,keepThin=true){
   if(!keepThin||view.showThinBlocks!==false)return hidden;
   const cached=effectHiddenCache.get(scene);if(cached?.hidden===hidden)return cached.result;
   const result=new Set(hidden);
-  for(const b of liveBlocks(scene))if(b.typeIndex===3&&isThinBlock(b)&&!scene.hiddenIds?.has(b.id))result.delete(b.id);
+  const threshold=thinBlockThreshold(scene);
+  for(const b of liveBlocks(scene))if(b.typeIndex===3&&isThinBlock(b,threshold)&&!scene.hiddenIds?.has(b.id))result.delete(b.id);
   effectHiddenCache.set(scene,{hidden,result});return result;
 }

@@ -1,12 +1,12 @@
 import {THRUSTER_DIRECTIONS,THRUSTER_DIRECTION_DESCRIPTION} from './thruster-settings.js';
 import {t} from './i18n.js';
 import {propertyDataRow,propertyPanel} from './property-ui.js';
-import {liveBlocks,viewportHiddenIds,isThinBlock} from './ship-structure.js';
+import {liveBlocks,viewportHiddenIds,isThinBlock,thinBlockThreshold} from './ship-structure.js';
 export function modelSummary(scene,view){
- const blocks=liveBlocks(scene),hidden=viewportHiddenIds(scene,view||{});
+ const blocks=liveBlocks(scene),hidden=viewportHiddenIds(scene,view||{}),threshold=thinBlockThreshold(scene);
  const min={x:Infinity,y:Infinity,z:Infinity},max={x:-Infinity,y:-Infinity,z:-Infinity};
  for(const b of blocks)for(const axis of ['x','y','z']){min[axis]=Math.min(min[axis],b.position[axis]-Math.abs(b.size[axis])/2);max[axis]=Math.max(max[axis],b.position[axis]+Math.abs(b.size[axis])/2);}
- return {name:scene.loaded?(scene.model?.fileName||scene.model?.doc?.documentElement.getAttribute('name')||'Ship'):'No model loaded',total:blocks.length,visible:scene.visible?blocks.filter(b=>!hidden.has(b.id)).length:0,engines:blocks.filter(b=>b.typeIndex===3).length,thin:blocks.filter(isThinBlock).length,dimensions:['x','y','z'].map(a=>blocks.length?max[a]-min[a]:0)};
+ return {name:scene.loaded?(scene.model?.fileName||scene.model?.doc?.documentElement.getAttribute('name')||'Ship'):'No model loaded',total:blocks.length,visible:scene.visible?blocks.filter(b=>!hidden.has(b.id)).length:0,engines:blocks.filter(b=>b.typeIndex===3).length,thin:blocks.filter(b=>isThinBlock(b,threshold)).length,dimensions:['x','y','z'].map(a=>blocks.length?max[a]-min[a]:0)};
 }
 export function mountEngineState(host,view,preferences){
  const panel=propertyPanel(host,'Engine State',true);

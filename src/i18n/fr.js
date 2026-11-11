@@ -1,6 +1,8 @@
 // Français interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+ "Thin Block Threshold": "Seuil des blocs minces",
+ "A block is thin if any dimension is below this cutoff in native units.": "Un bloc est mince si l’une de ses dimensions est inférieure à ce seuil en unités natives.",
  "Select Sockets Target Azimuth": "Azimut de la cible de sélection des sockets",
  "Select Sockets Target Distance": "Distance de la cible de sélection des sockets",
  "Cycle Object / Paint Mode": "Alterner mode Objet / Peinture",

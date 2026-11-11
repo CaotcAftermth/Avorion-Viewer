@@ -1,5 +1,5 @@
 import {posedTurretBlocks,posedComponentBlocks} from '../turrets/posed-blocks.js';
-import {liveBlocks,viewportHiddenIds,isThinBlock} from '../ship-structure.js';
+import {liveBlocks,viewportHiddenIds,isThinBlock,thinBlockThreshold} from '../ship-structure.js';
 import {secondaryColor} from '../block-colors.js';
 export const EXPORT_FORMATS={stl:'Binary triangle mesh · millimeters by convention', '3mf':'Print package · explicit millimeters and base materials',glb:'Single editable scene · basic PBR colors',gltf:'ZIP of glTF scene, buffer, and metadata',obj:'ZIP of OBJ, MTL, and metadata'};
 export function captureExport(scene,view,{scope='all',regionId='',placement='centered',colors='working',excludeThin=false,excludedIds=[]}={}){
@@ -9,8 +9,9 @@ export function captureExport(scene,view,{scope='all',regionId='',placement='cen
  const wanted=scope==='selected'?scene.selectedIds:region?new Set(region.ids):null,hidden=viewportHiddenIds(scene,view||{});
  const members=new Map();for(const r of scene.regions||[])for(const id of r.ids){if(!members.has(id))members.set(id,[]);members.get(id).push(r.name);}
  const excluded=new Set(excludedIds),scoped=liveBlocks(scene).filter(b=>(!wanted||wanted.has(b.id))&&(scope!=='visible'||scene.visible&&!hidden.has(b.id)));
- const thinCount=excludeThin?scoped.filter(isThinBlock).length:0,manualCount=scoped.filter(b=>excluded.has(b.id)&&!(excludeThin&&isThinBlock(b))).length;
- const blocks=scoped.filter(b=>!(excludeThin&&isThinBlock(b))&&!excluded.has(b.id)).map(b=>{
+ const threshold=thinBlockThreshold(scene),skipThin=b=>excludeThin&&isThinBlock(b,threshold);
+ const thinCount=scoped.filter(skipThin).length,manualCount=scoped.filter(b=>excluded.has(b.id)&&!skipThin(b)).length;
+ const blocks=scoped.filter(b=>!skipThin(b)&&!excluded.has(b.id)).map(b=>{
   const numeric=['index','material','look','up','lx','ly','lz','ux','uy','uz','lowerX','lowerY','lowerZ','upperX','upperY','upperZ'];
   if(b.el?.hasAttribute&&numeric.some(k=>b.el.hasAttribute(k)&&(!b.el.getAttribute(k).trim()||!Number.isFinite(Number(b.el.getAttribute(k))))))throw Object.assign(Error(`Block ${b.id} has invalid numeric XML attributes. Correct the source or exclude this block from the export.`),{issueIds:[b.id]});
   const secondary=colors==='imported'&&b.el?b.el.getAttribute('secondaryColor')??undefined:secondaryColor(b);
@@ -26,5 +27,5 @@ export function captureExport(scene,view,{scope='all',regionId='',placement='cen
   blocks.push({...b,regions:members.get(b.parentId)||[]});
  }
  if(!blocks.length)throw Error('The export scope contains no blocks after scope and exclusion filters.');
- return {version:1,fileName:scene.model.fileName,scope,placement,colorSource:colors,excludedThinBlocks:thinCount,excludedProblemBlocks:manualCount,revision:scene.revision||0,appearanceRevision:scene.appearanceRevision||0,blocks,warnings:[...(thinCount?[`Excluded ${thinCount} zero/thin blocks (any dimension below 0.01 native units), matching the viewport filter.`]:[]),...(manualCount?[`Excluded ${manualCount} explicitly chosen problem blocks from this export only.`]:[]),...(scene.model.warnings||[]).filter(w=>w.level!=='info'||/turret/i.test(w.message)).map(w=>w.message.replace('Preserved on export.','Retained in source XML; omitted from 3D export.'))]};
+ return {version:1,fileName:scene.model.fileName,scope,placement,colorSource:colors,excludedThinBlocks:thinCount,excludedProblemBlocks:manualCount,revision:scene.revision||0,appearanceRevision:scene.appearanceRevision||0,blocks,warnings:[...(thinCount?[`Excluded ${thinCount} zero/thin blocks (any dimension below ${threshold} native units), matching the viewport filter.`]:[]),...(manualCount?[`Excluded ${manualCount} explicitly chosen problem blocks from this export only.`]:[]),...(scene.model.warnings||[]).filter(w=>w.level!=='info'||/turret/i.test(w.message)).map(w=>w.message.replace('Preserved on export.','Retained in source XML; omitted from 3D export.'))]};
 }

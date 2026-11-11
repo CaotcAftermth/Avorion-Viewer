@@ -1,6 +1,8 @@
 // Polski interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+ "Thin Block Threshold": "Próg cienkich bloków",
+ "A block is thin if any dimension is below this cutoff in native units.": "Blok jest cienki, jeśli którykolwiek jego wymiar w jednostkach natywnych jest mniejszy od tego progu.",
  "Select Sockets Target Azimuth": "Azymut celu wyboru gniazd",
  "Select Sockets Target Distance": "Odległość celu wyboru gniazd",
  "Cycle Object / Paint Mode": "Przełącz tryb obiektu / malowania",

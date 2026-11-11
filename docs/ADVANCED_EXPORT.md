@@ -100,7 +100,7 @@ Runtime dependency audit: zero reported vulnerabilities after the fflate update.
 
 ## Thin blocks and recovery actions
 
-**Exclude zero / thin blocks** defaults on in the export dialog. It reuses the viewport rule: any dimension with absolute size below **0.01 native units**. It applies to all export scopes, independently of viewport visibility, before geometry validation and physical scaling. Counts appear in the summary and metadata. Original model/XML remain untouched.
+**Exclude zero / thin blocks** defaults on in the export dialog. It uses **Preferences > System > Viewport Rendering > Thin Block Threshold**. A block is thin when any dimension is strictly below the selected cutoff in native units. The default is **0.01**. Choose **0.005** to retain blocks from 0.005 up to 0.01. The filter applies to all export scopes before geometry validation and physical scaling. Counts appear in the summary and metadata.
 
 A **Resolve export issues** panel appears above failed diagnostics. Depending on the failure/settings it offers:
 

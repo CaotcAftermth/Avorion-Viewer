@@ -1,6 +1,8 @@
 // Español interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+ "Thin Block Threshold": "Umbral de bloques delgados",
+ "A block is thin if any dimension is below this cutoff in native units.": "Un bloque es delgado si alguna dimensión está por debajo de este límite en unidades nativas.",
  "Select Sockets Target Azimuth": "Azimut del objetivo de selección de sockets",
  "Select Sockets Target Distance": "Distancia del objetivo de selección de sockets",
  "Cycle Object / Paint Mode": "Alternar modo Objeto / Pintura",

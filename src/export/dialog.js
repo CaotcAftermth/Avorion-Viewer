@@ -1,5 +1,6 @@
 import {mountImageExport} from './image-dialog.js';
 import {EXPORT_FORMATS,captureExport} from './snapshot.js';
+import {thinBlockThreshold} from '../ship-structure.js';
 
 import {mountExportPreview} from './preview.js';
 import {reportError} from '../app-log.js';
@@ -60,7 +61,7 @@ export function openExportDialog(scene,view,onHighlight,context={}){
  field('placement','Placement',[['centered','Centered on origin'],['native','Native imported position'],['displayed','Displayed position']],'select',advanced);field('colors','Color source',[['working','Current working colors'],['imported','Imported colors']],'select',advanced);
  field('cleanup','Repair winding / clean faces',null,'checkbox',advanced).title='Correct per-block winding and remove degenerate or duplicate faces. Repair collapsed output triangles while preserving surfaces, then validate the result.';field('includeTransparent','Include transparent components',null,'checkbox',advanced);
  field('fillCavities','Fill sealed cavities',null,'checkbox',advanced).title='Shell only. Fill enclosed air pockets; preserve openings to outside air.';
- field('excludeThin','Exclude zero / thin blocks',null,'checkbox',advanced).title='Skip blocks with any dimension below 0.01 native units, matching the viewport toggle. Does not change the model.';
+ field('excludeThin','Exclude zero / thin blocks',null,'checkbox',advanced).title=`Skip blocks with any dimension below ${thinBlockThreshold(scene)} native units, matching the viewport toggle. Does not change the model.`;
  field('tolerance','Solid tolerance (mm)',null,'number',advanced);fields.tolerance.title='Shell only. 0 disables extra simplification. Positive values allow this maximum surface deviation before float32 output (up to 1% of longest dimension).';
  field('budget','Working memory budget (MiB)',null,'number',advanced);
  const note=el('p','Shell mode unions closed solids to remove internal surfaces and overlaps. Separate disconnected solids stay separate. Sealed cavities can optionally be filled; openings are preserved; no invented supports or thickness.');note.className='export-note';advanced.append(note);
@@ -84,7 +85,7 @@ export function openExportDialog(scene,view,onHighlight,context={}){
  function recovery(data){
   const panel=el('section');panel.className='export-recovery';panel.append(el('h4','Resolve export issues'));const area=el('div');area.className='export-result-buttons';panel.append(area);
   const action=(label,tip,changes)=>{const button=el('button',label);button.type='button';button.title=tip;button.onclick=()=>{Object.assign(options,changes);sync();invalidate();save();prepare.click();};area.append(button);};
-  if(!options.excludeThin)action('Exclude zero/thin blocks & retry','Uses the viewport threshold: any dimension below 0.01 native units.',{excludeThin:true});
+  if(!options.excludeThin)action('Exclude zero/thin blocks & retry',`Uses the viewport threshold: any dimension below ${thinBlockThreshold(scene)} native units.`,{excludeThin:true});
   if(!options.cleanup)action('Repair & revalidate','Enable safe winding and face cleanup on a fresh export copy.',{cleanup:true});
   if(data.summary&&options.mode==='grouped'){
    action('Resolve overlaps as shell','Unions solids and removes internal faces. Material boundaries are lost in shell mode.',{mode:'shell',cleanup:true});

@@ -95,7 +95,7 @@ const trackpadDrawers={workspace:null,side:null};
 let trackpadEnabled=preferences.value.trackpadNavigation;
 
 let hovered = null, maximized = null, focusMode = false, operation = null, renderers = [], toastTimer, saveTimer;
-const scene = { loaded: false, visible: true, selected: false, selectedId:null, selectedIds:new Set(), hiddenIds:new Set(), preview:false, revision:0, model:null };
+const scene = { loaded: false, visible: true, selected: false, selectedId:null, selectedIds:new Set(), hiddenIds:new Set(), preview:false, revision:0, model:null, thinBlockThreshold:preferences.value.thinBlockThreshold };
 let savedProjectState=null,workspaceProfileName='';
 const welcome=embedded?null:createWelcome({preferences,wireInputStyles,openModel:importXml,openProject:()=>openSavePicker(),openTextures:loadTextures,feedback:showFeedback,trackpadFallback});
 let textureStatus='Neutral texture fallback · Load a local texture folder from File';
@@ -216,7 +216,7 @@ function structureView(){return (leaves(workspace().root).find(n=>n.id===lastVie
 function visibilityStructure(ids,action,view=structureView()){
   const hidden=viewportHiddenIds(scene,view);
   if(action==='toggle')action=ids.some(id=>!hidden.has(id))?'hide':'show';
-  if(['show','all','isolate'].includes(action)&&view.showThinBlocks===false&&liveBlocks(scene).some(b=>isThinBlock(b)&&(action==='all'||ids.includes(b.id)))){
+  if(['show','all','isolate'].includes(action)&&view.showThinBlocks===false&&liveBlocks(scene).some(b=>isThinBlock(b,scene.thinBlockThreshold)&&(action==='all'||ids.includes(b.id)))){
     // Retain other filtered blocks as manually hidden when showing specific targets.
     scene.hiddenIds=new Set(hidden);
     view.showThinBlocks=true;
@@ -506,6 +506,7 @@ let requestedLanguage;
 function translateStatic(){document.querySelectorAll(STATIC_TEXT).forEach(translateDom);}
 onLanguageChange(()=>{translateStatic();render();});
 function applyPreferences(){
+  scene.thinBlockThreshold=preferences.value.thinBlockThreshold;
   installColorCells();
   setCursorPreferences(preferences.value);
   for(const input of document.querySelectorAll('[data-engine-state]'))input.value=preferences.value.shaderEngineState;
@@ -665,7 +666,7 @@ function chooseBrushColor(id){
 function cancelPaintTask(){paintWorker?.terminate();paintWorker=null;scene.paintBusy=false;finishPaintStroke(scene,true);}
 function scopedPaintIds(node){
  const o=paintOptions(node.view),hidden=viewportHiddenIds(scene,node.view);
- const key=[scene.model,scene.revision,scene.visible,scene.loaded,scene.selectedIds,scene.regions,scene.regions?.length,scene.hiddenIds,node.view.showThinBlocks,o.scope,o.regionId];
+ const key=[scene.model,scene.revision,scene.visible,scene.loaded,scene.selectedIds,scene.regions,scene.regions?.length,hidden,o.scope,o.regionId];
  if(!scopeCache||!key.every((v,i)=>v===scopeCache.key[i]))scopeCache={key,ids:paintScope(scene,o,hidden)};
  return scopeCache.ids;
 }
@@ -858,7 +859,7 @@ function headerFor(node){
     ]));select.className='header-optional';header.append(select);
     const spacer=document.createElement('span');spacer.className='spacer';header.append(spacer);
     const grid=button('Toggle grid',icon('grid'),()=>{node.view.grid=!node.view.grid;commit();},node.view.grid?'active':'');grid.setAttribute('aria-pressed',String(node.view.grid));header.append(grid);
-    const thin=button('Show/Hide 0 thickness blocks',icon('thinBlocks'),()=>{node.view.showThinBlocks=node.view.showThinBlocks===false;commit();},node.view.showThinBlocks!==false?'active':'');thin.title='Show/Hide 0 thickness blocks (any dimension below 0.01)';thin.setAttribute('aria-pressed',String(node.view.showThinBlocks!==false));header.append(thin);
+    const thin=button('Show/Hide 0 thickness blocks',icon('thinBlocks'),()=>{node.view.showThinBlocks=node.view.showThinBlocks===false;commit();},node.view.showThinBlocks!==false?'active':'');thin.setAttribute('aria-pressed',String(node.view.showThinBlocks!==false));header.append(thin);
     viewportHeader(header,node.view,()=>{save();renderers.find(r=>r.id===node.id)?.draw();});
     const sidebar=button('Toggle sidebar',icon('sidebar'),()=>{node.sidebar=!node.sidebar;commit();},node.sidebar?'active':'');sidebar.setAttribute('aria-pressed',String(node.sidebar));header.append(sidebar);
   }else if(node.editor==='outliner'){

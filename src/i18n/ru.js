@@ -1,6 +1,8 @@
 // Русский interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+ "Thin Block Threshold": "Порог тонких блоков",
+ "A block is thin if any dimension is below this cutoff in native units.": "Блок считается тонким, если любой его размер в исходных единицах меньше этого порога.",
  "Select Sockets Target Azimuth": "Азимут цели выбора сокетов",
  "Select Sockets Target Distance": "Расстояние до цели выбора сокетов",
  "Cycle Object / Paint Mode": "Переключить режим объекта / рисования",

@@ -24,7 +24,7 @@ import {gridSpacing} from './world-guides.js';
 import { frameVisibleModel } from './model-framing.js';
 import { shadeFace, REFERENCE_NORMALS } from './shading.js';
 import { imageRenderBusy, drawGame, pickGame, pickGamePoint, pickComponent, pickTurret, pickWeaponCoverage, socketExposed, releaseViewportResources, setPaintPreview } from './game-renderer.js';
-import { liveBlocks, simplified, isThinBlock, viewportHiddenIds } from './ship-structure.js';
+import { liveBlocks, simplified, viewportHiddenIds, engineEffectHiddenIds } from './ship-structure.js';
 import { selectCubeView } from './view-cube.js';
 import { matchesBinding, modifierActive, bindingFor, shortcutLabel } from './keymaps.js';
 import { basis, dot, ensureCamera, cameraPoint, projectCamera, clipNear, orbit, pan, zoom, dolly, alignView, snapAxis, viewLabel, dragMode, zoomRegion, REFERENCE_VERTICES } from './navigation.js';
@@ -181,9 +181,10 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     const label = body.querySelector('.view-label');
     if (label) label.textContent = viewLabel(view);
     const stats=body.querySelector('.viewport-statistics');
-    const statsInputs=[liveBlocks(scene),scene.hiddenIds,scene.selectedIds,scene.visible,view.showThinBlocks,view.grid,gridSpacing(view,width,height)];
+    const hidden=viewportHiddenIds(scene,view);
+    const statsInputs=[liveBlocks(scene),hidden,scene.selectedIds,scene.visible,view.showThinBlocks,view.grid,gridSpacing(view,width,height)];
     if(stats&&!statsInputs.every((v,i)=>v===statsKey[i])){
-      const blocks=statsInputs[0];let visibleCount=0;for(const b of blocks)if(!scene.hiddenIds?.has(b.id)&&(view.showThinBlocks!==false||!isThinBlock(b)))visibleCount++;
+      const blocks=statsInputs[0];let visibleCount=0;for(const b of blocks)if(!hidden.has(b.id))visibleCount++;
       stats.textContent=scene.loaded&&scene.visible?`Blocks ${visibleCount} visible / ${blocks.length} · ${scene.selectedIds?.size||0} selected`:'Objects 0';
       if(view.grid)stats.textContent+=`\nGrid ${Number(statsInputs[6].toPrecision(6))} units / cell`;statsKey=statsInputs;
     }
@@ -213,7 +214,10 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
       line.style.zIndex = String(100 + Math.round(depth*25));
       line.style.opacity = depth < -0.01 ? '0.55' : '1';
     });
-    if(scene.model&&scene.visible&&scene.loaded&&!simplified(scene,preferences)&&liveBlocks(scene).some(b=>!scene.hiddenIds?.has(b.id)&&(view.showThinBlocks!==false||!isThinBlock(b)||(b.typeIndex===3&&preferences.shaderThinEnginePlumes!==false))&&[3,7,10,13,61,62,63,64,65].includes(b.typeIndex)))invalidate();
+    if(scene.model&&scene.visible&&scene.loaded&&!simplified(scene,preferences)){
+      const hidden=engineEffectHiddenIds(scene,view,preferences.shaderThinEnginePlumes!==false);
+      if(liveBlocks(scene).some(b=>!hidden.has(b.id)&&[3,7,10,13,61,62,63,64,65].includes(b.typeIndex)))invalidate();
+    }
   }
   const observer = new ResizeObserver(entries => {
     const rect = entries[0].contentRect; width=rect.width;height=rect.height;

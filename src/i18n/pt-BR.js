@@ -1,6 +1,8 @@
 // Português (Brasil) interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+ "Thin Block Threshold": "Limite de blocos finos",
+ "A block is thin if any dimension is below this cutoff in native units.": "Um bloco é fino se alguma dimensão ficar abaixo deste limite em unidades nativas.",
  "Select Sockets Target Azimuth": "Azimute do alvo de seleção de soquetes",
  "Select Sockets Target Distance": "Distância do alvo de seleção de soquetes",
  "Cycle Object / Paint Mode": "Alternar modo Objeto / Pintura",

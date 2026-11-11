@@ -1,6 +1,8 @@
 // 日本語 interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+ "Thin Block Threshold": "薄いブロックのしきい値",
+ "A block is thin if any dimension is below this cutoff in native units.": "いずれかの寸法がネイティブ単位でこのしきい値を下回るブロックを薄いブロックとして扱います。",
  "Select Sockets Target Azimuth": "ソケット選択ターゲットの方位角",
  "Select Sockets Target Distance": "ソケット選択ターゲットの距離",
  "Cycle Object / Paint Mode": "オブジェクト／ペイントモードを切り替え",
