@@ -58,11 +58,11 @@ export function chooseEmbeddedSocket(block, blocks, size, clearance) {
   return candidates[0];
 }
 
-export async function restoreEmbeddedTurrets(model, library) {
+export async function restoreEmbeddedTurrets(model, library, {attach=true}={}) {
   const designs = [...(model.doc?.getElementsByTagName('turretDesign') || [])]
     .filter(node => node.hasAttribute('blockIndex'));
   if (!designs.length) return;
-  const report={restored:0,reused:0,added:0,entries:[]};model.turretRestoration=report;
+  const report={restored:0,reused:0,added:0,entries:[]};if(attach)model.turretRestoration=report;
   const warn = message => model.warnings.push({level:'warn', message});
   let assets;
   try { assets = await library.load(); }
@@ -71,13 +71,13 @@ export async function restoreEmbeddedTurrets(model, library) {
   const signatureOf = asset => { let value = signatures.get(asset); if (!value) signatures.set(asset, value = turretSignature(asset)); return value; };
   const blocks = model.blocks, byIndex = new Map(blocks.map(block =>
     [block.itemEl?.getAttribute('index'), block]));
-  const clearance = createSocketClearance(blocks), scene = {model};
+  const clearance = attach?createSocketClearance(blocks):null, scene = {model};
   for (const design of designs) {
     const index = design.getAttribute('blockIndex'), block = byIndex.get(index);
     const result={index,blockId:block?.id,state:'unresolved',inferred:true};report.entries.push(result);
     try {
       // Respect existing mounts, including edits restored from a session.
-      if (block && model.turretMounts?.some(mount => mount.socketId.startsWith(`turret:${block.id}:`))){result.state='existing';continue;}
+      if (attach && block && model.turretMounts?.some(mount => mount.socketId.startsWith(`turret:${block.id}:`))){result.state='existing';continue;}
       const imported = importTurretXml(new XMLSerializer().serializeToString(design),
         `${model.fileName.replace(/\.xml$/i, '')} turret ${index}`, crypto.randomUUID());
       let asset = findMatchingTurret(known, imported, signatureOf);if(asset)report.reused++;
@@ -88,12 +88,13 @@ export async function restoreEmbeddedTurrets(model, library) {
         known.push(asset);
       }
       result.assetId=asset.id;result.asset=asset;result.size=imported.sourceSize;
+      if(!attach){result.state='available';continue;}
       if (!block || !isTurretBlock(block)) throw Error('mounting block is missing or is not a turret base');
       const socket = chooseEmbeddedSocket(block, blocks, imported.sourceSize, clearance);
       if (!socket) throw Error('no exposed socket fits the saved turret size');
       // Share the library ID while retaining the geometry and scale authored for this mount.
       placeTurret(scene, {...imported,id:asset.id}, socket, imported.sourceSize);result.state='restored';result.socketId=socket.id;report.restored++;
-    } catch (error) { result.reason=error.message;warn(`Turret on block ${index} could not be attached: ${error.message}`); }
+    } catch (error) { result.reason=error.message;warn(`Turret on block ${index} could not be ${attach?'attached':'read'}: ${error.message}`); }
   }
   return report;
 }

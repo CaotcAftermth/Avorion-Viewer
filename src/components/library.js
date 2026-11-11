@@ -10,8 +10,9 @@ const listeners=new Set();
 const emit=(selectionOnly=false)=>listeners.forEach(fn=>fn(selectionOnly));
 subscribeComponents(assets=>{componentLibrary.assets=assets;emit();});
 let ready;
-export function loadComponentLibrary(){
- return ready??=loadComponents().then(assets=>{componentLibrary.assets=assets;componentLibrary.loaded=true;emit();return assets;}).catch(error=>{ready=null;componentLibrary.error=error.message;emit();throw error;});
+export async function loadComponentLibrary(){
+ await (ready??=loadComponents().then(assets=>{componentLibrary.assets=assets;componentLibrary.loaded=true;emit();}).catch(error=>{ready=null;componentLibrary.error=error.message;emit();throw error;}));
+ return componentLibrary.assets;
 }
 export const selectedComponent=()=>componentLibrary.assets.find(a=>a.id===componentLibrary.selectedId)||null;
 export function selectComponent(id){componentLibrary.selectedId=id;emit(true);}

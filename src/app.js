@@ -9,6 +9,7 @@ import {syncAttachmentContext,routeAttachmentInspector,resolveAttachmentContext,
 import {turretLibrary} from './turrets/library.js';
 import {componentLibrary} from './components/library.js';
 import {restoreEmbeddedTurrets} from './turrets/embedded.js';
+import {registerProjectAssets} from './attachments/project-library.js';
 import {loadTurretLibrary,addTurretAsset,openTurretProject} from './turrets/library.js';
 import {createWelcome} from './welcome.js';
 import {createStudio} from './turrets/studio.js';
@@ -377,10 +378,17 @@ async function openSavedFile(file){
   }
   const restored=restoreProject(record);
   if(!canLeaveProject())return;
+  const previous=scene.model;
+  const warningCount=restored.model.warnings.length;
+  const failures=await registerProjectAssets(restored.model);
+  if(scene.model!==previous)return;
   installModel(restored);
   savedProjectState=projectState();
   commit(`Project opened: ${restored.project.name}`);
-  notify(`Project opened: ${restored.project.name}`);
+  const warnings=restored.model.warnings.slice(warningCount);
+  for(const error of failures)reportError(error,'ASSETS');
+  for(const warning of warnings)log(warning.message,'ASSETS',warning.level);
+  notify(failures.length||warnings.length?`Project opened with asset library warnings. See Info.`:`Project opened: ${restored.project.name}`);
 }
 
 function openSavePicker(extension=PROJECT_EXTENSION){

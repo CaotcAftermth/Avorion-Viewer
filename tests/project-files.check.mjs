@@ -60,7 +60,10 @@ async function recovered(page){
   });
 }
 
-const source='<ship><plan><item index="7" parent="-1"><block index="20" lx="0" ly="0" lz="0" ux="4" uy="4" uz="4" color="ff123456" custom="keep"/></item><item index="2" parent="7"><block index="2" lx="8" ly="0" lz="0" ux="10" uy="4" uz="4" color="ff102030"/></item></plan></ship>';
+const turretBlock='<item index="0" parent="-1"><block index="2" lx="0" ly="0" lz="0" ux="1" uy="1" uz="1" color="ff112233"/></item>';
+const turretDesign=`<turretDesign blockIndex="2" size="1" coaxial="false" shot_color="0"><base px="0" py="0" pz="0"><plan>${turretBlock}</plan></base><body px="0" py=".2" pz="0"><plan>${turretBlock}</plan></body><barrel px="0" py=".4" pz="0"><plan>${turretBlock}</plan></barrel></turretDesign>`;
+const hull='<ship><plan><item index="7" parent="-1"><block index="20" lx="0" ly="0" lz="0" ux="4" uy="4" uz="4" color="ff123456" custom="keep"/></item><item index="2" parent="7"><block index="2" lx="8" ly="0" lz="0" ux="10" uy="4" uz="4" color="ff102030"/></item></plan></ship>';
+const source=hull.replace('</ship>',turretDesign+'</ship>');
 const revised='<ship><plan><item index="2" parent="-1"><block index="2" lx="16" ly="0" lz="0" ux="20" uy="4" uz="4" color="ff102030"/></item><item index="7" parent="2"><block index="20" lx="0" ly="0" lz="0" ux="8" uy="4" uz="4" color="ff887766" custom="keep"/></item></plan></ship>';
 
 try{
@@ -72,11 +75,15 @@ try{
     const {sceneSockets}=await import('/src/turrets/sockets.js');
     const {demoProject}=await import('/src/turrets/core.js');
     const {placeTurret}=await import('/src/turrets/mounts.js');
+    const {makeBlock}=await import('/src/block-model.js');
     const model=parseAvorionXml(xml,'Source.xml',xml.length);
     const scene={model,loaded:true,regions:[{id:'engine',name:'Engine',color:'#00bbcc',ids:['b0']},{id:'overlap',name:'Overlap',color:'#aa00cc',ids:['b0','b1']}]};
     applyBlockColors(scene,[{id:'b0',color:'ffaabbcc',secondaryColor:'00000000'}],{writeXml:false});
     const socket=sceneSockets(scene).find(socket=>socket.fitSize>=1);
     placeTurret(scene,demoProject().assets[0],socket,1,1);
+    const component={id:'portable-pod',name:'Portable Pod',blocks:[makeBlock()],attachment:{position:[0,0,0],rotation:[0,0,0]}};
+    model.componentSetup={version:1,blockType:null,sockets:[{id:'pod-socket',name:'Pod socket',blockId:'b1',position:[1,0,0],rotation:[0,0,0]}],
+      mounts:[{id:'pod-mount',socketId:'pod-socket',asset:component,scale:1,twist:0}]};
     await openSessionStore().put('model',snapshotModel(scene));
   },source);
   await first.reload();
@@ -96,6 +103,20 @@ try{
   const clean=await openPage();
   await upload(clean,'Open Project…','Source.avproject',project);
   await clean.waitForFunction(()=>document.querySelector('.project-title').textContent==='Source · Project');
+  const library=()=>clean.evaluate(async()=>{
+    const {loadTurretLibrary}=await import('/src/turrets/library.js');
+    const {loadComponentLibrary}=await import('/src/components/library.js');
+    return {turrets:(await loadTurretLibrary()).map(({id,name})=>({id,name})),components:(await loadComponentLibrary()).map(asset=>asset.id)};
+  });
+  const expectedLibrary=await library();
+  assert.deepEqual(expectedLibrary.components,['portable-pod']);
+  assert.equal(expectedLibrary.turrets.length,2);
+  assert.ok(expectedLibrary.turrets.some(asset=>asset.id===projectData.model.turretMounts[0].asset.id));
+  assert.ok(expectedLibrary.turrets.some(asset=>asset.name==='Source turret 2'));
+  await clean.evaluate(()=>{document.querySelector('#toast').textContent='';});
+  await upload(clean,'Open Project…','Source.avproject',project);
+  await clean.waitForFunction(()=>document.querySelector('#toast').textContent==='Project opened: Source');
+  assert.deepEqual(await library(),expectedLibrary);
   const originalPaint=await clean.evaluate(async record=>{
     const {restoreProject}=await import('/src/project-files.js');
     const {originalBlockColors,exportPaintedXml}=await import('/src/color-workshop.js');
@@ -135,8 +156,8 @@ try{
     const asset=importTurretXml(xml,'Refit Turret','portable-turret');
     asset.blocks[0].color='ff6789ab';
     return captureTurretProject(asset);
-  },source);
-  assert.equal(turretProject.asset.sourceXml,source);
+  },hull);
+  assert.equal(turretProject.asset.sourceXml,hull);
   assert.equal(turretProject.asset.blocks,undefined);
   await upload(clean,'Open Project…','Refit Turret.avproject',JSON.stringify(turretProject));
   const studio=clean.getByRole('dialog',{name:'Turret workspace'});
