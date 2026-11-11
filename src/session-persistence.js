@@ -1,6 +1,7 @@
 import {validateSetup} from './components/core.js';
 import {makeModel,parseAvorionXml,placeImportedModel} from './block-model.js';
 import {exportPaintedXml} from './color-workshop.js';
+import {applyBlockColors, blockIndex, secondaryColor} from './block-colors.js';
 import {upgradeGalleryColors} from './block-gallery.js';
 
 // Keep large models and original texture blobs out of synchronous localStorage.
@@ -35,12 +36,32 @@ export function openSessionStore(factory=globalThis.indexedDB){
 export function coverageSnapshot(scene){
   return {options:scene.weaponCoverage?structuredClone(scene.weaponCoverage):null,show:!!scene.showFireCoverage,direction:scene.fireDirection||null,baseline:scene.coverageBaseline||null};
 }
-export function snapshotModel(scene){
+export function paintSnapshot(model){
+  const blocks=blockIndex(model), edits=[];
+  for(const [id,mask] of model.colorOverrides||[]){
+    const block=blocks.get(id);
+    if(!block?.el)continue;
+    const edit={id};
+    if(mask&1 && block.color!==(block.el.getAttribute('color')??'ff808080').toLowerCase())edit.color=block.color;
+    const secondary=secondaryColor(block);
+    if(mask&2 && secondary!==block.el.getAttribute('secondaryColor')?.toLowerCase())edit.secondaryColor=secondary??null;
+    if(Object.keys(edit).length>1)edits.push(edit);
+  }
+  return edits;
+}
+
+export function snapshotModel(scene,{portable=false}={}){
   if(!scene.loaded||!scene.model)return {version:1,empty:true};
   const model=scene.model;
+  const source=model.doc?model.sourceXml:undefined;
+  const regions=scene.regions?.length?structuredClone(scene.regions):undefined;
+  const hidden=scene.regionDisplay?.applied===scene.hiddenIds?scene.regionDisplay?.restore:scene.hiddenIds;
   return {version:1,preview:!!scene.preview,fileName:model.fileName,fileSize:model.fileSize,
-    opacityOverrides:Object.fromEntries(model.blocks.filter(b=>Number.isFinite(b.opacity)).map(b=>[b.id,b.opacity])),turretMounts:model.turretMounts,componentSetup:model.componentSetup,placementOffset:model.placementOffset,placement:model.placement,xml:model.doc?exportPaintedXml(model):undefined,
-    blocks:model.doc?undefined:model.blocks.map(({el,itemEl,...block})=>block),coverage:coverageSnapshot(scene)};
+    opacityOverrides:Object.fromEntries(model.blocks.filter(b=>Number.isFinite(b.opacity)).map(b=>[b.id,b.opacity])),turretMounts:model.turretMounts,componentSetup:model.componentSetup,placementOffset:model.placementOffset,placement:model.placement,
+    // Keep legacy recovery readable by older builds. Portable files store the source only once.
+    xml:model.doc&&!portable?exportPaintedXml(model):undefined, sourceXml:source, paint:source?paintSnapshot(model):undefined,
+    blocks:model.doc?undefined:model.blocks.map(({el,itemEl,...block})=>block),coverage:coverageSnapshot(scene),
+    regions,hiddenIds:hidden?.size?[...hidden]:undefined,project:scene.project||undefined,projectViews:scene.projectViews||undefined};
 }
 function restoreCoverage(saved){
   if(!saved||typeof saved!=='object')return {};
@@ -51,9 +72,13 @@ export function restoreModel(record){
   if(record?.version!==1)throw new Error('Saved model version is not supported.');
   if(record.empty)return {model:null,loaded:false,preview:false};
   let model;
-  if(typeof record.xml==='string'){
-    model=parseAvorionXml(record.xml,record.fileName,record.fileSize);
+  const xml=record.sourceXml??record.xml;
+  if(typeof xml==='string'){
+    model=parseAvorionXml(xml,record.fileName,record.fileSize);
     placeImportedModel(model,record.placement||'imported');
+    if(record.sourceXml&&record.paint?.length){
+      applyBlockColors({model},record.paint.map(edit=>edit.secondaryColor===null?{...edit,secondaryColor:undefined}:edit),{writeXml:false});
+    }
   }else{
     if(!Array.isArray(record.blocks)||!record.blocks.length||record.blocks.some(b=>!['x','y','z'].every(a=>Number.isFinite(b.position?.[a])&&Number.isFinite(b.size?.[a]))))throw new Error('Saved model data is invalid.');
     model=makeModel(record.blocks,record.fileName);
@@ -63,13 +88,16 @@ export function restoreModel(record){
   if(Array.isArray(record.turretMounts))model.turretMounts=record.turretMounts;
   if(record.componentSetup)model.componentSetup=validateSetup(record.componentSetup);
   if(!model.doc&&record.placementOffset)model.placementOffset=record.placementOffset;
-  return {model,loaded:true,preview:!!record.preview,...restoreCoverage(record.coverage)};
+  return {model,loaded:true,preview:!!record.preview,...restoreCoverage(record.coverage),
+    ...(record.regions?{regions:record.regions}:{}),...(record.hiddenIds?{hiddenIds:new Set(record.hiddenIds)}:{}),
+    ...(record.project?{project:record.project}:{}),...(record.projectViews?{projectViews:record.projectViews}:{})};
 }
 
 // gate(record) runs before a saved model is restored and resolves to
 // {model,textures}: false holds that part back (crash recovery).
 export function createSessionPersistence({scene,textures,restored,onError,gate,store=openSessionStore()}){
-  let ready=false,stopped=false,timer,lastModel,lastAppearance,lastLoaded,lastCoverage,lastTextures=null,failed=false;
+  let ready=false,stopped=false,timer,lastScene,lastTextures=null,failed=false;
+  const recoveryState=()=>[scene.model,scene.model?.componentSetup,scene.loaded,scene.appearanceRevision,scene.regions,scene.hiddenIds,scene.project,scene.projectViews,coverageKey()];
   const coverageKey=()=>{try{return JSON.stringify(coverageSnapshot(scene));}catch{return null;}};
   const report=error=>{if(!failed)onError(error);failed=true;};
   let persistAsked=false;
@@ -85,9 +113,13 @@ export function createSessionPersistence({scene,textures,restored,onError,gate,s
   }
   function flush(){
     clearTimeout(timer);if(!ready)return;
-    const coverage=coverageKey();
-    if(scene.model===lastModel&&scene.loaded===lastLoaded&&scene.appearanceRevision===lastAppearance&&coverage===lastCoverage)return;
-    try{const record=snapshotModel(scene);lastModel=scene.model;lastLoaded=scene.loaded;lastAppearance=scene.appearanceRevision;lastCoverage=coverage;void save('model',record);}catch(error){report(error);}
+    const current=recoveryState();
+    if(lastScene&&current.every((value,i)=>value===lastScene[i]))return;
+    try{
+      const record=snapshotModel(scene);
+      lastScene=current;
+      void store.put('model',record).catch(error=>{if(lastScene===current)lastScene=null;report(error);});
+    }catch(error){report(error);}
   }
   function changed(){if(ready){clearTimeout(timer);timer=setTimeout(flush,250);}}
   async function start(){
@@ -102,7 +134,7 @@ export function createSessionPersistence({scene,textures,restored,onError,gate,s
     // A held-back texture set stays saved: start from it so the empty library is not written over it.
     if(!plan.textures&&textureResult.status==='fulfilled'&&Array.isArray(textureResult.value))lastTextures=[];
     if(modelResult.status==='fulfilled'){
-      if(plan.model&&modelResult.value!==undefined&&scene.model===initialModel){try{Object.assign(scene,restoreModel(modelResult.value));lastModel=scene.model;lastLoaded=scene.loaded;lastAppearance=scene.appearanceRevision;lastCoverage=coverageKey();scene.revision++;restored('model');}catch(error){report(error);}}
+      if(plan.model&&modelResult.value!==undefined&&scene.model===initialModel){try{Object.assign(scene,restoreModel(modelResult.value));lastScene=recoveryState();scene.revision++;restored('model');}catch(error){report(error);}}
     }else report(modelResult.reason);
     ready=true;textures.subscribe(saveTextures);flush();
     if(textureResult.status==='fulfilled'){

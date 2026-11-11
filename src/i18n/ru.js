@@ -118,6 +118,7 @@ export default {
  "Open Preferences": "Открыть настройки",
  "Maximize Area": "Развернуть область",
  "Focus Mode": "Режим фокуса",
+ "Save Model Project": "Сохранить проект модели",
  "Save Workspace Layout": "Сохранить раскладку рабочего пространства",
  "Previous Workspace": "Предыдущее рабочее пространство",
  "Next Workspace": "Следующее рабочее пространство",

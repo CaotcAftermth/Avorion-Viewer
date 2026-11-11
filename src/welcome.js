@@ -1,6 +1,6 @@
 import {APP_VERSION} from './version.js';
 
-export function createWelcome({preferences,wireInputStyles,openModel,openTextures,feedback,trackpadFallback=false}) {
+export function createWelcome({preferences,wireInputStyles,openModel,openProject,openTextures,feedback,trackpadFallback=false}) {
   const dialog=document.createElement('dialog');
   dialog.id='welcome-dialog';dialog.setAttribute('aria-labelledby','welcome-title');
   dialog.innerHTML=`
@@ -37,7 +37,14 @@ export function createWelcome({preferences,wireInputStyles,openModel,openTexture
   preferences.subscribe(sync);
   const showHome=()=>{home.hidden=false;guide.hidden=true;dialog.setAttribute('aria-labelledby','welcome-title');dialog.classList.remove('reading-guide');dialog.scrollTop=0;};
   dialog.querySelector('.icon-button').onclick=()=>dialog.close();
-  dialog.querySelector('[data-open]').onclick=openModel;
+  const modelButton=dialog.querySelector('[data-open]');
+  modelButton.onclick=openModel;
+  const projectButton=modelButton.cloneNode();
+  projectButton.removeAttribute('data-open');
+  projectButton.classList.remove('primary');
+  projectButton.textContent='Open Project…';
+  projectButton.onclick=openProject;
+  modelButton.after(projectButton);
   dialog.querySelector('[data-textures]').onclick=openTextures;
   dialog.querySelector('[data-feedback]').onclick=feedback;
   dialog.querySelector('[data-back]').onclick=()=>{showHome();dialog.querySelector('[data-guide]').focus();};

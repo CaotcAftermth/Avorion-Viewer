@@ -118,6 +118,7 @@ export default {
  "Open Preferences": "Abrir preferencias",
  "Maximize Area": "Maximizar área",
  "Focus Mode": "Modo enfoque",
+ "Save Model Project": "Guardar proyecto de modelo",
  "Save Workspace Layout": "Guardar diseño del espacio de trabajo",
  "Previous Workspace": "Espacio de trabajo anterior",
  "Next Workspace": "Espacio de trabajo siguiente",

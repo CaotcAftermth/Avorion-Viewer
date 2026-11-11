@@ -9,7 +9,7 @@ import {syncAttachmentContext,routeAttachmentInspector,resolveAttachmentContext,
 import {turretLibrary} from './turrets/library.js';
 import {componentLibrary} from './components/library.js';
 import {restoreEmbeddedTurrets} from './turrets/embedded.js';
-import {loadTurretLibrary,addTurretAsset} from './turrets/library.js';
+import {loadTurretLibrary,addTurretAsset,openTurretProject} from './turrets/library.js';
 import {createWelcome} from './welcome.js';
 import {createStudio} from './turrets/studio.js';
 import {attachSubmenu} from './submenu.js';
@@ -29,7 +29,11 @@ import {componentHistory,detachSurfaceComponent,changeSetup} from './components/
 import {componentSetup} from './components/core.js';
 import {validateComponent} from './components/core.js';
 import {mountTurretProperties} from './turrets/properties.js';
-import {createSessionPersistence} from './session-persistence.js';
+import {createSessionPersistence, coverageSnapshot} from './session-persistence.js';
+import {PROJECT_EXTENSION, PROFILE_EXTENSION, captureProject, restoreProject, restoreTurretProject, captureProfile, restoreProfile, documentFileName, readSaveFile, downloadSave} from './project-files.js';
+import {previewReplacement, applyReplacement} from './project-replacement.js';
+import {confirmReplacement} from './project-replacement-dialog.js';
+
 import {createCrashGuard,findCrashRecords,forgetCrashRecords,askCrashRecovery,warnLiveFailure,isMemoryFailure} from './crash-guard.js';
 import {mountSceneProperties,mountEngineState,mountThrusterState} from './scene-properties.js';
 import {openExportDialog} from './export/dialog.js';
@@ -91,7 +95,8 @@ let trackpadEnabled=preferences.value.trackpadNavigation;
 
 let hovered = null, maximized = null, focusMode = false, operation = null, renderers = [], toastTimer, saveTimer;
 const scene = { loaded: false, visible: true, selected: false, selectedId:null, selectedIds:new Set(), hiddenIds:new Set(), preview:false, revision:0, model:null };
-const welcome=embedded?null:createWelcome({preferences,wireInputStyles,openModel:importXml,openTextures:loadTextures,feedback:showFeedback,trackpadFallback});
+let savedProjectState=null,workspaceProfileName='';
+const welcome=embedded?null:createWelcome({preferences,wireInputStyles,openModel:importXml,openProject:()=>openSavePicker(),openTextures:loadTextures,feedback:showFeedback,trackpadFallback});
 let textureStatus='Neutral texture fallback · Load a local texture folder from File';
 installGlobalErrorCapture(window);
 // Crash recovery: an unclean exit with a model on screen holds the saved model back on the next launch.
@@ -107,7 +112,7 @@ async function crashRecoveryGate(record){
   return {model:choice!=='clear',textures:choice!=='lite'};
 }
 addLog(`Avorion Viewer ${APP_VERSION} ready. Layout changes are saved in this browser.`,'SYSTEM');addLog('No model loaded. Drop an Avorion .xml or use File > Import Avorion XML.','SCENE');
-const assetPersistence=embedded?{changed(){},start(){},flush(){},stop(){}}:createSessionPersistence({scene,textures:textureLibrary,restored:kind=>{if(kind==='textures'){scene.revision++;/* rebuild: the restored model was built before its textures finished loading */textureStatus=`${textureLibrary.loadedCount} texture maps - restored locally`;if(textureLibrary.loadedCount)notify(`${textureLibrary.loadedCount} saved texture maps restored.`);}if(kind==='model')frameLoadedViewport=createViewportLoadFramer();render();log(`${kind==='model'?'Model':'Textures'} restored from this browser.`,'STORAGE');},onError:error=>{notify('Model/texture persistence unavailable. Current session still works.');reportError(error,'STORAGE');},gate:crashRecoveryGate});
+const assetPersistence=embedded?{changed(){},start(){},flush(){},stop(){}}:createSessionPersistence({scene,textures:textureLibrary,restored:kind=>{if(kind==='textures'){scene.revision++;/* rebuild: the restored model was built before its textures finished loading */textureStatus=`${textureLibrary.loadedCount} texture maps - restored locally`;if(textureLibrary.loadedCount)notify(`${textureLibrary.loadedCount} saved texture maps restored.`);}if(kind==='model'){prepareProjectFraming();if(!scene.project&&!scene.model?.colorOverrides?.size&&!scene.regions?.length&&!scene.model?.turretMounts?.length&&!scene.model?.componentSetup?.mounts?.length)savedProjectState=projectState();}render();log(`${kind==='model'?'Model':'Textures'} restored from this browser.`,'STORAGE');},onError:error=>{notify('Model/texture persistence unavailable. Current session still works.');reportError(error,'STORAGE');},gate:crashRecoveryGate});
 const workspace = () => state.workspaces.find(w => w.id === state.active);
 const currentArea = () => find(workspace().root, hovered) || leaves(workspace().root)[0];
 const areaElement = id => document.querySelector(`[data-area-id="${id}"]`);
@@ -159,7 +164,7 @@ $('#menu').addEventListener('keydown',e=>{
 document.addEventListener('pointerdown',e=>{if(!$('#menu').contains(e.target)&&!activeMainMenu?.contains(e.target))closeMenu();});
 function anchorMenu(button,title,items){const rect=button.getBoundingClientRect();menu(rect.left,rect.bottom+3,title,items);}
 function button(label,content,action,className='') {const el=document.createElement('button');el.type='button';el.title=t(label);el.setAttribute('aria-label',t(label));el.dataset.label=label;el.innerHTML=content;el.className=className;el.addEventListener('click',action);return el;}
-function clearScene(){releaseGameModel();Object.assign(scene,{loaded:false,selected:false,selectedIds:new Set(),hiddenIds:new Set(),regions:[],paintHistory:null,model:null});commit('Scene cleared.');}
+function clearScene({force=false}={}){if(!force&&!canLeaveProject())return;releaseGameModel();installModel({});savedProjectState=null;commit('Scene cleared.');}
 function totalAreas(){return state.workspaces.reduce((sum,w)=>sum+leaves(w.root).length,0);}
 let attachmentInspectorId=null;
 const inspectorPins=new WeakMap();
@@ -171,6 +176,7 @@ function refreshStructure(){
   if(priorAttachment?.type!==context?.type||priorAttachment?.kind!==context?.kind||priorAttachment?.id!==context?.id)routeAttachmentInspector(leaves(workspace().root),context,attachmentInspectorId);
   if(context?.type!=='component'||priorAttachment?.type===context.type&&priorAttachment?.id===context.id)for(const node of coverageNodes)node.propertyTab='coverage';
   assetPersistence.changed();crashGuard.track();
+  updateProjectTitle();
   reconcileStructure(scene);
   refreshStatusHint();
   renderers.forEach(r=>{r.sync?.();r.draw?.();});
@@ -253,14 +259,150 @@ function openGalleryBlock(node){
   editGalleryVariant(block);
 }
 function loadModel(model,preview=false){
-  cancelPaintTask();scopeCache=null;scene.paintSample=null;scene.paintMessage='';
   if(!preview)placeImportedModel(model,preferences.value.importPlacement);
-  Object.assign(scene,{regions:[],paintHistory:null,visibilityHistory:[],outlinerRevealId:null,model,preview,loaded:true,visible:true,selected:false,selectedId:null,selectedIds:new Set(),hiddenIds:new Set(),revision:scene.revision+1});
-  welcome?.close();
-  frameLoadedViewport=createViewportLoadFramer();
+  installModel({model,preview,loaded:true});
+  savedProjectState=projectState();
   commit(`${model.fileName} · ${model.blocks.length} blocks loaded.`);
   const restoredSummary=restorationSummary(model.turretRestoration);if(restoredSummary)notify(restoredSummary);
   for(const warning of model.warnings||[])if(warning.level==='warn')log(warning.message,'MODEL','warning');
+}
+
+function installModel(next){
+  renderers.forEach(renderer=>renderer.cancel?.());
+  cancelOperation();
+  cancelPaintTask();
+  scopeCache=null;
+  Object.assign(scene,{
+    regions:[],regionDisplay:null,regionEdit:null,regionHistory:null,paintHistory:null,visibilityHistory:[],outlinerRevealId:null,
+    paintSample:null,paintMessage:'',model:null,preview:false,loaded:false,visible:true,selected:false,selectedId:null,
+    selectedIds:new Set(),hiddenIds:new Set(),selectedTurretId:null,selectedTurretIds:new Set(),turretSockets:null,
+    weaponCoverage:undefined,showFireCoverage:false,fireDirection:null,coverageBaseline:null,coverageInspection:null,coverageHover:null,
+    selectedComponentMountId:null,selectedComponentMountIds:new Set(),selectedComponentSocketId:null,attachmentContext:null,
+    project:null,projectViews:[],revision:scene.revision+1,...next
+  });
+  if(next.loaded)welcome?.close();
+  prepareProjectFraming();
+}
+
+function prepareProjectFraming(){
+  const frame=createViewportLoadFramer(),viewports=leaves(workspace().root).filter(node=>node.editor==='viewport');
+  const saved=new Set();
+  scene.projectViews?.forEach((view,index)=>{
+    if(!viewports[index])return;
+    const target=viewports[index].view;
+    Object.assign(target,structuredClone(view));saved.add(target);
+  });
+  frameLoadedViewport=(...args)=>saved.has(args[1])?false:frame(...args);
+}
+
+function projectState(){
+  const hidden=scene.regionDisplay?.applied===scene.hiddenIds?scene.regionDisplay?.restore:scene.hiddenIds;
+  return [scene.model,scene.model?.componentSetup,scene.project,scene.regions,hidden,scene.appearanceRevision,scene.projectViews,
+    scene.showFireCoverage,scene.fireDirection,scene.coverageBaseline,JSON.stringify(scene.weaponCoverage)];
+}
+
+function projectDirty(){
+  if(!scene.loaded||embedded)return false;
+  return !savedProjectState||projectState().some((value,index)=>value!==savedProjectState[index]);
+}
+
+function updateProjectTitle(){
+  const name=scene.project?.name||scene.model?.fileName||t('Untitled');
+  const status=projectDirty()?' · Unsaved project changes':scene.project?' · Project':' · '+t('Local session');
+  const title=$('.project-title');
+  title.textContent=name+status;
+  title.title=name+status;
+}
+
+function canLeaveProject(){
+  return !projectDirty()||window.confirm('Leave this model with unsaved project changes? Cancel to save a project file first.');
+}
+
+function rememberProjectViews(){
+  scene.projectViews=leaves(workspace().root).filter(node=>node.editor==='viewport').map(({view})=>{
+    const {target,yaw,pitch,roll,zoom,panX,panY,projection,orthographicDistance}=ensureCamera(view);
+    return {target:[...target],yaw,pitch,roll,zoom,panX,panY,projection,orthographicDistance};
+  });
+  assetPersistence.changed();
+  updateProjectTitle();
+  notify('Current viewport cameras will be included in the project.');
+}
+
+function saveProject(copy=false){
+  if(embedded||!scene.loaded)return;
+  try{
+    const current=scene.project;
+    const name=!current||copy?window.prompt('Model Project name',current?`${current.name} Copy`:scene.model.fileName.replace(/\.xml$/i,''))?.trim():current.name;
+    if(!name)return;
+    const project=current&&!copy?current:{id:uid(),name};
+    downloadSave(captureProject(scene,project),name,PROJECT_EXTENSION);
+    scene.project=project;
+    savedProjectState=projectState();
+    assetPersistence.changed();
+    updateProjectTitle();
+    notify(`Project download started: ${documentFileName(name,PROJECT_EXTENSION)}`);
+  }catch(error){notify(error.message);reportError(error,'FILE');}
+}
+
+function saveWorkspaceProfile(){
+  try{
+    const name=window.prompt('Workspace Profile name',workspaceProfileName||'My Workspace')?.trim();
+    if(!name)return;
+    downloadSave(captureProfile(name,state,preferences.value),name,PROFILE_EXTENSION);
+    workspaceProfileName=name;
+    notify(`Workspace Profile download started: ${documentFileName(name,PROFILE_EXTENSION)}`);
+  }catch(error){notify(error.message);reportError(error,'FILE');}
+}
+
+async function openSavedFile(file){
+  const record=await readSaveFile(file);
+  if(record?.format==='avorion-model-project'&&record.kind==='turret'){
+    const asset=restoreTurretProject(record);
+    welcome?.close();
+    openTurretProject(asset,refreshStructure);
+    return;
+  }
+  if(record?.format==='avorion-workspace-profile'){
+    const profile=restoreProfile(record);
+    if(!preferences.applyProfile(profile.preferences))throw Error(preferences.error);
+    state=profile.layout;
+    workspaceProfileName=profile.name;
+    hovered=maximized=lastViewportId=null;
+    focusMode=false;
+    trackpadDrawers.workspace=trackpadDrawers.side=null;
+    prepareProjectFraming();
+    commit(`Workspace Profile applied: ${profile.name}`);
+    notify(`Workspace Profile applied: ${profile.name}`);
+    return;
+  }
+  const restored=restoreProject(record);
+  if(!canLeaveProject())return;
+  installModel(restored);
+  savedProjectState=projectState();
+  commit(`Project opened: ${restored.project.name}`);
+  notify(`Project opened: ${restored.project.name}`);
+}
+
+function openSavePicker(extension=PROJECT_EXTENSION){
+  chooseFiles(extension,false,async files=>{if(files[0])await openSavedFile(files[0]);});
+}
+
+function replaceSourceXml(){
+  chooseFiles('.xml',false,async ([file])=>{
+    if(!file||!scene.model?.sourceXml)return;
+    const original=scene.model;
+    const model=parseAvorionXml(await file.text(),file.name,file.size);
+    if(original!==scene.model)return;
+    placeImportedModel(model,original.placement||preferences.value.importPlacement);
+    const preview=previewReplacement(scene,model);
+    const choice=await confirmReplacement(file.name,preview);
+    if(!choice||original!==scene.model)return;
+    const project=scene.project,coverage=coverageSnapshot(scene);
+    const replacement=applyReplacement(preview,choice);
+    installModel({...replacement,project,loaded:true,weaponCoverage:coverage.options||undefined,showFireCoverage:coverage.show,fireDirection:coverage.direction,coverageBaseline:coverage.baseline});
+    rememberModel(file.name);
+    commit(`Source XML replaced: ${file.name} · ${replacement.matchedCount} blocks matched.`);
+  });
 }
 function chooseFiles(accept,multiple,callback,folder=false){
   const input=document.createElement('input');input.type='file';input.accept=accept;input.multiple=multiple;input.hidden=true;
@@ -286,6 +428,7 @@ async function openXmlFile(file){
     await nextPaint();const text=await file.text();
     loading.update(25,t('Reading blocks…'));await nextPaint();
     model=parseAvorionXml(text,file.name,file.size);
+    if(!canLeaveProject()){loading.done();return false;}
     await restoreEmbeddedTurrets(model,{load:loadTurretLibrary,add:addTurretAsset});
     await restoreComponentSetup(model);
   }catch(error){loading.done();showImportError(file.name,error);return false;}
@@ -402,21 +545,30 @@ function openPreferences(){
 }
 
 function renderTopbar(){
-  document.querySelector('.project-title').textContent=(scene.model?.fileName||t('Untitled'))+' · '+t('Local session');
+  updateProjectTitle();
   const main=$('#main-menu');main.replaceChildren();
   const menus={
     File:()=>[
       {section:'Open'},
+      ...(!embedded?[{label:'Open Project…',action:()=>openSavePicker()}]:[]),
       {label:'Import Avorion XML…',action:importXml},
+      ...(!embedded?[{label:'Replace Source XML…',disabled:!scene.model?.sourceXml,disabledReason:'Open an XML model first.',action:replaceSourceXml}]:[]),
       {label:'Asset folders…',action:openAssetFolders},
-      null,{section:'Save & Export'},
-      {label:'Save preserved XML…',disabled:!scene.model?.doc,disabledReason:'Import an Avorion XML model first. The Block Gallery has no original XML to save.',action:saveXml},
+      ...(!embedded?[null,{section:'Model Project'},
+        {label:'Save Project…',key:shortcut('saveLayout'),disabled:!scene.loaded,disabledReason:'Load a model first.',action:()=>saveProject()},
+        {label:'Save Project As…',disabled:!scene.loaded,disabledReason:'Load a model first.',action:()=>saveProject(true)},
+        {label:'Save Current Views with Project',disabled:!scene.loaded,disabledReason:'Load a model first.',action:rememberProjectViews},
+        null,{section:'Workspace Profile'},
+        {label:'Export Workspace Profile…',action:saveWorkspaceProfile},
+        {label:'Import Workspace Profile…',action:()=>openSavePicker(PROFILE_EXTENSION)}]:[]),
+      null,{section:'Export'},
+      {label:'Export Avorion XML…',disabled:!scene.model?.doc,disabledReason:'Import an Avorion XML model first. Generated block previews have no original XML to export.',action:saveXml},
       {label:'Advanced Export…',disabled:!scene.loaded||!scene.model,disabledReason:'Load a model first.',action:()=>{renderers.forEach(r=>r.cancel?.());cancelPaintTask();const view=currentArea().editor==='viewport'?currentArea().view:leaves(workspace().root).find(n=>n.editor==='viewport')?.view;openExportDialog(scene,view,ids=>selectStructure(ids),{preferences:preferences.value,canvas:[...document.querySelectorAll('.area[data-editor="viewport"]')].find(el=>find(workspace().root,el.dataset.areaId)?.view===view)?.querySelector('canvas')});}},
       null,{section:'Textures'},
       {label:'Load local texture folder…',action:loadTextures},
       {label:'Unload textures',action:()=>{textureLibrary.clear();textureStatus='Neutral texture fallback';scene.revision++;render();notify('Textures unloaded.');}},
       null,
-      {label:'Save workspace layout',key:shortcut('saveLayout'),disabled:!preferences.value.rememberLayout,disabledReason:'Enable workspace persistence in Preferences > Save & Load to save layouts.',action:()=>{saveNow();notify(storageAvailable?'Layout saved in this browser.':'Browser storage is unavailable.');}},
+      {label:'Save workspace layout locally',disabled:!preferences.value.rememberLayout,disabledReason:'Enable workspace persistence in Preferences > Save & Load to save layouts.',action:()=>{saveNow();notify(storageAvailable?'Layout saved in this browser.':'Browser storage is unavailable.');}},
       null,
       {label:'Clear scene',action:clearScene}
     ],
@@ -441,8 +593,8 @@ function renderTopbar(){
       {label:'Send feedback…',action:showFeedback},
       {label:'About Avorion Viewer',action:showAbout},
       null,{section:'Developer'},
-      {label:'Load Block Gallery',action:()=>loadModel(blockGallery(),true)},
-      {label:'Load orientation gallery · 7 × 24',action:()=>loadModel(orientationGallery())}
+      {label:'Load Block Gallery',action:()=>{if(canLeaveProject())loadModel(blockGallery(),true);}},
+      {label:'Load orientation gallery · 7 × 24',action:()=>{if(canLeaveProject())loadModel(orientationGallery());}}
     ]
   };
   Object.entries(menus).forEach(([name,items])=>{
@@ -636,10 +788,12 @@ document.addEventListener('drop',async e=>{
   e.preventDefault();dragDepth=0;$('#drop-overlay').hidden=true;
   try{
     const files=await droppedFiles(e.dataTransfer);
+    const saved=files.find(f=>/\.(avproject|avprofile)$/i.test(f.name));
     const xml=files.find(f=>/\.xml$/i.test(f.name)),images=files.filter(f=>TEXTURE_FILE.test(f.name));
     if(images.length){notify('Loading local textures…');await loadAssetTextures(images);}
-    if(xml)await openXmlFile(xml);
-    if(!xml&&!images.length)notify('Drop an Avorion .xml file or texture images.');
+    if(saved)await openSavedFile(saved);
+    else if(xml)await openXmlFile(xml);
+    if(!saved&&!xml&&!images.length)notify('Drop a Model Project, Workspace Profile, Avorion XML, or texture images.');
   }catch(error){notify(error.message);reportError(error,'FILE');}
 });
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
@@ -768,7 +922,8 @@ function renderArea(node){
 
 function emptyState(){
   const card=document.createElement('section');card.className='empty-state';
-  card.innerHTML='<p>Drop an Avorion .xml here, or open the welcome screen.</p>';
+  card.innerHTML='<p>Drop a Model Project or Avorion XML here.</p>';
+  if(!embedded)card.append(button('Open Project','Open Project…',()=>openSavePicker(),'setting-button'));
   card.append(button('Welcome','Open Welcome',()=>welcome?.open(),'primary'));
   return card;
 }
@@ -1114,7 +1269,7 @@ document.addEventListener('keydown',e=>{
   }
   if(node.editor==='preferences'&&(match('searchPreferences')||match('clearSearch'))){e.preventDefault();renderers.find(r=>r.preferenceAreaId===node.id)?.focusSearch(match('clearSearch'));return;}
   if(match('maximize')||match('focus')){e.preventDefault();closeMenu();toggleMaximize(node.id,match('focus'));return;}
-  if(match('saveLayout')){e.preventDefault();saveNow();notify(!preferences.value.rememberLayout?'Layout saving is paused in Preferences.':storageAvailable?'Layout saved in this browser.':'Browser storage is unavailable.');return;}
+  if(match('saveLayout')){e.preventDefault();if(scene.loaded&&!embedded)saveProject();else saveNow();return;}
   if(match('previousWorkspace')||match('nextWorkspace')){e.preventDefault();const i=state.workspaces.findIndex(w=>w.id===state.active);switchWorkspace(state.workspaces[(i+(match('nextWorkspace')?1:-1)+state.workspaces.length)%state.workspaces.length].id);return;}
   if(!$('#menu').hidden||node.editor!=='viewport')return;
   if(match('toggleMode')&&!e.target.closest('button,[role=dialog]')){e.preventDefault();if(e.repeat)return;renderers.find(r=>r.id===node.id)?.cancel();cancelPaintTask();node.view.interactionMode=nextInteractionMode(node.view.interactionMode);commit();return;}
@@ -1138,10 +1293,11 @@ window.addEventListener('pagehide',event=>{if(event.persisted)assetPersistence.f
 window.addEventListener('pageshow',event=>{if(event.persisted)crashGuard.resume();});
 // Failures visible while they happen: lost graphics context, allocation RangeErrors and
 // worker/render errors that reach the log. Keep the crash record and offer to clear.
-function liveFailure(message){if(embedded||!scene.loaded)return;crashGuard.fail();warnLiveFailure({message,clearScene,translate:t});}
+function liveFailure(message){if(embedded||!scene.loaded)return;crashGuard.fail();warnLiveFailure({message,clearScene:()=>clearScene({force:true}),translate:t});}
 window.addEventListener('avorion-context-lost',()=>liveFailure('The graphics context was lost, usually because the GPU ran out of memory.'));
 onLog(entries=>{const entry=entries[entries.length-1];if(entry?.level==='error'&&!entry.count&&isMemoryFailure({message:entry.message}))liveFailure('A memory allocation failed: '+entry.message);});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)assetPersistence.flush();});
+if(!embedded)window.addEventListener('beforeunload',event=>{if(projectDirty()){event.preventDefault();event.returnValue='';}});
 
 
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&scene.paintBusy){cancelPaintTask();scene.paintMessage='Paint calculation cancelled.';refreshStructure();}},{capture:true});
@@ -1155,6 +1311,7 @@ export async function configureAssetWorkspace(asset, textureFiles=[], sharedText
  if(!textureLibrary.adopt(sharedTextures)&&textureFiles.length)await textureLibrary.loadFiles(textureFiles,{retainUndecoded:true});
  if(textureLibrary.loadedCount)textureStatus=`${textureLibrary.loadedCount} texture maps · shared from the viewer`;
  assetDraft=structuredClone(asset);scene.turretEditorAsset=assetDraft;
+ scene.regions=assetDraft.projectRegions||[];
  scene.model=makeModel(assetDraft.blocks,assetDraft.name);scene.preview=false;scene.loaded=true;scene.visible=true;scene.revision++;
  scene.selectedIds=new Set();scene.hiddenIds=new Set();scene.selectedId=null;scene.selected=false;
  scene.blockTransforms=assetPoseTransforms(assetDraft);
@@ -1164,7 +1321,7 @@ export async function configureAssetWorkspace(asset, textureFiles=[], sharedText
  maximized=null;hovered=null;document.body.classList.add('embedded-asset-workspace');render();
  if(!assetDraft.editorLayout)for(const node of leaves(workspace().root))if(node.editor==='viewport')navigate(node,{action:'frame',interrupt:false});
  renderers.forEach(r=>r.draw?.());
- return {advance:studio.advance,seek:studio.seek,studio,snapshot(){assetDraft.blocks=scene.model.blocks;assetDraft.editorLayout=workspace().root;return structuredClone(assetDraft);},dispose(){studio.dispose();renderers.forEach(r=>r.dispose());renderers=[];releaseGameModel();}};
+ return {advance:studio.advance,seek:studio.seek,studio,snapshot(){assetDraft.blocks=scene.model.blocks;assetDraft.editorLayout=workspace().root;assetDraft.projectRegions=scene.regions;return structuredClone(assetDraft);},dispose(){studio.dispose();renderers.forEach(r=>r.dispose());renderers=[];releaseGameModel();}};
 }
 
 if(embeddedAsset)window.assetWorkspace={configure:configureAssetWorkspace};

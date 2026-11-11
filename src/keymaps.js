@@ -14,7 +14,7 @@ export const KEYMAPS = [
 
   key('focus','Focus Mode','Window','Ctrl+Shift+Space'),
 
-  key('saveLayout','Save Workspace Layout','Window','Ctrl+KeyS'),
+  key('saveLayout','Save Model Project','Window','Ctrl+KeyS'),
 
   key('previousWorkspace','Previous Workspace','Window','Ctrl+Alt+PageUp'),
 

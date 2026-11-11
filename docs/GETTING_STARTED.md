@@ -29,7 +29,7 @@ Choose **Paint Mode** in the viewport header, or press **Tab** to switch between
 
 Choose the **Primary** or **Secondary** color channel and a scope: **Whole Ship**, **Selected Blocks**, or **Active Region**. Scope limits where the tool can act; Whole Ship does not make every brush stroke repaint the entire ship. **Ctrl+Z** undoes paint and **Ctrl+Shift+Z** redoes it.
 
-Open **Window > Open Color Workshop** for palette and harmony choices, applying colors to selections, and named regions. Regions let you highlight or isolate sections such as engines, armor, or trim. Use these tools to compare a paint scheme or show how a ship is organized. Regions are session-only, so do not treat them as saved ship data.
+Open **Window > Open Color Workshop** for palette and harmony choices, applying colors to selections, and named regions. Regions let you highlight or isolate sections such as engines, armor, or trim. Save a Model Project to take your regions with the model.
 
 ### Preview turret placement: Select Sockets
 
@@ -100,9 +100,9 @@ Use it for a close-up demonstration of a turret design or an animated presentati
 
 ### Save a painted ship for Avorion
 
-Use **File > Save preserved XML…** to download a copy with your paint changes while retaining the imported XML structure and original coordinates. Keep your original file too. This is the paint-saving route, not an export of every viewport, lighting, or studio setting.
+Use **File > Save Project…** or **Ctrl+S** to download a named Model Project. Reopen it with **Open Project…**. Use **Export Avorion XML…** to download a game copy with paint applied and the original coordinates preserved.
 
-**Ctrl+S saves the workspace layout, not the ship XML.** Browser-restored models and textures are convenient working copies, not backups.
+Use **Export Workspace Profile…** to take your layout, preferences, and shaders to another browser.
 
 ### Export pictures and a rotating ship
 

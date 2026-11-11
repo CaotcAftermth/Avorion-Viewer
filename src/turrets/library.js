@@ -24,6 +24,12 @@ export function addTurretAsset(asset,{force=false}={}){
   additions=operation.catch(()=>{});return operation;
 }
 const emit=(selectionOnly=false)=>listeners.forEach(fn=>fn(selectionOnly));
+export function openTurretProject(asset,changed=()=>{}){
+  return openTurretWorkspace(asset,async draft=>{
+    const copy=await addTurretAsset({...draft,id:crypto.randomUUID()},{force:true});
+    turretLibrary.selectedId=copy.id;emit();changed();
+  });
+}
 export function mountTurretLibrary(host,changed){
   host.classList.add('turret-library');let error='',busy=false,disposed=false;
   const draw=(selectionOnly=false)=>{

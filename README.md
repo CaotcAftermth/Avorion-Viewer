@@ -8,7 +8,7 @@ View, inspect and repaint Avorion ship models in a browser, using a Blender-insp
 
 1. Use the welcome screen to choose Blender or Laptop controls, open the Quick Start Guide, or send feedback. Trackpad is temporarily unavailable. Reopen it through **Help > Welcome**.
 2. Use **Open Avorion XML…** and **Load texture folder…** on the welcome screen, or drop files onto the viewport. **File > Asset folders…** separately manages remembered folders.
-3. Select blocks to inspect them, or switch to Paint Mode to recolor them. Use **File > Save preserved XML** to save your edits to a new file.
+3. Select blocks to inspect them, or switch to Paint Mode to recolor them. Use **File > Save Project** to keep editable work, or **File > Export Avorion XML** to download a painted copy for the game.
 
 Models and textures are processed locally. Browser storage restores saved assets on later visits; clearing site data can remove those copies. Keep your original files. If a browser cannot remember a game folder, use the one-time folder picker.
 

@@ -118,6 +118,7 @@ export default {
  "Open Preferences": "打开偏好设置",
  "Maximize Area": "最大化区域",
  "Focus Mode": "专注模式",
+ "Save Model Project": "保存模型项目",
  "Save Workspace Layout": "保存工作区布局",
  "Previous Workspace": "上一个工作区",
  "Next Workspace": "下一个工作区",

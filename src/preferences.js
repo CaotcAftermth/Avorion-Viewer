@@ -301,6 +301,13 @@ export function createPreferencesStore(storage) {
       emit(); return true;
     },
     save() { const success = write(current); emit(); return success; },
+    applyProfile(value) {
+      const next=parsePreferences(JSON.stringify(value));
+      if(!write(next))return false;
+      current=next;
+      emit();
+      return true;
+    },
     revert() { current = { ...saved }; error = ''; emit(); },
     factory() {
       // Like Blender, factory reset is a live preview, never an implicit overwrite.

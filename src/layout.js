@@ -101,7 +101,7 @@ export function validateState(state) {
       && (n.view.roll === undefined || Number.isFinite(n.view.roll))
       && (n.view.projection === undefined || ['orthographic', 'perspective'].includes(n.view.projection))
       && (n.search === undefined || (typeof n.search === 'string' && n.search.length <= 1000))
-      && (n.propertyTab === undefined || ['object', 'scene', 'world', 'shaders', 'workspace', 'turrets'].includes(n.propertyTab))
+      && (n.propertyTab === undefined || ['object', 'scene', 'world', 'shaders', 'workspace', 'turrets', 'components', 'coverage'].includes(n.propertyTab))
       && (n.collectionClosed === undefined || typeof n.collectionClosed === 'boolean')
       && (n.panels === undefined || (n.panels && typeof n.panels === 'object' && Object.values(n.panels).every(v => typeof v === 'boolean')));
   };
