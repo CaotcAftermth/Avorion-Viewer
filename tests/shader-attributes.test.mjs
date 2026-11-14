@@ -21,7 +21,11 @@ test('block meshes stay under the vertex attribute budget and pack seam sides in
       const declared = [...mesh.material.vertexShader.matchAll(/^\s*attribute\s+\w+\s+(\w+)/gm)].map(m => m[1]);
       const used = new Set(['position', 'normal', ...declared]);
       assert.ok(used.size <= MAX_ATTRIBUTES, `shader declares ${used.size} attributes: ${[...used]}`);
-      assert.ok(Object.keys(mesh.geometry.attributes).length <= MAX_ATTRIBUTES);
+      assert.equal(Object.keys(mesh.geometry.attributes).length,mesh.userData.instanced?13:12);
+      assert.equal(used.size,14); // Includes both conditional instance inputs.
+      assert.equal(mesh.geometry.getAttribute('aScale'),undefined);
+      assert.equal(mesh.geometry.getAttribute('aWindow'),undefined);
+      assert.ok(!/\b(?:aWindow|vWindow)\b/.test(mesh.material.vertexShader+mesh.material.fragmentShader));
       assert.equal(mesh.geometry.getAttribute('aEmission').itemSize, 4);
       assert.equal(mesh.geometry.getAttribute('aEdges').itemSize, 4);
       if (mesh.userData.instanced) {
@@ -31,3 +35,4 @@ test('block meshes stay under the vertex attribute budget and pack seam sides in
     }
   } finally {model.dispose(); textureLibrary.clear();}
 });
+

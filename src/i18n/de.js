@@ -1,6 +1,11 @@
 // Deutsch interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+  "Hull Renderer": "Rumpf-Renderer",
+  "Canonical rendering reduces hull geometry memory on eligible blocks. The viewport shows the renderer actually used. A legacy URL override takes precedence.": "Der kanonische Renderer spart Geometriespeicher bei geeigneten Blöcken. Der aktive Renderer steht im Ansichtsfenster. Die Legacy-URL-Option hat Vorrang.",
+  "Default (Legacy)": "Standard (Legacy)",
+  "Canonical (Experimental)": "Kanonisch (experimentell)",
+  "Force Legacy": "Legacy erzwingen",
  "Thin Block Threshold": "Schwellenwert für dünne Blöcke",
  "A block is thin if any dimension is below this cutoff in native units.": "Ein Block gilt als dünn, wenn eine seiner Abmessungen in nativen Einheiten unter diesem Grenzwert liegt.",
  "Select Sockets Target Azimuth": "Sockelauswahl-Zielwinkel",

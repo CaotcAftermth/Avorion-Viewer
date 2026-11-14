@@ -1,3 +1,6 @@
+import {CanonicalRendererError,resourceFailure} from '../../../renderer-layout.js';
+import {wedgeTypes,wedgeBoundsWriter,endpointBoundsWriter,isWedgeInstance,hasCanonicalEndpoints,hasDiscreteOrientation,instanceOrientation,encodeOrientationSeams,decodeSeams,placeWedgeVertex,expandWedgeShading,setWedgeCreaseAxes} from './wedgeInstances.js';
+import {boxTypes,supportsBoxInstances,isCanonicalBox,setBoxFaceAxes,placeBoxVertex,boxInstanceBounds} from './boxInstances.js';
 // ---------------------------------------------------------------------------
 // Textured model builder. Shares repeated opaque geometry in bounded spatial
 // batches, with merged fallbacks. Attributes carry everything the shader needs:
@@ -16,7 +19,7 @@ import {blockIndex,secondaryColor} from '../../../block-colors.js';
 import {installBlockRaycast} from './blockRaycast.js';
 import { edgeAngles } from './edgeAngles.js';
 import { getBlockDefinition, getMaterial } from "../avorion/blockDefinitions.js";
-import { blockSurfaceGeometry, surfaceKind } from "./blockSurface.js";
+import { blockSurfaceVertexCount, blockSurfaceGeometry, surfaceKind } from "./blockSurface.js";
 import { getShadingSpec, textureName } from "../textures/shadingMap.js";
 import { textureLibrary } from "../textures/textureLibrary.js";
 import { thrusterTier } from "./thrusterPorts.js";
@@ -116,74 +119,84 @@ function rawSecondaryColor(block) {
     return parseColor(secondaryColor(block), [0, 0, 0, 0]);
 }
 class Builder {
-    edges = [];
-    pos = [];
-    nrm = [];
-    col = [];
-    sec = [];
-    lay = [];
-    par = [];
-    faceUv = [];
-    surface = [];
-    emission = [];
-    side = [];
-    windowColor = [];
-    materialLayers = [];
     ranges = new Map();
-    get vertexCount() { return this.pos.length / 3; }
-    add(id, geometry, color, secondary, layers, params, surface, normalOverlay, emission, windowColor, materialLayers, seamSides = [0]) {
-        const emissionSeam = [emission[0], emission[1], emission[2], seamSides[0]];
+    written = 0;
+
+    constructor(vertexCount, instanceCount = 0, endpoints = false) {
+        const instanced = instanceCount > 0;
+        this.vertexCount = vertexCount;
+        this.instanced = instanced;
+        this.g = instanced ? new THREE.InstancedBufferGeometry() : new THREE.BufferGeometry();
+        // Keep the same attribute order and divisors in both layouts.
+        for (const [name, size, perBlock] of [
+            ['aEdges',4], ['position',3], ['normal',3], ['aColor',4,true],
+            ['aSecondary',4,true], ['aLayers',4,true], ['aFaceUV',2],
+            ['aSurface',4], ['aSide',4], ['aEmission',4,true],
+            ['aMaterialLayers',3,true], ['aParams',4,true]
+        ]) {
+            const isInstanceAttribute = instanced && perBlock;
+            const Attribute = isInstanceAttribute ? THREE.InstancedBufferAttribute : THREE.BufferAttribute;
+            const count = isInstanceAttribute ? instanceCount : vertexCount;
+            const itemSize = endpoints && name === 'aMaterialLayers' ? 4 : size;
+            const attribute = new Attribute(new Float32Array(count * itemSize), itemSize);
+            if (name === 'aParams' || isInstanceAttribute && (name === 'aColor' || name === 'aSecondary'))
+                attribute.setUsage(THREE.DynamicDrawUsage);
+            this.g.setAttribute(name, attribute);
+        }
+    }
+
+    add(id, geometry, color, secondary, layers, params, surface, normalOverlay, emission, materialLayers, seamSides = [0]) {
         const { positions, uv, faces } = geometry;
-        const angles=edgeAngles(positions);
-        const start = this.vertexCount;
+        const count = positions.length / 3, start = this.written;
+        if (count % 3 || uv.length !== count * 2 || faces.length !== count * 3 || start + count > this.vertexCount)
+            throw new Error('Hull geometry emission exceeded its allocation or emitted inconsistent attributes.');
+        const angles = edgeAngles(positions);
+        const attributes = this.g.attributes;
+        attributes.position.array.set(positions, start * 3);
+        attributes.aFaceUV.array.set(uv, start * 2);
         const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3();
+        const emissionSeam = [emission[0], emission[1], emission[2], seamSides[0]];
+        const edges = attributes.aEdges.array, side = attributes.aSide.array, surfaceData = attributes.aSurface.array;
         for (let i = 0; i < positions.length; i += 9) {
             a.fromArray(positions, i);
             b.fromArray(positions, i + 3);
             c.fromArray(positions, i + 6);
-            n.subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
+            n.subVectors(b, a).cross(c.sub(a)).normalize();
+            const triangle = i / 3, creases = angles.subarray(triangle, triangle + 3);
             for (let k = 0; k < 3; k++) {
-                this.edges.push(...angles.subarray(i/3,i/3+3),k);
-                const vertex = i / 3 + k;
-                this.pos.push(positions[i + k * 3], positions[i + k * 3 + 1], positions[i + k * 3 + 2]);
-                this.nrm.push(n.x, n.y, n.z);
-                this.col.push(...color);
-                this.sec.push(...secondary);
-                this.lay.push(...layers);
-                this.par.push(...params);
-                this.faceUv.push(uv[vertex * 2], uv[vertex * 2 + 1]);
-                this.surface.push(faces[vertex * 3], faces[vertex * 3 + 1], surfaceKind(surface, faces[vertex * 3 + 2]), normalOverlay);
-                this.emission.push(...emissionSeam);
-                this.side.push(faces[vertex * 3 + 2]);
-                this.windowColor.push(...windowColor);
-                this.materialLayers.push(...materialLayers);
+                const source = i + k * 3, vertex = start + triangle + k, offset = vertex * 4;
+                edges.set(creases, offset);
+                edges[offset + 3] = k;
+                n.toArray(attributes.normal.array, vertex * 3);
+                side[offset] = positions[source];
+                side[offset + 1] = positions[source + 1];
+                side[offset + 2] = positions[source + 2];
+                side[offset + 3] = faces[source + 2];
+                surfaceData[offset] = faces[source];
+                surfaceData[offset + 1] = faces[source + 1];
+                surfaceData[offset + 2] = surfaceKind(surface, faces[source + 2]);
+                surfaceData[offset + 3] = normalOverlay;
+                if (!this.instanced) {
+                    attributes.aColor.array.set(color, offset);
+                    attributes.aSecondary.array.set(secondary, offset);
+                    attributes.aLayers.array.set(layers, offset);
+                    attributes.aParams.array.set(params, offset);
+                    attributes.aEmission.array.set(emissionSeam, offset);
+                    attributes.aMaterialLayers.array.set(materialLayers, vertex * 3);
+                }
             }
         }
+        this.written += count;
         const list = this.ranges.get(id) ?? [];
-        list.push([start, this.vertexCount - start]);
+        list.push([start, count]);
         this.ranges.set(id, list);
     }
-    geometry() {
-        if (this.pos.length === 0)
-            return undefined;
-        const g = new THREE.BufferGeometry();
-        g.setAttribute('aEdges',new THREE.Float32BufferAttribute(this.edges,4));
-        g.setAttribute("position", new THREE.Float32BufferAttribute(this.pos, 3));
-        g.setAttribute("normal", new THREE.Float32BufferAttribute(this.nrm, 3));
-        g.setAttribute("aColor", new THREE.Float32BufferAttribute(this.col, 4));
-        g.setAttribute("aSecondary", new THREE.Float32BufferAttribute(this.sec, 4));
-        g.setAttribute("aLayers", new THREE.Float32BufferAttribute(this.lay, 4));
-        g.setAttribute("aFaceUV", new THREE.Float32BufferAttribute(this.faceUv, 2));
-        g.setAttribute("aSurface", new THREE.Float32BufferAttribute(this.surface, 4));
-        g.setAttribute("aSide", new THREE.Float32BufferAttribute(this.side.flatMap((side,i)=>[...this.pos.slice(i*3,i*3+3),side]), 4));
-        g.setAttribute("aWindow", new THREE.Float32BufferAttribute(this.windowColor, 4));
-        g.setAttribute("aEmission", new THREE.Float32BufferAttribute(this.emission, 4));
-        g.setAttribute("aMaterialLayers", new THREE.Float32BufferAttribute(this.materialLayers, 3));
-        const par = new THREE.Float32BufferAttribute(this.par, 4);
-        par.setUsage(THREE.DynamicDrawUsage);
-        g.setAttribute("aParams", par);
-        g.computeBoundingSphere();
-        return g;
+
+    finish() {
+        if (this.written !== this.vertexCount)
+            throw new Error('Hull geometry emission did not fill its allocation.');
+        this.g.computeBoundingSphere();
+        return this.g;
     }
 }
 export function buildTexturedModel(model, profile, params) {
@@ -228,20 +241,37 @@ export function buildTexturedModel(model, profile, params) {
                 auxNames.add(n);
         return { spec, names };
     });
+    const textureStart=params.measure&&performance.now();
+    const owned = [];
+    let spill = null, spillRadius = null;
+    const meshes = [];
+    try {
     const albedo = textureLibrary.getArray("albedo", albedoNames);
+    owned.push(()=>albedo.release());
     const normal = textureLibrary.getArray("normal", normalNames);
+    owned.push(()=>normal.release());
     const aux = textureLibrary.getArray("aux", auxNames, generated);
+    owned.push(()=>aux.release());
+    params.measure?.("texture arrays prepared",{durationMs:params.measure?performance.now()-textureStart:0});
     const layer = (arr, name) => name ? (arr.layerOf.get(name) ?? 0) : 0;
     const batches=(params.prepared||[]).map(entry=>{
       const g=entry.instanced?new THREE.InstancedBufferGeometry():new THREE.BufferGeometry();
+      owned.push(()=>g.dispose());
       for(const [name,attr] of Object.entries(entry.attributes))g.setAttribute(name,attr.instanced?new THREE.InstancedBufferAttribute(attr.array,attr.size):new THREE.BufferAttribute(attr.array,attr.size));
       if(entry.index)g.setIndex(new THREE.BufferAttribute(entry.index,1));
       if(entry.instanced)g.instanceCount=entry.count;
+      if(entry.canonicalLayout)g.userData.canonicalLayout=entry.canonicalLayout;
       g.boundingBox=new THREE.Box3(new THREE.Vector3(...entry.min),new THREE.Vector3(...entry.max));g.boundingSphere=g.boundingBox.getBoundingSphere(new THREE.Sphere());
       return {...entry,g,builder:{ranges:new Map(entry.ranges)}};
     });
     if(!params.prepared){
-    const opaque = new Builder(), twoSided=new Builder(), translucent = new Builder(),instanceGroups=new Map();
+    const canonicalSupported = (params.canonicalBoxes || params.canonicalWedges) && supportsBoxInstances(profile);
+    const writeWedgeBounds = canonicalSupported && params.canonicalWedges ? wedgeBoundsWriter(profile) : null;
+    const writeBoxBounds = canonicalSupported && params.canonicalBoxes && (params.canonicalEndpointBoxes || params.canonicalDiscrete)
+        ? endpointBoundsWriter(profile, 'box') : null;
+    const wedgePrecision = {}, endpointBoxPrecision = {};
+    const classificationStart = params.measure && performance.now();
+    const opaque = [], twoSided = [], translucent = [], instanceGroups = new Map(), instancePlans = [];
     const coverIds=new Set(live.filter((b,i)=>{const spec=resolved[i].spec,kind=getBlockDefinition(b.typeIndex).geometryKind;
       return (kind==='box'||kind==='placeholder')&&b.typeIndex!==10&&!spec.translucent&&!spec.cutout&&!(supportsOpacity(b)&&blockOpacity(b)<1);}).map(b=>b.id));
     const seams=seamSides(live,b=>coverIds.has(b.id));
@@ -268,54 +298,169 @@ export function buildTexturedModel(model, profile, params) {
         const pars = [layer(aux, names.glow), flags, spec.reflect ?? 1, 0];
         const emission = parseColor("ff" + getMaterial(b.materialIndex).color.slice(1), [1, 1, 1, 1]).slice(0, 3);
         const blended = spec.translucent && !(spec.surface === "hologram" && color[3] >= 1);
-        const args=[color,secondary,layers,pars,spec.surface,layer(aux,names.normalOverlay),emission,secondary,[layer(aux,names.materialOverlay),layer(aux,names.materialGlow),[7,13].includes(b.typeIndex)?thrusterTier(b.size.x,b.size.y,b.size.z).size:0],[b.typeIndex===10?0:seams.get(b.id)]];
-        if(blended)translucent.add(b.id,blockSurfaceGeometry(b,profile),...args);
+        const args=[color,secondary,layers,pars,spec.surface,layer(aux,names.normalOverlay),emission,[layer(aux,names.materialOverlay),layer(aux,names.materialGlow),[7,13].includes(b.typeIndex)?thrusterTier(b.size.x,b.size.y,b.size.z).size:0],[b.typeIndex===10?0:seams.get(b.id)]];
+        if(blended)translucent.push({b,args});
         else{
-          const key=[b.typeIndex,b.materialIndex,b.look,b.up,b.size.x,b.size.y,b.size.z,flags,Math.floor(b.position.x/cell),Math.floor(b.position.y/cell),Math.floor(b.position.z/cell)].join('|');
-          let entries=instanceGroups.get(key);if(!entries){entries=[];instanceGroups.set(key,entries);}entries.push({b,args});
+          let canonical;
+          if (writeWedgeBounds && wedgeTypes.has(b.typeIndex) && !(flags & FLAG_DOUBLE_SIDED)) {
+            canonical = writeWedgeBounds(b) ? (params.canonicalDiscrete ? 'discreteWedge' : 'wedge') : undefined;
+            if (params.measure) {
+              const counts = wedgePrecision[b.typeIndex] ??= {passed:0,rejected:0};
+              counts[canonical ? 'passed' : 'rejected']++;
+            }
+          } else if (canonicalSupported && params.canonicalBoxes && !(flags & FLAG_DOUBLE_SIDED)) {
+            if (writeBoxBounds && boxTypes.has(b.typeIndex)) {
+              if (writeBoxBounds(b)) canonical = params.canonicalDiscrete ? 'discreteBox' : 'endpointBox';
+              if (params.measure) {
+                const counts = endpointBoxPrecision[b.typeIndex] ??= {passed:0,rejected:0};
+                counts[canonical ? 'passed' : 'rejected']++;
+              }
+            } else if (isCanonicalBox(b, profile)) canonical = 'box';
+          }
+          const sizeKey = canonical ?? [b.size.x,b.size.y,b.size.z].join('|');
+          const orientationKey = canonical?.startsWith('discrete') ? '' : [b.look,b.up].join('|');
+          const key=[b.typeIndex,b.materialIndex,orientationKey,sizeKey,flags,Math.floor(b.position.x/cell),Math.floor(b.position.y/cell),Math.floor(b.position.z/cell)].join('|');
+          let entries=instanceGroups.get(key);if(!entries){entries=[];instanceGroups.set(key,entries);}entries.push({b,args,canonical});
         }
     });
     // Bound draw calls on heterogeneous ships: spend batches on the largest
     // repeated groups first, and merge the remaining shapes into shared meshes.
     let instanceBudget=Math.max(16,2*Math.ceil(live.length/1024));
+    const canonicalCounts = {}, canonicalRejected = {smallGroup:0,budget:0,instancingDisabled:0};
     for(const entries of [...instanceGroups.values()].sort((a,b)=>b.length-a.length)){
       const batchCount=Math.ceil(entries.length/1024);
-      if(entries.length<16||batchCount>instanceBudget||params.instancing===false){for(const {b,args} of entries)((args[3][1]&FLAG_DOUBLE_SIDED)?twoSided:opaque).add(b.id,blockSurfaceGeometry(b,profile),...args);continue;}
+      const {canonical,b} = entries[0];
+      if(params.measure && canonical){
+        const counts=canonicalCounts[b.typeIndex]??={candidates:0,accepted:0};
+        counts.candidates+=entries.length;
+        const reason=entries.length<16?'smallGroup':batchCount>instanceBudget?'budget':params.instancing===false?'instancingDisabled':null;
+        if(reason)canonicalRejected[reason]+=entries.length;
+        else counts.accepted+=entries.length;
+      }
+      if(entries.length<16||batchCount>instanceBudget||params.instancing===false){
+        for(const entry of entries)((entry.args[3][1]&FLAG_DOUBLE_SIDED)?twoSided:opaque).push(entry);
+        continue;
+      }
       instanceBudget-=batchCount;
+      instancePlans.push(entries);
+    }
+    instanceGroups.clear();
+    const classificationMs = params.measure ? performance.now() - classificationStart : 0;
+    const sizingStart = params.measure && performance.now();
+    const expandedPlans = [[opaque,false,false],[twoSided,false,true],[translucent,true,true]].map(([entries,isT,doubleSided])=>{
+      const vertexCount = entries.reduce((total,{b})=>total+blockSurfaceVertexCount(b.typeIndex),0);
+      return {entries,isT,doubleSided,vertexCount};
+    });
+    const sizingMs = params.measure ? performance.now() - sizingStart : 0;
+    const writeStart = params.measure && performance.now();
+    for(const entries of instancePlans){
+      const templateVertexCount = blockSurfaceVertexCount(entries[0].b.typeIndex);
       for(let start=0;start<entries.length;start+=1024){
-        const chunk=entries.slice(start,start+1024),first=chunk[0],builder=new Builder();
-        builder.add(first.b.id,blockSurfaceGeometry({...first.b,position:{x:0,y:0,z:0}},profile),...first.args);
-        const base=builder.geometry(),g=new THREE.InstancedBufferGeometry();g.copy(base);g.instanceCount=chunk.length;base.dispose();
-        const attributes={aColor:[0,4],aSecondary:[1,4],aLayers:[2,4],aParams:[3,4],aEmission:[6,4],aWindow:[7,4],aMaterialLayers:[8,3]};
-        for(const [name,[argument,size]] of Object.entries(attributes)){
-          const data=new Float32Array(chunk.length*size);chunk.forEach((entry,i)=>data.set(name==='aEmission'?[...entry.args[6],entry.args[9][0]]:entry.args[argument],i*size));
-          const attr=new THREE.InstancedBufferAttribute(data,size);if(['aParams','aColor','aSecondary','aWindow'].includes(name))attr.setUsage(THREE.DynamicDrawUsage);g.setAttribute(name,attr);
+        const chunk=entries.slice(start,start+1024),first=chunk[0],layout=first.canonical;
+        const wedge=layout==='wedge'||layout==='discreteWedge', discrete=layout?.startsWith('discrete');
+        const endpoints=!!layout&&layout!=='box';
+        const builder=new Builder(templateVertexCount,chunk.length,endpoints);
+        owned.push(()=>builder.g.dispose());
+        const template={...first.b,position:{x:0,y:0,z:0}};
+        if(layout)template.size={x:1,y:1,z:1};
+        if(discrete){template.look=1;template.up=3;}
+        builder.add(first.b.id,blockSurfaceGeometry(template,profile),...first.args);
+        const g=builder.g;g.instanceCount=chunk.length;
+        if(layout)g.userData.canonicalLayout=layout;
+        const attributes={aColor:[0,4],aSecondary:[1,4],aLayers:[2,4],aParams:[3,4],aEmission:[6,4],aMaterialLayers:[7,3]};
+        for(const [name,[argument]] of Object.entries(attributes)){
+          const {array,itemSize}=g.getAttribute(name);
+          chunk.forEach(({b,args},i)=>{
+            if(name!=='aEmission')array.set(args[argument],i*itemSize);
+            else {
+              const seams=args[8][0];
+              array.set([...args[6],discrete?encodeOrientationSeams(b.look,b.up,seams):seams],i*itemSize);
+            }
+          });
         }
-        const offsets=new Float32Array(chunk.length*3);chunk.forEach(({b},i)=>offsets.set([b.position.x,b.position.y,b.position.z],i*3));g.setAttribute('aOffset',new THREE.InstancedBufferAttribute(offsets,3));
-        base.computeBoundingBox();const local=base.boundingBox.clone(),bounds=new THREE.Box3(),offset=new THREE.Vector3();
-        for(let i=0;i<chunk.length;i++)bounds.union(local.clone().translate(offset.fromArray(offsets,i*3)));
+        const transformSize=endpoints?4:3;
+        const offsets=new THREE.InstancedBufferAttribute(new Float32Array(chunk.length*transformSize),transformSize);
+        g.setAttribute('aOffset',offsets);
+        let scales;
+        if(first.canonical){
+          scales=new THREE.InstancedBufferAttribute(new Float32Array(chunk.length*transformSize),transformSize);
+          g.setAttribute('aScale',scales);
+          try{
+            setBoxFaceAxes(g,template.look,template.up);
+            if(wedge)setWedgeCreaseAxes(g,template.look,template.up);
+          }catch(error){
+            if(resourceFailure(error))throw error;
+            throw new CanonicalRendererError('Canonical template metadata could not be constructed.',{cause:error});
+          }
+        }
+        if(endpoints){
+          const writeBounds=wedge?writeWedgeBounds:writeBoxBounds;
+          const extents=new THREE.Vector3();
+          const materialLayers=g.getAttribute('aMaterialLayers');
+          chunk.forEach(({b},i)=>{
+            if(!writeBounds(b,(min,max,localScale)=>{
+              const lookAxis=b.look>>1,upAxis=b.up>>1;
+              extents.setComponent(lookAxis,localScale.x);
+              extents.setComponent(upAxis,localScale.y);
+              extents.setComponent(3-lookAxis-upAxis,localScale.z);
+              offsets.setXYZW(i,min.x,min.y,min.z,extents.x);
+              scales.setXYZW(i,max.x,max.y,max.z,extents.y);
+              materialLayers.setW(i,extents.z);
+            }))throw new CanonicalRendererError('Canonical endpoints changed after classification.');
+          });
+        }else{
+          chunk.forEach(({b},i)=>offsets.setXYZ(i,b.position.x,b.position.y,b.position.z));
+          if(scales)chunk.forEach(({b},i)=>scales.setXYZ(i,b.size.x,b.size.y,b.size.z));
+        }
+        builder.finish();
+        g.computeBoundingBox();
+        const local=g.boundingBox,bounds=new THREE.Box3(),instanceBounds=new THREE.Box3();
+        const offset=new THREE.Vector3(),scale=new THREE.Vector3();
+        for(let i=0;i<chunk.length;i++){
+          offset.fromBufferAttribute(offsets,i);
+          if(endpoints)instanceBounds.set(offset,scale.fromBufferAttribute(scales,i));
+          else if(scales)boxInstanceBounds(instanceBounds,local,scale.fromBufferAttribute(scales,i),offset);
+          else instanceBounds.copy(local).translate(offset);
+          bounds.union(instanceBounds);
+        }
         g.boundingBox=bounds;g.boundingSphere=bounds.getBoundingSphere(new THREE.Sphere());
         builder.ranges=new Map(chunk.map(({b},i)=>[b.id,[[i,1]]]));
         batches.push({builder,g,isT:false,instanced:true,doubleSided:!!(first.args[3][1]&FLAG_DOUBLE_SIDED)});
       }
     }
-    for(const [builder,isT,doubleSided] of [[opaque,false,false],[twoSided,false,true],[translucent,true,true]]){const g=builder.geometry();if(g)batches.push({builder,g,isT,doubleSided});}
+    for(const {entries,isT,doubleSided,vertexCount} of expandedPlans){
+      if(!vertexCount)continue;
+      const builder = new Builder(vertexCount);
+      owned.push(()=>builder.g.dispose());
+      for(const {b,args} of entries)builder.add(b.id,blockSurfaceGeometry(b,profile),...args);
+      entries.length = 0;
+      batches.push({builder,g:builder.finish(),isT,doubleSided});
     }
+    params.measure?.('hull writes completed',{classificationMs,sizingMs,writeAndBoundsMs:performance.now()-writeStart,canonicalCounts,canonicalRejected,wedgePrecision,endpointBoxPrecision});
+    }
+    const finalizationStart = params.measure && performance.now();
+    let pickingMs = 0;
     const group = new THREE.Group();
     group.name = "textured";
     const effects = buildBlockEffects(params.simplified?[]:live, profile, params);
+    owned.push(()=>effects.dispose());
     const effectPose = new BlockPose(effects.mesh.geometry, effects.ranges);
     group.add(...effects.meshes);
     const materials = [],materialCache=new Map();
-    const meshes = [],owners=new Map();
+    const owners=new Map();
     const ranges = new Map();
     for (const {builder,g,isT,instanced,doubleSided,pickTree} of batches) {
-        const materialKey=[isT,instanced,doubleSided].join(':');
+        const canonical=g.userData.canonicalLayout;
+        const materialKey=[isT,instanced,doubleSided,canonical].join(':');
         let mat=materialCache.get(materialKey);
-        if(!mat){mat=createGameMaterial(albedo.texture,normal.texture,aux.texture,params,isT);materialCache.set(materialKey,mat);materials.push(mat);}
+        if(!mat){mat=createGameMaterial(albedo.texture,normal.texture,aux.texture,params,isT);materialCache.set(materialKey,mat);materials.push(mat);owned.push(()=>mat.dispose());}
         mat.userData.hardwareCull=!doubleSided;
         if(!doubleSided)mat.side=THREE.FrontSide;
         if(instanced){mat.defines={...mat.defines,BLOCK_INSTANCED:1};}
+        if(canonical==='box')mat.defines.BLOCK_CANONICAL_BOX=1;
+        if(hasCanonicalEndpoints(g))mat.defines.BLOCK_CANONICAL_ENDPOINTS=1;
+        if(isWedgeInstance(g))mat.defines.BLOCK_CANONICAL_WEDGE=1;
+        if(hasDiscreteOrientation(g))mat.defines.BLOCK_CANONICAL_DISCRETE=1;
         if (isT)
             mat.forceSinglePass = true; // triangles are sorted globally, including back faces
         const mesh = new THREE.Mesh(g, mat);
@@ -335,7 +480,9 @@ export function buildTexturedModel(model, profile, params) {
             ranges.set(id, acc);
         }
         mesh.userData.ranges = builder.ranges;for(const id of builder.ranges.keys())owners.set(id,mesh);
+        const pickStart = params.measure && performance.now();
         installBlockRaycast(mesh,pickTree);
+        if(params.measure)pickingMs += performance.now()-pickStart;
         if(!instanced)mesh.userData.pose = new BlockPose(g, builder.ranges);
         if (isT) {
             const position = g.getAttribute("position"), centers = [];
@@ -343,15 +490,34 @@ export function buildTexturedModel(model, profile, params) {
                 centers.push(new THREE.Vector3()
                     .fromBufferAttribute(position, i).add(new THREE.Vector3().fromBufferAttribute(position, i + 1))
                     .add(new THREE.Vector3().fromBufferAttribute(position, i + 2)).multiplyScalar(1 / 3));
-            g.setIndex(Array.from({ length: position.count }, (_, i) => i));
+            const IndexArray = position.count > 65535 ? Uint32Array : Uint16Array;
+            const existing = g.index?.array;
+            const index = existing instanceof IndexArray && existing.length === position.count
+                ? existing : new IndexArray(position.count);
+            for (let i = 0; i < index.length; i++) index[i] = i;
+            if (index !== existing) g.setIndex(new THREE.BufferAttribute(index, 1));
             mesh.userData.sortCenters = centers;
             mesh.userData.sortOrder=centers.map((c,i)=>({i,z:0}));
             mesh.userData.sortedView = new THREE.Matrix4().set(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         }
     }
+    if(params.measure){
+        let attributeBytes=0,indexBytes=0,largestBatchBytes=0,expandedVertices=0,templateVertices=0,instances=0;
+        for(const {g,instanced} of batches){
+            const bytes=Object.values(g.attributes).reduce((total,attr)=>total+attr.array.byteLength,0);
+            const indices=g.index?.array.byteLength||0,vertices=g.getAttribute('position').count;
+            attributeBytes+=bytes;
+            indexBytes+=indices;
+            largestBatchBytes=Math.max(largestBatchBytes,bytes+indices);
+            if(instanced){templateVertices+=vertices;instances+=g.instanceCount;}
+            else expandedVertices+=vertices;
+        }
+        params.measure('hull construction',{prepared:!!params.prepared,expandedVertices,templateVertices,instances,
+            attributeBytes,indexBytes,largestBatchBytes,numericStagingArrays:0,numericStagingSlots:0,sideExpansionSlots:0,
+            pickingMs,finalizationMs:performance.now()-finalizationStart});
+    }
     let selected = new Set(), hidden = new Set(), hovered = new Set(), regioned = new Set();
     const lights = collectBlockLights(live, profile);
-    let spill = null, spillRadius = null;
     const rebuildSpill = () => {
         spill?.dispose();
         spill = lights.length ? buildSpillGrid(lights, spillRadius, hidden) : null;
@@ -373,16 +539,17 @@ export function buildTexturedModel(model, profile, params) {
         for(const [mesh,[start,end]] of dirty){const attr=mesh.geometry.getAttribute('aParams');attr.addUpdateRange(start*4,(end-start)*4);attr.needsUpdate=true;}
         for(const mesh of meshes)mesh.userData.hidden=hidden;
     };
+    owned.length=0;
     return {
         group, materials, ranges,
         dispose() {
-            effects.dispose();
             spill?.dispose();
+            meshes.forEach((m) => { m.geometry.dispose(); });
+            materials.forEach((m) => m.dispose());
+            effects.dispose();
             albedo.release();
             normal.release();
             aux.release();
-            meshes.forEach((m) => { m.geometry.dispose(); });
-            materials.forEach((m) => m.dispose());
         },
         setSelection(ids) {
             const next=new Set(ids),changed=new Set([...selected].filter(id=>!next.has(id)));for(const id of next)if(!selected.has(id))changed.add(id);
@@ -406,13 +573,13 @@ export function buildTexturedModel(model, profile, params) {
                 const mesh=owners.get(block.id);if(!mesh)continue;
                 const color=parseColor(block.color,[.5,.5,.5,1]),secondary=rawSecondaryColor(block);
                 if(supportsOpacity(block))color[3]=blockOpacity(block);
-                const attr=mesh.geometry.getAttribute('aColor'),second=mesh.geometry.getAttribute('aSecondary'),windows=mesh.geometry.getAttribute('aWindow'),span=dirty.get(mesh)||[Infinity,0];
+                const attr=mesh.geometry.getAttribute('aColor'),second=mesh.geometry.getAttribute('aSecondary'),span=dirty.get(mesh)||[Infinity,0];
                 for(const [start,count] of mesh.userData.ranges.get(block.id)){
-                    for(let v=start;v<start+count;v++){attr.setXYZW(v,...color);second.setXYZW(v,...secondary);windows.setXYZW(v,...secondary);}
+                    for(let v=start;v<start+count;v++){attr.setXYZW(v,...color);second.setXYZW(v,...secondary);}
                     span[0]=Math.min(span[0],start);span[1]=Math.max(span[1],start+count);
                 }dirty.set(mesh,span);
             }
-            for(const [mesh,[start,end]] of dirty)for(const name of ['aColor','aSecondary','aWindow']){const attr=mesh.geometry.getAttribute(name);attr.addUpdateRange(start*4,(end-start)*4);attr.needsUpdate=true;}
+            for(const [mesh,[start,end]] of dirty)for(const name of ['aColor','aSecondary']){const attr=mesh.geometry.getAttribute(name);attr.addUpdateRange(start*4,(end-start)*4);attr.needsUpdate=true;}
         },
 
         setParams(p) {
@@ -430,15 +597,48 @@ export function buildTexturedModel(model, profile, params) {
                   // affected batch; ordinary selection and color edits stay instanced.
                   if(![...poses.keys()].some(id=>mesh.userData.ranges.has(id)))continue;
                   const old=mesh.geometry,count=old.instanceCount,vertices=old.getAttribute('position').count,next=new THREE.BufferGeometry();
-                  const offsets=old.getAttribute('aOffset');
+                  const offsets=old.getAttribute('aOffset'),scales=old.getAttribute('aScale'),endpoints=hasCanonicalEndpoints(old),discrete=hasDiscreteOrientation(old);
+                  const extents=new THREE.Vector3(),inverseRotation=new THREE.Matrix3();
+                  const point=new THREE.Vector3(),scale=new THREE.Vector3(),offset=new THREE.Vector3();
                   for(const [name,attribute] of Object.entries(old.attributes)){
-                    if(name==='aOffset')continue;const size=attribute.itemSize,data=new Float32Array(count*vertices*size);
-                    for(let i=0;i<count;i++)for(let v=0;v<vertices;v++)for(let k=0;k<size;k++)data[(i*vertices+v)*size+k]=attribute.array[(attribute.isInstancedBufferAttribute?i:v)*size+k]+(name==='position'||name==='aSide'&&k<3?offsets.array[i*3+k]:0);
+                    if(name==='aOffset'||name==='aScale')continue;
+                    const size=endpoints&&name==='aMaterialLayers'?3:attribute.itemSize,data=new Float32Array(count*vertices*size);
+                    for(let i=0;i<count;i++){
+                      const rotation=discrete?instanceOrientation(old,i):null;
+                      if(scales){
+                        scale.fromBufferAttribute(scales,i);
+                        offset.fromBufferAttribute(offsets,i);
+                        if(endpoints)extents.set(offsets.getW(i),scales.getW(i),old.getAttribute('aMaterialLayers').getW(i));
+                        else extents.copy(scale);
+                        if(rotation){
+                          extents.applyMatrix3(inverseRotation.copy(rotation).transpose());
+                          extents.set(Math.abs(extents.x),Math.abs(extents.y),Math.abs(extents.z));
+                        }
+                      }
+                      for(let v=0;v<vertices;v++){
+                        const dst=(i*vertices+v)*size,src=(attribute.isInstancedBufferAttribute?i:v)*attribute.itemSize;
+                        for(let k=0;k<size;k++)data[dst+k]=attribute.array[src+k];
+                        if(name==='position'||name==='aSide'){
+                          if(scales)(endpoints?placeWedgeVertex:placeBoxVertex)(point.fromArray(attribute.array,src),scale,offset,rotation).toArray(data,dst);
+                          else for(let k=0;k<3;k++)data[dst+k]=attribute.array[src+k]+offsets.array[i*3+k];
+                        }else if(scales&&name==='aSurface'){
+                          data[dst]=extents.getComponent(data[dst]);
+                          data[dst+1]=extents.getComponent(data[dst+1]);
+                        }else if(discrete&&name==='aEmission')data[dst+3]=decodeSeams(data[dst+3]);
+                      }
+                    }
                     next.setAttribute(name,new THREE.BufferAttribute(data,size));
+                  }
+                  if(endpoints)expandWedgeShading(next,vertices);
+                  if(scales){
+                    next.computeBoundingBox();
+                    next.computeBoundingSphere();
+                    params.measure?.('canonical pose expansion',{instances:count,vertices:count*vertices,
+                        attributeBytes:count*vertices*172});
                   }
                   const nextRanges=new Map([...mesh.userData.ranges].map(([id,[[i]]])=>[id,[[i*vertices,vertices]]]));
                   mesh.geometry=next;mesh.userData.ranges=nextRanges;for(const [id,list] of nextRanges)ranges.set(id,list);mesh.userData.instanced=false;mesh.userData.pose=new BlockPose(next,nextRanges);installBlockRaycast(mesh);old.dispose();
-                  const compile=mesh.material.onBeforeCompile;mesh.material=mesh.material.clone();mesh.material.onBeforeCompile=compile;delete mesh.material.defines.BLOCK_INSTANCED;mesh.material.needsUpdate=true;materials.push(mesh.material);setSpillGrid(mesh.material,spill);
+                  const compile=mesh.material.onBeforeCompile;mesh.material=mesh.material.clone();mesh.material.onBeforeCompile=compile;delete mesh.material.defines.BLOCK_INSTANCED;delete mesh.material.defines.BLOCK_CANONICAL_BOX;delete mesh.material.defines.BLOCK_CANONICAL_WEDGE;delete mesh.material.defines.BLOCK_CANONICAL_ENDPOINTS;delete mesh.material.defines.BLOCK_CANONICAL_DISCRETE;mesh.material.needsUpdate=true;materials.push(mesh.material);setSpillGrid(mesh.material,spill);
                 }
                 mesh.userData.pose.apply(poses);
                 const centers = mesh.userData.sortCenters;
@@ -469,4 +669,8 @@ export function buildTexturedModel(model, profile, params) {
             }
         },
     };
+    } catch(error) {
+        for(const release of owned.reverse())release();
+        throw error;
+    }
 }

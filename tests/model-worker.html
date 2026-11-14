@@ -18,12 +18,14 @@ try{
  // Exercise the production async install and cancellation path.
  const canvas=document.createElement('canvas');canvas.width=canvas.height=240;document.body.append(canvas);const ctx=canvas.getContext('2d');
  const view=area().view;Object.assign(ensureViewportOptions(view),{background:'VIEWPORT',showOverlays:false,objectOutline:false});view.grid=false;view.target=[0,0,0];view.yaw=0;view.pitch=0;
+ // Set the fixture threshold explicitly so both production scheduling paths are exercised.
+ const preferences={...FACTORY_PREFERENCES,worldEnabled:false,simplifyThreshold:10000};
  const scene={model:source,loaded:true,visible:true,revision:1,selectedIds:new Set(['b0']),hiddenIds:new Set()};
- drawGame(ctx,scene,view,240,240,{...FACTORY_PREFERENCES,worldEnabled:false},1);assert(scene.renderPreparing,'production queues worker');
+ drawGame(ctx,scene,view,240,240,preferences,1);assert(scene.renderPreparing,'production queues worker');
  await new Promise((resolve,reject)=>{window.addEventListener('avorion-model-ready',resolve,{once:true});setTimeout(()=>reject(Error('worker install timeout')),15000)});
- assert(!scene.renderPreparing&&!scene.renderError,'worker installed');drawGame(ctx,scene,view,240,240,{...FACTORY_PREFERENCES,worldEnabled:false},1);assert(pickGame(scene,view,240,240,120,120)==='b0','large-model picking');
- scene.revision++;drawGame(ctx,scene,view,240,240,FACTORY_PREFERENCES,1);assert(scene.renderPreparing,'rebuild queues');
- scene.model=makeModel([makeBlock({id:'replacement'})]);scene.revision++;drawGame(ctx,scene,view,240,240,FACTORY_PREFERENCES,1);assert(!scene.renderPreparing,'replacement cancels worker');
+ assert(!scene.renderPreparing&&!scene.renderError,'worker installed');drawGame(ctx,scene,view,240,240,preferences,1);assert(pickGame(scene,view,240,240,120,120)==='b0','large-model picking');
+ scene.revision++;drawGame(ctx,scene,view,240,240,preferences,1);assert(scene.renderPreparing,'rebuild queues');
+ scene.model=makeModel([makeBlock({id:'replacement'})]);scene.revision++;drawGame(ctx,scene,view,240,240,preferences,1);assert(!scene.renderPreparing,'replacement cancels worker');
  await new Promise(r=>setTimeout(r,300));assert(pickGame(scene,view,240,240,120,120)==='replacement','late worker cannot overwrite replacement');releaseGameModel();
  document.body.dataset.result='pass';document.querySelector('#status').textContent=JSON.stringify({count,workerTicks:ticks,totalMs:performance.now()-started,attributeMiB:bytes/2**20});
 }catch(e){document.body.dataset.result='fail';document.querySelector('#status').textContent=e.stack}

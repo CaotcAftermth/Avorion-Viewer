@@ -145,11 +145,20 @@ try{
   assert.deepEqual(updated.model.paint,[{id:'b1',color:'ffaabbcc',secondaryColor:'00000000'}]);
   assert.deepEqual(updated.model.regions[0].ids,['b1']);
   assert.match(updated.model.turretMounts[0].socketId,/^turret:b1:/);
-  await clean.waitForFunction(async()=>{
-    const {openSessionStore}=await import('/src/session-persistence.js');
-    return (await openSessionStore().get('model'))?.fileName==='Stretched.xml';
-  });
-  assert.equal((await recovered(clean)).regions.length,2);
+  // Poll the resolved IndexedDB value. An async waitForFunction predicate can
+  // resolve immediately with a truthy Promise before the debounced write runs.
+  const deadline=Date.now()+10000;
+  let recovery;
+  do{
+    recovery=await recovered(clean);
+    if(recovery?.fileName==='Stretched.xml'&&recovery.regions?.length===2)break;
+    await new Promise(resolve=>setTimeout(resolve,25));
+  }while(Date.now()<deadline);
+  assert.equal(recovery?.fileName,'Stretched.xml');
+  assert.equal(recovery?.regions?.length,2);
+  assert.deepEqual(recovery.regions,updated.model.regions);
+  await new Promise(resolve=>setTimeout(resolve,500));
+  assert.deepEqual((await recovered(clean))?.regions,recovery.regions);
   const turretProject=await clean.evaluate(async xml=>{
     const {importTurretXml}=await import('/src/turrets/core.js');
     const {captureTurretProject}=await import('/src/project-files.js');

@@ -7,7 +7,7 @@ export const VIEWPORT_DEFAULTS=Object.freeze({
   lighting:'STUDIO',studioLight:'Default',matcap:'Red Wax',background:'WORLD',backgroundColor:'#0d0d0d',
   backfaceCulling:true,objectOutline:true,outlineColor:'#000000',specular:true,
   xray:false,xrayAlpha:.5,shadows:true,shadowIntensity:.5,dof:false,focusDistance:10,aperture:2.8,
-  focalLength:50,clipStart:.01,clipEnd:1000
+  focalLength:50,clipStart:.01,clipEnd:1000000
 });
 const enums={shading:['WIREFRAME','SOLID','MATERIAL','RENDERED'],lighting:['STUDIO','MATCAP'],background:['THEME','WORLD','VIEWPORT'],studioLight:['Default'],matcap:['Red Wax']};
 const ranges={axisLength:[.001,1e12],axisWidth:[.5,12],axisBrightness:[0,4],ambientStrength:[0,4],ambientDetail:[0,1],gridScale:[.001,1000],wireThreshold:[0,1],wireOpacity:[0,1],xrayAlpha:[0,1],shadowIntensity:[0,1],focusDistance:[.001,1e7],aperture:[.1,64],focalLength:[1,300],clipStart:[.0001,1e6],clipEnd:[.001,1e7]};
@@ -24,7 +24,7 @@ export function ensureViewportOptions(view){
     const v=value[key];
     if(enums[key]?!enums[key].includes(v):ranges[key]?(!Number.isFinite(v)||v<ranges[key][0]||v>ranges[key][1]):typeof fallback==='boolean'?typeof v!=='boolean':!/^#[\da-f]{6}$/i.test(v))value[key]=fallback;
   }
-  if(value.clipEnd<=value.clipStart){value.clipStart=.01;value.clipEnd=1000;}
+  if(value.clipEnd<=value.clipStart){value.clipStart=VIEWPORT_DEFAULTS.clipStart;value.clipEnd=VIEWPORT_DEFAULTS.clipEnd;}
   view.wire=value.shading==='WIREFRAME';
   return value;
 }

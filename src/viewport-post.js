@@ -1,3 +1,4 @@
+import {diagnosticRender} from './performance-diagnostics.js';
 import * as THREE from './vendor/three.module.js';
 // Each viewport retains its targets while all viewports share one GPU context.
 // Avorion PostProcessing/brightnesspass.frag: subtract the threshold, then cap
@@ -139,34 +140,34 @@ export function createViewportPost(samples=4,hdr=false){
     selectionMap:{value:mask.texture},projection:{value:new THREE.Matrix4()},projectionInverse:{value:new THREE.Matrix4()},radius:{value:1},tileOrigin:{value:new THREE.Vector2()},kernel:{value:AO_KERNEL}}});
   const aoBlur=new THREE.ShaderMaterial({depthTest:false,depthWrite:false,vertexShader:QUAD_VERTEX,fragmentShader:AO_BLUR,uniforms:{...depthUniforms(),source:{value:null}}});
   const aoTargets=[0,1].map(()=>new THREE.WebGLRenderTarget(1,1,{depthBuffer:false}));
-  const renderAO=(renderer,sourceCamera,u,radius)=>{
+  const renderAO=(renderer,sourceCamera,u,radius,sample)=>{
     for(const m of [aoPass,aoBlur])for(const k of ['nearPlane','farPlane','logDepth','perspective','pixel'])m.uniforms[k].value=u[k].value;
     aoPass.uniforms.projection.value.copy(sourceCamera.projectionMatrix);aoPass.uniforms.projectionInverse.value.copy(sourceCamera.projectionMatrixInverse);aoPass.uniforms.radius.value=radius;
-    quad.material=aoPass;renderer.setRenderTarget(aoTargets[0]);renderer.render(scene,camera);
-    aoBlur.uniforms.source.value=aoTargets[0].texture;quad.material=aoBlur;renderer.setRenderTarget(aoTargets[1]);renderer.render(scene,camera);
+    quad.material=aoPass;renderer.setRenderTarget(aoTargets[0]);diagnosticRender(renderer,scene,camera,'ambient occlusion',sample);
+    aoBlur.uniforms.source.value=aoTargets[0].texture;quad.material=aoBlur;renderer.setRenderTarget(aoTargets[1]);diagnosticRender(renderer,scene,camera,'AO blur',sample);
     quad.material=material;
   };
   const levelTarget=()=>new THREE.WebGLRenderTarget(1,1,{type:hdr?THREE.HalfFloatType:THREE.UnsignedByteType,depthBuffer:false});
   const levels=Array.from({length:BLOOM_LEVELS},()=>({target:levelTarget(),scratch:levelTarget()}));
-  const run=(renderer,program,source,output)=>{program.uniforms.source.value=source;quad.material=program;renderer.setRenderTarget(output);renderer.render(scene,camera);};
+  const run=(renderer,program,source,output,sample)=>{program.uniforms.source.value=source;quad.material=program;renderer.setRenderTarget(output);diagnosticRender(renderer,scene,camera,'bloom',sample);};
   // Each level halves the previous one, so the four blurs widen together.
-  const renderBloom=(renderer,threshold,scale=1,source=target.texture)=>{
+  const renderBloom=(renderer,threshold,scale=1,source=target.texture,sample)=>{
     bright.uniforms.threshold.value=threshold;
     levels.forEach((level,i)=>{
-      if(i===0)run(renderer,bright,source,level.target);else run(renderer,copy,levels[i-1].target.texture,level.target);
-      blur.uniforms.texelStep.value.set(scale/level.target.width,0);run(renderer,blur,level.target.texture,level.scratch);
-      blur.uniforms.texelStep.value.set(0,scale/level.target.height);run(renderer,blur,level.scratch.texture,level.target);
+      if(i===0)run(renderer,bright,source,level.target,sample);else run(renderer,copy,levels[i-1].target.texture,level.target,sample);
+      blur.uniforms.texelStep.value.set(scale/level.target.width,0);run(renderer,blur,level.target.texture,level.scratch,sample);
+      blur.uniforms.texelStep.value.set(0,scale/level.target.height);run(renderer,blur,level.scratch.texture,level.target,sample);
     });
     quad.material=material;
   };
-  return {target,mask,dispose(){bloomSourceTarget?.dispose();target.dispose();mask.dispose();material.dispose();quad.geometry.dispose();for(const m of [bright,blur,copy,aoPass,aoBlur])m.dispose();aoTargets.forEach(t=>t.dispose());for(const l of levels){l.target.dispose();l.scratch.dispose();}},draw(renderer,sourceCamera,d,useLog,p,selected,outputTarget=null,output=null,renderBloomSource=null){
+  return {target,mask,dispose(){bloomSourceTarget?.dispose();target.dispose();mask.dispose();material.dispose();quad.geometry.dispose();for(const m of [bright,blur,copy,aoPass,aoBlur])m.dispose();aoTargets.forEach(t=>t.dispose());for(const l of levels){l.target.dispose();l.scratch.dispose();}},draw(renderer,sourceCamera,d,useLog,p,selected,outputTarget=null,output=null,renderBloomSource=null,sample){
     const u=material.uniforms;u.preserveAlpha.value=output?.transparent?1:0;u.sampleScale.value=d.imageSampleScale||1;u.pixel.value.set(1/target.width,1/target.height);u.nearPlane.value=sourceCamera.near;u.farPlane.value=sourceCamera.far;u.logDepth.value=useLog;
     u.perspective.value=sourceCamera.isPerspectiveCamera?1:0;u.focus.value=d.focusDistance;u.blurStrength.value=d.dof&&d.shading==='RENDERED'?20/d.aperture:0;
     u.cavity.value=d.ambientOnly&&d.shading!=='WIREFRAME'&&!d.xray&&p.shaderDebug===0?(d.ambientDetail??.35):0;
     u.outline.value=d.objectOutline?1:0;u.selected.value=selected?1:0;u.outlineColor.value.setStyle(d.outlineColor,THREE.LinearSRGBColorSpace);u.selectionColor.value.setStyle(p.accent,THREE.LinearSRGBColorSpace);
     const ao=aoActive(d,p)?p.shaderAO:0;u.ao.value=ao;
     aoPass.uniforms.tileOrigin.value.set(output?.tile?.x||0,output?.tile?(output.fullHeight-output.tile.y-output.tile.height):0);
-    if(ao>0){renderAO(renderer,sourceCamera,u,p.shaderAORadius);u.aoMap.value=aoTargets[1].texture;}
+    if(ao>0){renderAO(renderer,sourceCamera,u,p.shaderAORadius,sample);u.aoMap.value=aoTargets[1].texture;}
     const bloom=bloomActive(d,p)?p.shaderBloom:0;u.bloom.value=bloom;
     if(bloom>0){
       let source=target.texture;
@@ -175,8 +176,8 @@ export function createViewportPost(samples=4,hdr=false){
         bloomSourceTarget.samples=samples;bloomSourceTarget.setSize(target.width,target.height);
         renderer.setRenderTarget(bloomSourceTarget);renderBloomSource();source=bloomSourceTarget.texture;
       }
-      renderBloom(renderer,p.shaderBloomThreshold,d.imageSampleScale||1,source);levels.forEach((level,i)=>{u['bloomMap'+(i+1)].value=level.target.texture;});}
-    renderer.setRenderTarget(outputTarget);renderer.render(scene,camera);
+      renderBloom(renderer,p.shaderBloomThreshold,d.imageSampleScale||1,source,sample);levels.forEach((level,i)=>{u['bloomMap'+(i+1)].value=level.target.texture;});}
+    renderer.setRenderTarget(outputTarget);diagnosticRender(renderer,scene,camera,'post composite',sample);
   },resize(w,h){if(target.width!==w||target.height!==h){target.setSize(w,h);mask.setSize(w,h);aoTargets.forEach(t=>t.setSize(w,h));
     levels.forEach((level,i)=>{const lw=Math.max(1,w>>(i+1)),lh=Math.max(1,h>>(i+1));level.target.setSize(lw,lh);level.scratch.setSize(lw,lh);});}}};
 }

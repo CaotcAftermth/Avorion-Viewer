@@ -1,3 +1,4 @@
+import {diagnosticStart,diagnosticEnd,diagnosticClock,diagnosticPhase,diagnosticAllocation,diagnosticTypedBytes,diagnosticSnapshotBytes} from '../performance-diagnostics.js';
 import {mountImageExport} from './image-dialog.js';
 import {EXPORT_FORMATS,captureExport} from './snapshot.js';
 import {thinBlockThreshold} from '../ship-structure.js';
@@ -80,7 +81,13 @@ export function openExportDialog(scene,view,onHighlight,context={}){
 
  function setBusy(value){busy=value;controls.querySelectorAll('input,select,button').forEach(n=>n.disabled=value);prepare.disabled=value;prepare.title=value?'Wait for processing, or cancel it first.':'';cancel.hidden=!value;progress.hidden=!value;if(!value){fields.regionId.disabled=options.scope!=='region';fields.tolerance.disabled=options.mode!=='shell';fields.mode.disabled=false;}disabledReasons();}
 
- function invalidate(){if(busy)return;worker?.terminate();worker=null;result=null;preview?.dispose();preview=null;d.querySelector('.export-preview').hidden=true;download.disabled=true;summary.textContent=autoPrepare()?'Preparing automatically when settings change.':'Press Prepare & Validate to build and check the printable mesh before download.';status.textContent='';for(const choice of fields.mode.options){choice.textContent=choice.value==='grouped'?(options.format==='stl'?'Visual STL (block surfaces)':'Editable grouped mesh'):choice.value==='detailed'?(options.format==='stl'?'Visual STL (individual blocks)':'Individual blocks'):'Printable exterior shell';}fields.mode.disabled=false;fields.regionId.disabled=options.scope!=='region';fields.tolerance.disabled=options.mode!=='shell';d.querySelector('.export-description').textContent=`${options.format.toUpperCase()} · ${EXPORT_FORMATS[options.format]} · ${options.sizing==='native'?'real scale, 1 unit = 1 m':options.longest+' mm longest dimension'}`;applies();disabledReasons();}
+ let prepareOperation,downloadOperation,releaseSnapshot,releaseWorkerPayload,releasePrepared,releasePreview;
+ function releaseJob(cancel=false){
+  if(cancel){diagnosticEnd(prepareOperation,'cancelled');diagnosticEnd(downloadOperation,'cancelled');}
+  releaseWorkerPayload?.();releaseWorkerPayload=null;releasePrepared?.();releasePrepared=null;releasePreview?.();releasePreview=null;
+  prepareOperation=downloadOperation=null;
+ }
+ function invalidate(){if(busy)return;releaseJob();worker?.terminate();worker=null;result=null;preview?.dispose();preview=null;d.querySelector('.export-preview').hidden=true;download.disabled=true;summary.textContent=autoPrepare()?'Preparing automatically when settings change.':'Press Prepare & Validate to build and check the printable mesh before download.';status.textContent='';for(const choice of fields.mode.options){choice.textContent=choice.value==='grouped'?(options.format==='stl'?'Visual STL (block surfaces)':'Editable grouped mesh'):choice.value==='detailed'?(options.format==='stl'?'Visual STL (individual blocks)':'Individual blocks'):'Printable exterior shell';}fields.mode.disabled=false;fields.regionId.disabled=options.scope!=='region';fields.tolerance.disabled=options.mode!=='shell';d.querySelector('.export-description').textContent=`${options.format.toUpperCase()} · ${EXPORT_FORMATS[options.format]} · ${options.sizing==='native'?'real scale, 1 unit = 1 m':options.longest+' mm longest dimension'}`;applies();disabledReasons();}
 
  function recovery(data){
   const panel=el('section');panel.className='export-recovery';panel.append(el('h4','Resolve export issues'));const area=el('div');area.className='export-result-buttons';panel.append(area);
@@ -102,8 +109,14 @@ export function openExportDialog(scene,view,onHighlight,context={}){
   if(options.mode==='shell'&&data.summary&&!data.downloadable)panel.append(el('p','Shell errors without source attribution cannot be safely fixed by deleting arbitrary faces. Try the zero/thin filter, adjust Solid tolerance, or narrow Export scope, then Prepare & Validate again. Download remains blocked until validation passes.'));
   summary.prepend(panel);
  }
- function showError(data){reportError(data.message,'EXPORT');worker?.terminate();worker=null;result=null;setBusy(false);download.disabled=true;summary.replaceChildren(el('p',data.message));status.textContent=data.message;recovery(data);disabledReasons();}
- function showResult(data){result=data;summary.replaceChildren();
+ function showError(data){diagnosticEnd(prepareOperation,'failed');diagnosticEnd(downloadOperation,'failed');releaseJob();reportError(data.message,'EXPORT');worker?.terminate();worker=null;result=null;setBusy(false);download.disabled=true;summary.replaceChildren(el('p',data.message));status.textContent=data.message;recovery(data);disabledReasons();}
+ function showResult(data){
+  if(prepareOperation){
+   const preparedBytes=diagnosticTypedBytes(data.preview?.geometries);
+   releasePreview=diagnosticAllocation('retainedPreviewGeometry',preparedBytes,'mesh preview clone',prepareOperation);
+   diagnosticEnd(prepareOperation,data.downloadable?'completed':'failed',{objects:data.summary.Objects,triangles:data.summary.Triangles,previewCloneBytes:preparedBytes});
+  }
+  result=data;summary.replaceChildren();
   const failed=!data.downloadable||data.summary['Mesh validation']==='Failed',s=data.summary;
   // Preview first, then a one-line verdict. Full diagnostics sit behind Details.
   const host=d.querySelector('.export-preview'),mount=()=>{host.hidden=false;preview?.dispose();preview=mountExportPreview(host,data.preview);};
@@ -119,6 +132,7 @@ export function openExportDialog(scene,view,onHighlight,context={}){
  }
 
  prepare.onclick=()=>{try{
+  releaseJob();prepareOperation=diagnosticStart('export preparation',options.format,scene.model?.blocks.length,options);
 
   if(!Number.isFinite(options.longest)||options.longest<.001||options.longest>1e6)throw Error('Longest dimension must be 0.001 to 1,000,000 mm.');
 
@@ -126,21 +140,39 @@ export function openExportDialog(scene,view,onHighlight,context={}){
 
   if(options.mode==='shell'&&(!Number.isFinite(options.tolerance)||options.tolerance<0||options.tolerance>options.longest*.01))throw Error('Solid tolerance must be 0 to 1% of the longest dimension.');
 
-  clearTimeout(autoTimer);save();snapshot=captureExport(scene,view,options);worker?.terminate();preview?.dispose();preview=null;d.querySelector('.export-preview').hidden=true;summary.textContent='Processing export snapshot...';result=null;download.disabled=true;setBusy(true);progress.value=0;status.textContent='Capturing model snapshot…';
+  clearTimeout(autoTimer);save();const started=diagnosticClock();snapshot=captureExport(scene,view,options);
+  releaseSnapshot?.();releaseSnapshot=null;let snapshotBytes;
+  if(prepareOperation){
+   snapshotBytes=diagnosticSnapshotBytes(snapshot.blocks);
+   diagnosticPhase('export snapshot created',prepareOperation,started,{blocks:snapshot.blocks.length,estimatedPayloadBytes:snapshotBytes});
+   releaseSnapshot=diagnosticAllocation('estimatedSnapshot',snapshotBytes,'mesh snapshot',prepareOperation);
+  }worker?.terminate();preview?.dispose();preview=null;d.querySelector('.export-preview').hidden=true;summary.textContent='Processing export snapshot...';result=null;download.disabled=true;setBusy(true);progress.value=0;status.textContent='Capturing model snapshot…';
 
   const job=new Worker(new URL('./worker.js',import.meta.url),{type:'module'});worker=job;worker.onerror=e=>{if(worker!==job)return;showError({message:e.message});};
 
-  worker.onmessage=({data})=>{if(worker!==job)return;if(data.type==='progress'){progress.value=data.percent;status.textContent=data.message;}else if(data.type==='error'){showError(data);}else if(data.type==='ready'){setBusy(false);showResult(data.result);}else if(data.type==='file'){const url=URL.createObjectURL(new Blob([data.bytes],{type:data.mime})),a=el('a');a.href=url;a.download=data.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);setBusy(false);download.disabled=false;status.textContent='Export downloaded.';}};
+  worker.onmessage=({data})=>{if(worker!==job)return;if(data.type==='diagnostic'){
+   const op=downloadOperation||prepareOperation;
+   diagnosticPhase(data.phase,op,undefined,data.metrics);
+   if(data.phase==='export worker prepared')releasePrepared=diagnosticAllocation('preparedExportGeometry',data.metrics.payloadBytes,'export worker',op);
+  }else if(data.type==='progress'){progress.value=data.percent;status.textContent=data.message;}else if(data.type==='error'){releaseWorkerPayload?.();showError(data);}else if(data.type==='ready'){releaseWorkerPayload?.();setBusy(false);showResult(data.result);}else if(data.type==='file'){
+    const blob=new Blob([data.bytes],{type:data.mime}),url=URL.createObjectURL(blob),a=el('a');
+    const release=downloadOperation&&diagnosticAllocation('encodedExportOutput',blob.size,'mesh download',downloadOperation);
+    diagnosticEnd(downloadOperation,'completed',{blobBytes:blob.size,transferBytes:data.bytes.byteLength});
+    a.href=url;a.download=data.name;a.click();setTimeout(()=>{URL.revokeObjectURL(url);release?.();},30000);setBusy(false);download.disabled=false;status.textContent='Export downloaded.';}};
 
-  worker.postMessage({type:'prepare',snapshot,options:{...options,unitScale:options.sizing==='native'?1000:0}});
+  if(prepareOperation){
+   releaseWorkerPayload=diagnosticAllocation('exportWorkerPayload',snapshotBytes,'mesh snapshot clone estimate',prepareOperation);
+   diagnosticPhase('export worker dispatched',prepareOperation,undefined,{estimatedCloneBytes:snapshotBytes});
+  }
+  worker.postMessage({type:'prepare',snapshot,diagnostics:!!prepareOperation,options:{...options,unitScale:options.sizing==='native'?1000:0}});
 
  }catch(e){showError({message:e.message,issueIds:e.issueIds});}};
 
- download.onclick=()=>{if(!result||!worker)return;setBusy(true);download.disabled=true;status.textContent='Writing file…';worker.postMessage({type:'download'});};
+ download.onclick=()=>{if(!result||!worker)return;downloadOperation=diagnosticStart('export',options.format,scene.model?.blocks.length,options);setBusy(true);download.disabled=true;status.textContent='Writing file…';worker.postMessage({type:'download'});};
 
- cancel.onclick=()=>{worker?.terminate();worker=null;result=null;setBusy(false);download.disabled=true;status.textContent='Cancelled. The working model was not changed.';};
+ cancel.onclick=()=>{releaseJob(true);worker?.terminate();worker=null;result=null;setBusy(false);download.disabled=true;status.textContent='Cancelled. The working model was not changed.';};
 
- d.addEventListener('close',()=>{clearTimeout(autoTimer);imageExport.dispose();worker?.terminate();worker=null;preview?.dispose();d.remove();},{once:true});document.body.append(d);sync();invalidate();d.showModal();if(context.imageType)tabs.querySelectorAll('button')[1].click();else schedule();
+ d.addEventListener('close',()=>{clearTimeout(autoTimer);imageExport.dispose();releaseJob(true);releaseSnapshot?.();worker?.terminate();worker=null;preview?.dispose();d.remove();},{once:true});document.body.append(d);sync();invalidate();d.showModal();if(context.imageType)tabs.querySelectorAll('button')[1].click();else schedule();
 
 }
 

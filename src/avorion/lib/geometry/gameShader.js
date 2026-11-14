@@ -35,8 +35,15 @@ export const FLAG_TRANSLUCENT = 4;
 export const FLAG_CUTOUT = 8;
 export const FLAG_OVERLAY_SECONDARY = 16;
 const VERT = /* glsl */ `
-#ifdef BLOCK_INSTANCED
+#ifdef BLOCK_CANONICAL_ENDPOINTS
+attribute vec4 aOffset;
+attribute vec4 aScale;
+attribute vec4 aMaterialLayers;
+#elif defined(BLOCK_INSTANCED)
 attribute vec3 aOffset;
+#ifdef BLOCK_CANONICAL_BOX
+attribute vec3 aScale;
+#endif
 #endif
 // Vertex attributes are capped at 16 by WebGL, and some GPU drivers (ANGLE on
 // Windows) refuse a program that uses all 16. Keep this shader at 14 or fewer
@@ -55,10 +62,11 @@ attribute vec2 aFaceUV;
 attribute vec4 aSurface;  // physical face width/height, surface kind, overlay normal layer
 attribute vec4 aSide; // rest-space position and face side, packed to preserve attribute budget
 flat out float vSide;
-attribute vec4 aWindow;
-flat out vec4 vWindow;
 attribute vec4 aEmission; // rgb: material's default effect color; w: seam sides touching another block (bit per -X,+X,-Y,+Y,-Z,+Z)
-attribute vec3 aMaterialLayers; // plating accent and glow, independent of decals
+#ifndef BLOCK_CANONICAL_ENDPOINTS
+attribute vec3 aMaterialLayers;
+#endif
+// plating accent and glow, independent of decals
 flat out float vSeamFace;
 
 varying vec3 vTexturePosition;
@@ -76,11 +84,60 @@ flat out vec4 vSurface;
 flat out vec3 vEmission;
 flat out vec3 vMaterialLayers;
 
+#ifdef BLOCK_CANONICAL_ENDPOINTS
+vec3 endpointPoint(vec3 p) {
+  return mix(aScale.xyz, aOffset.xyz, lessThan(p, vec3(0.0)));
+}
+#endif
+#ifdef BLOCK_CANONICAL_DISCRETE
+vec3 nativeAxis(int code) {
+  vec3 axis=vec3(0.0);
+  axis[code/2]=(code%2==0)?-1.0:1.0;
+  return axis;
+}
+#endif
+#ifdef BLOCK_CANONICAL_WEDGE
+float wedgeCrease(float code, vec3 span) {
+  if (code < 2.0) return code;
+  int descriptor=int(code)-2;
+  vec3 slope=1.0/span;
+  slope[descriptor/3]=0.0;
+  return acos(-normalize(slope)[descriptor%3]) / 3.141592653589793;
+}
+#endif
 void main() {
   vBary=vec3(equal(vec3(floor(aEdges.w+.5)),vec3(0.,1.,2.)));vEdges=aEdges.xyz;
   vec3 blockPosition=position;
   vec3 texturePosition=aSide.xyz;
-  #ifdef BLOCK_INSTANCED
+  vec3 physicalNormal=normal;
+  float seamMask=aEmission.w;
+  #ifdef BLOCK_CANONICAL_DISCRETE
+  // Six ship-axis seam bits, followed by the integer look/up code.
+  int packedMetadata=int(seamMask);
+  int code=packedMetadata/64;
+  seamMask=float(packedMetadata%64);
+  vec3 look=nativeAxis(code/6), up=nativeAxis(code%6);
+  mat3 rotation=mat3(look,up,cross(look,up));
+  blockPosition=rotation*blockPosition;
+  texturePosition=rotation*texturePosition;
+  physicalNormal=rotation*physicalNormal;
+  #endif
+  #ifdef BLOCK_CANONICAL_ENDPOINTS
+  blockPosition=endpointPoint(blockPosition);
+  texturePosition=endpointPoint(texturePosition);
+  #ifdef BLOCK_CANONICAL_WEDGE
+  vec3 span=aScale.xyz-aOffset.xyz;
+  physicalNormal=normalize(physicalNormal/span);
+  #ifdef BLOCK_CANONICAL_DISCRETE
+  span=abs(transpose(rotation)*span);
+  #endif
+  vEdges=vec3(wedgeCrease(aEdges.x,span),wedgeCrease(aEdges.y,span),wedgeCrease(aEdges.z,span));
+  #endif
+  #elif defined(BLOCK_CANONICAL_BOX)
+  blockPosition*=aScale;
+  texturePosition*=aScale;
+  #endif
+  #if defined(BLOCK_INSTANCED) && !defined(BLOCK_CANONICAL_ENDPOINTS)
   blockPosition+=aOffset;
   texturePosition+=aOffset;
   #endif
@@ -88,21 +145,29 @@ void main() {
   vWorldPos = wp.xyz;
   vTexturePosition=texturePosition;
   vModelPos = blockPosition;
-  vWorldNormal = normalize(mat3(modelMatrix) * normal);
+  vWorldNormal = normalize(mat3(modelMatrix) * physicalNormal);
   vColor = aColor;
   vSecondary = aSecondary;
   vLayers = aLayers;
   vParams = aParams;
   vFaceUV = aFaceUV;
   vSurface = aSurface;
+  #ifdef BLOCK_CANONICAL_BOX
+  vSurface.xy = vec2(aScale[int(aSurface.x)], aScale[int(aSurface.y)]);
+  #elif defined(BLOCK_CANONICAL_ENDPOINTS)
+  vec3 extents=vec3(aOffset.w,aScale.w,aMaterialLayers.w);
+  #ifdef BLOCK_CANONICAL_DISCRETE
+  extents=abs(transpose(rotation)*extents);
+  #endif
+  vSurface.xy=vec2(extents[int(aSurface.x)],extents[int(aSurface.y)]);
+  #endif
   vSide = aSide.w;
-  vWindow = aWindow;
   vEmission = aEmission.rgb;
-  vMaterialLayers = aMaterialLayers;
+  vMaterialLayers = aMaterialLayers.xyz;
   // Flag axis-aligned faces pressed against a neighbouring block.
-  vec3 axisNormal = abs(normal);
-  float seamSide = axisNormal.x > .999 ? (normal.x > 0. ? 1. : 0.) : axisNormal.y > .999 ? (normal.y > 0. ? 3. : 2.) : axisNormal.z > .999 ? (normal.z > 0. ? 5. : 4.) : -1.;
-  vSeamFace = seamSide < 0. ? 0. : mod(floor(aEmission.w / exp2(seamSide) + .001), 2.);
+  vec3 axisNormal = abs(physicalNormal);
+  float seamSide = axisNormal.x > .999 ? (physicalNormal.x > 0. ? 1. : 0.) : axisNormal.y > .999 ? (physicalNormal.y > 0. ? 3. : 2.) : axisNormal.z > .999 ? (physicalNormal.z > 0. ? 5. : 4.) : -1.;
+  vSeamFace = seamSide < 0. ? 0. : mod(floor(seamMask / exp2(seamSide) + .001), 2.);
   gl_Position = projectionMatrix * viewMatrix * wp;
   #include <logdepthbuf_vertex>
 }
@@ -126,7 +191,6 @@ uniform float uTileScale;
 uniform float uExposure;
 uniform float uBlueprint,uLineScale;
 flat in float vSide;
-flat in vec4 vWindow;
 uniform vec3 uWindowColor;
 uniform float uWindowStrength;
 uniform vec3 uLightDir;
@@ -506,7 +570,7 @@ void main() {
   // Native housing window pass uses world plating coordinates / 8 and raw secondary alpha.
   if(surface == 26.0 && vLayers.w > 0.5) {
     vec4 windows=sampleTriScaled(uAux,vLayers.w,p,w,0.125);
-    vec3 windowColor=mix(uWindowColor,vWindow.rgb*2.5,vWindow.a);
+    vec3 windowColor=mix(uWindowColor,vSecondary.rgb*2.5,vSecondary.a);
     outc=mix(outc,uWindowStrength*windowColor*windows.rgb,windows.a);
   }
   // Keep a strong fill floor while revealing face angles with a fixed soft key.

@@ -1,3 +1,4 @@
+import {diagnosticClock,diagnosticPhase,diagnosticAllocation} from './performance-diagnostics.js';
 import {leaves, validateState} from './layout.js';
 import {parsePreferences, PREFERENCE_SECTIONS} from './preferences.js';
 import {restoreModel, snapshotModel} from './session-persistence.js';
@@ -46,19 +47,24 @@ export async function readSaveFile(file){
   });
 }
 
-export function writeSaveFile(record){
-  const blob=new Blob([JSON.stringify(record,null,2)],{type:'application/json'});
+export function writeSaveFile(record,operation){
+  const started=operation&&diagnosticClock(),serialized=JSON.stringify(record,null,2);
+  const blob=new Blob([serialized],{type:'application/json'});
+  if(operation)diagnosticPhase('project serialization',operation,started,{jsonCodeUnits:serialized.length,blobBytes:blob.size});
   if(blob.size>MAX_FILE_SIZE)throw Error('Save files must be 128 MiB or smaller.');
   return blob;
 }
 
-export function downloadSave(record,name,extension){
-  const url=URL.createObjectURL(writeSaveFile(record));
+export function downloadSave(record,name,extension,operation){
+  const start=diagnosticClock(),blob=writeSaveFile(record,operation);
+  if(operation)diagnosticPhase('project encoded',operation,start,{blobBytes:blob.size});
+  const release=operation&&diagnosticAllocation('encodedExportOutput',blob.size,'project download',operation);
+  const url=URL.createObjectURL(blob);
   const anchor=document.createElement('a');
   anchor.href=url;
   anchor.download=documentFileName(name,extension);
   anchor.click();
-  setTimeout(()=>URL.revokeObjectURL(url),30000);
+  setTimeout(()=>{URL.revokeObjectURL(url);release?.();},30000);
 }
 
 export function captureProject(scene,project){
@@ -219,7 +225,7 @@ export function captureProfile(name,layout,preferences){
   if(!named(name)||!validateState(layout))throw Error('Invalid workspace name or layout.');
   const copy=structuredClone(layout),settings={},shaders={};
   for(const [key,value] of Object.entries(preferences)){
-    if(key==='version')continue;
+    if(key==='version'||key==='rendererMode')continue;
     (SHADERS.has(key)?shaders:settings)[key]=value;
   }
   for(const workspace of copy.workspaces)for(const node of leaves(workspace.root)){

@@ -1,3 +1,4 @@
+import {diagnosticStart,diagnosticEnd,diagnosticFailure,diagnosticPhase,diagnosticFrame} from '../performance-diagnostics.js';
 import {visibleFrameBlocks} from '../model-framing.js';
 import {GIF_MAX_SIDE,GIF_MAX_FRAME_PIXELS} from './gif-limits.js';
 import {exportImage,imageView} from './image-pipeline.js';
@@ -48,8 +49,18 @@ export function turntableCamera(snapshot,o){
   return view;
 }
 
-export async function exportTurntable(snapshot,o,{signal,onProgress=()=>{}}={}){
+export function exportTurntable(snapshot,o,options={}){
+  const operation=diagnosticStart(options.preview?'image preview':'export','gif',snapshot.scene.model.blocks.length,o);
+  const result=renderTurntable(snapshot,o,options,operation);
+  if(!operation)return result;
+  return result.then(value=>{
+    diagnosticEnd(operation,'completed',{blobBytes:value.blob.size});
+    return value;
+  },error=>{diagnosticFailure(operation,error);throw error;});
+}
+async function renderTurntable(snapshot,o,{signal,onProgress=()=>{}},operation){
   const {frames}=validateTurntable(o,snapshot.scene.model.blocks.length),owner={};
+  if(operation)diagnosticPhase('animation planned',operation,undefined,{frames});
   const view=turntableCamera(snapshot,o),yaw=view.yaw,encoder=new GifEncoder(o.width,o.height,o.background==='solid'?o.backgroundColor:null,o.background==='transparent');
   const frameSnapshot={...snapshot,preferences:{...snapshot.preferences,...(o.background==='solid'?{vignetteEnabled:false}:{})},view,size:{width:o.width,height:o.height}};
   const frameOptions={...o,type:'viewport',format:'png',camera:'current',projection:'current',framing:'contain',gizmos:false,labels:false};
@@ -59,9 +70,12 @@ export async function exportTurntable(snapshot,o,{signal,onProgress=()=>{}}={}){
     check();await beginImageRender(owner,signal);acquired=true;
     for(let i=0;i<frames;i++){
       check();view.yaw=yaw+(o.direction==='clockwise'?1:-1)*2*Math.PI*i/frames;
-      const frame=await exportImage(frameSnapshot,frameOptions,{signal,renderOwner:owner,encode:false});lastCanvas=frame.canvas;
+      const start=operation&&performance.now();
+      const frame=await exportImage(frameSnapshot,frameOptions,{signal,renderOwner:owner,encode:false,operation});lastCanvas=frame.canvas;
+      const encodeStart=operation&&performance.now();
       check();const rgba=lastCanvas.getContext('2d').getImageData(0,0,o.width,o.height).data;
       encoder.addFrame(rgba,Math.round((i+1)*100/o.fps)-Math.round(i*100/o.fps));
+      if(operation)diagnosticFrame(operation,encodeStart-start,performance.now()-encodeStart,encoder.bytes);
       if(encoder.bytes>Math.min(128*1024**2,o.budget*1024**2/4))throw Error('GIF output exceeds the memory limit. Reduce resolution or duration.');
       if(i<frames-1){lastCanvas.width=lastCanvas.height=1;lastCanvas=null;}
       onProgress(Math.round((i+1)/frames*100),`Rendering GIF frame ${i+1} / ${frames}...`);

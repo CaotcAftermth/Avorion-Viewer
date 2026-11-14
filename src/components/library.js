@@ -1,3 +1,4 @@
+import {diagnosticDownload} from '../performance-diagnostics.js';
 import {revisedAsset} from '../attachments/lifecycle.js';
 import {thumbnail} from '../turrets/thumbnail.js';
 import {importComponent,validateComponent} from './core.js';
@@ -49,7 +50,7 @@ export function mountComponentLibrary(host,changed){
   const tools=document.createElement('div');tools.className='component-library-tools';host.append(tools);
   const search=document.createElement('input');search.type='search';search.placeholder='Search components';search.setAttribute('aria-label','Search components');search.value=componentLibrary.query;search.dataset.componentTool='search';search.oninput=()=>{componentLibrary.query=search.value;draw();};
   const exportPack=document.createElement('button');exportPack.type='button';exportPack.textContent='Export pack';exportPack.title='Save the components shown here as a pack file';exportPack.disabled=!componentLibrary.assets.length;
-  exportPack.onclick=()=>{const list=filteredComponents();const url=URL.createObjectURL(new Blob([componentPackFile(list)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='avorion-components.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+  exportPack.onclick=()=>diagnosticDownload('component pack',undefined,()=>{const list=filteredComponents(),blob=new Blob([componentPackFile(list)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='avorion-components.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return blob;});
   const importPack=document.createElement('button');importPack.type='button';importPack.textContent='Import pack';importPack.title='Add components from a pack file';
   const packInput=document.createElement('input');packInput.type='file';packInput.accept='.json';packInput.hidden=true;importPack.onclick=()=>packInput.click();
   packInput.onchange=async()=>{const file=packInput.files[0];if(!file)return;busy=true;error='';draw();try{const {added,skipped}=await importComponentPack(await file.text());error=`Imported ${added} component${added===1?'':'s'}${skipped?`, skipped ${skipped} already in the library`:''}.`;changed();}catch(e){error=e.message;}finally{busy=false;draw();}};

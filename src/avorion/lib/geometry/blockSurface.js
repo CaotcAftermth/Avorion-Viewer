@@ -68,12 +68,22 @@ export function hangarPositions(size) {
         for(let axis=0;axis<3;axis++)[out[i+3+axis],out[i+6+axis]]=[out[i+6+axis],out[i+3+axis]];
     return new THREE.Float32BufferAttribute(out, 3);
 }
+function unitPositions(typeIndex, scale) {
+    return typeIndex === 10 ? hangarPositions(scale)
+        : getUnitGeometry(getBlockDefinition(typeIndex).geometryKind).getAttribute("position");
+}
+
+// Hangar dimensions change the rim, while the number of quads is fixed.
+const hangarVertexCount = hangarPositions({x:1,y:1}).count;
+export function blockSurfaceVertexCount(typeIndex) {
+    return typeIndex === 10 ? hangarVertexCount : unitPositions(typeIndex).count;
+}
+
 /** Bake face-local UVs alongside the existing ship-space positions. */
 export function blockSurfaceGeometry(block, profile) {
     const { quaternion, base } = resolveOrientation(profile, block.look, block.up, block.typeIndex);
     const scale = localScaleFor(base, block.size);
-    const unit = block.typeIndex === 10 ? hangarPositions(scale)
-        : getUnitGeometry(getBlockDefinition(block.typeIndex).geometryKind).getAttribute("position");
+    const unit = unitPositions(block.typeIndex, scale);
     const matrix = new THREE.Matrix4().compose(new THREE.Vector3(block.position.x, block.position.y, block.position.z), quaternion, scale);
     const positions = new Float32Array(unit.count * 3), uv = new Float32Array(unit.count * 2);
     const faces = new Float32Array(unit.count * 3); // physical face width, height, local side

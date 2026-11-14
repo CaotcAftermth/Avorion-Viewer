@@ -1,3 +1,4 @@
+import {diagnosticClock,diagnosticEvent,diagnosticPhase} from '../../../performance-diagnostics.js';
 import { getBlockDefinition, getMaterial } from "./blockDefinitions.js";
 const KNOWN_ATTRS = new Set([
     "index", "material", "look", "up", "color",
@@ -25,7 +26,11 @@ function num(el, name, fallback = 0) {
 }
 export function parseAvorionXml(xmlText, fileName, fileSize) {
     const warnings = [];
+    const domStarted=diagnosticClock();
+    if(domStarted!==undefined)diagnosticEvent("XML DOM parse started");
     const doc = new DOMParser().parseFromString(xmlText, "application/xml");
+    if(domStarted!==undefined)diagnosticPhase("XML DOM parsed",null,domStarted,{inputBytes:fileSize});
+    const extractionStarted=diagnosticClock();
     const parseErr = doc.querySelector("parsererror");
     if (parseErr) {
         throw new Error("This file is not valid XML. " + (parseErr.textContent?.slice(0, 160) ?? ""));
@@ -70,9 +75,10 @@ export function parseAvorionXml(xmlText, fileName, fileSize) {
         const itemEl = el.parentElement?.tagName === "item" ? el.parentElement : undefined;
         const parentAttr = itemEl?.getAttribute("parent") ?? undefined;
         const unknownAttrs = {};
-        for (const a of Array.from(el.attributes)) {
-            if (!KNOWN_ATTRS.has(a.name))
-                unknownAttrs[a.name] = a.value;
+        // Enumerating Attr objects materializes native nodes for the retained XML document.
+        for (const name of el.getAttributeNames()) {
+            if (!KNOWN_ATTRS.has(name))
+                unknownAttrs[name] = el.getAttribute(name);
         }
         const block = {
             id: `b${i}`,
@@ -121,6 +127,7 @@ export function parseAvorionXml(xmlText, fileName, fileSize) {
         warnings.push({ level: "info", message: "Large model: GPU geometry and texture memory usage may be substantial." });
     }
     warnings.push({ level: "info", message: `Parsed ${blocks.length} blocks from ${fileName}.` });
+    if(extractionStarted!==undefined)diagnosticPhase("logical blocks extracted",null,extractionStarted,{blocks:blocks.length,embeddedBlocks:turretBlocks});
     return {
         fileName,
         fileSize,

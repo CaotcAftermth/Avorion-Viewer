@@ -1,3 +1,4 @@
+import {diagnosticRender,diagnosticTarget} from './performance-diagnostics.js';
 import * as THREE from './vendor/three.module.js';
 import { WORLD_DEFAULTS, skyKey, skySpecification } from './sky-settings.js';
 
@@ -56,7 +57,7 @@ export function createSkybox(onReady=()=>{}){
   return {
     ready,
     get status(){return failed?'Sky textures unavailable':atlas?'Ready':'Loading sky textures';},
-    texture(renderer,preferences){
+    texture(renderer,preferences,sample){
       const p={...WORLD_DEFAULTS,...preferences};if(!p.worldEnabled||!atlas)return null;
       const next=skyKey(p);if(key===next&&target)return target.texture;
       const specification=skySpecification(p),u=uniforms;
@@ -67,10 +68,11 @@ export function createSkybox(onReady=()=>{}){
       for(const [name,value] of Object.entries({count:specification.clouds.length,nebula:p.worldNebula,highlights:p.worldHighlights,darkness:p.worldDarkClouds,dust:p.worldDust,density:specification.density,starBrightness:p.worldStars===0?0:p.worldStarBrightness,sun:p.worldSun,brightness:p.worldBrightness,seed:specification.offset}))u[name].value=value;
       const replacement=new THREE.WebGLCubeRenderTarget(p.worldResolution,{generateMipmaps:true,minFilter:THREE.LinearMipmapLinearFilter});
       const camera=new THREE.CubeCamera(.1,10,replacement),saved=renderer.getRenderTarget();
+      if(sample)diagnosticTarget(replacement,'sky cube');
       try{camera.update(renderer,scene);}catch(error){replacement.dispose();throw error;}finally{renderer.setRenderTarget(saved);}
       target?.dispose();target=replacement;key=next;return target.texture;
     },
-    orthographicBackground(renderer,texture,camera,width,height,focal,rotation,tile=null){
+    orthographicBackground(renderer,texture,camera,width,height,focal,rotation,tile=null,sample){
       // Cube backgrounds assume a perspective projection. Render the distant sky
       // separately, retaining camera orientation but ignoring position and zoom.
       flatTarget??=new THREE.WebGLRenderTarget(width,height);
@@ -80,7 +82,7 @@ export function createSkybox(onReady=()=>{}){
       flatCamera.clearViewOffset();flatCamera.fov=2*Math.atan(height/(2*focal))*180/Math.PI;flatCamera.updateProjectionMatrix();
       if(tile)flatCamera.setViewOffset(width,height,tile.x,tile.y,tile.width,tile.height);
       const saved=renderer.getRenderTarget();
-      try{renderer.setRenderTarget(flatTarget);renderer.render(flatScene,flatCamera);}finally{renderer.setRenderTarget(saved);}
+      try{renderer.setRenderTarget(flatTarget);diagnosticRender(renderer,flatScene,flatCamera,'orthographic sky',sample);}finally{renderer.setRenderTarget(saved);}
       return flatTarget.texture;
     },
     dispose(){flatTarget?.dispose();disposed=true;target?.dispose();atlas?.dispose();geometry.dispose();material.dispose();}

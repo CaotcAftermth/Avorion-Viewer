@@ -1,3 +1,4 @@
+import {diagnosticDownload} from '../performance-diagnostics.js';
 import {mountSocketName} from './socket-name.js';
 import {withoutSocket,assetAttachment} from './asset-sockets.js';
 import {propertyPanel,propertyDataRow,propertyNote,propertyAction} from '../property-ui.js';
@@ -14,7 +15,7 @@ export function mountComponentProperties(host,scene,changed,context=scene.attach
  const run=async task=>{if(busy)return;busy=true;try{await task();changed();}catch(error){status.textContent=error.message;}finally{busy=false;}};
  const action=(parent,label,task,disabled=false)=>propertyAction(parent,label,()=>run(task),disabled);
  const picker=(parent,label,options,value,task)=>{const row=document.createElement('label');row.className='field-row';row.textContent=label;const select=document.createElement('select');select.setAttribute('aria-label',label);for(const [id,name] of options)select.add(new Option(name,id));select.value=value??'';select.onchange=()=>task(select.value);row.append(select);parent.append(row);return select;};
- const download=(text,name,type)=>{const url=URL.createObjectURL(new Blob([text],{type})),link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+ const download=(text,name,type)=>{const blob=new Blob([text],{type}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return blob;};
  if(!componentLibrary.loaded&&!componentLibrary.error)loadComponentLibrary().then(changed).catch(error=>{status.textContent=error.message;});
  const draft=scene.componentAttachmentDraft;
  if(draft){
@@ -66,8 +67,8 @@ export function mountComponentProperties(host,scene,changed,context=scene.attach
  }
  if(draft){host.append(status);return;}
  const files=propertyPanel(host,'Ship Component Files');
- action(files,'Save Ship XML with Components',()=>{const {text}=bakeComponentsXml(scene);download(text,model.fileName.replace(/\.xml$/i,'')+'-with-components.xml','application/xml');},!setup.mounts.length);
- action(files,'Export Ship Component Setup (.json)',()=>download(componentSetupFile(model),model.fileName.replace(/\.xml$/i,'')+'-components.json','application/json'));
+ action(files,'Save Ship XML with Components',()=>diagnosticDownload('xml with components',model.blocks.length,()=>{const {text}=bakeComponentsXml(scene);return download(text,model.fileName.replace(/\.xml$/i,'')+'-with-components.xml','application/xml');}),!setup.mounts.length);
+ action(files,'Export Ship Component Setup (.json)',()=>diagnosticDownload('component setup',model.blocks.length,()=>download(componentSetupFile(model),model.fileName.replace(/\.xml$/i,'')+'-components.json','application/json')));
  action(files,'Import Ship Component Setup (.json)',()=>{const input=document.createElement('input');input.type='file';input.accept='.json';input.onchange=()=>run(async()=>{if(input.files[0])previewSetupImport(scene,parseComponentSetupFile(await input.files[0].text()),changed);});input.click();});
  propertyNote(files,'Sockets and attached components save locally with this ship. Ship XML writes a copy for Avorion; JSON backs up the editable setup.');
  host.append(status);

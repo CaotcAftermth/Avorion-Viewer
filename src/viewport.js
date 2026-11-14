@@ -23,7 +23,7 @@ import {modelExtents,dimensionRulers,exteriorRuler} from './model-overlays.js';
 import {gridSpacing} from './world-guides.js';
 import { frameVisibleModel } from './model-framing.js';
 import { shadeFace, REFERENCE_NORMALS } from './shading.js';
-import { imageRenderBusy, drawGame, pickGame, pickGamePoint, pickComponent, pickTurret, pickWeaponCoverage, socketExposed, releaseViewportResources, setPaintPreview } from './game-renderer.js';
+import { hullRendererStatus, imageRenderBusy, drawGame, pickGame, pickGamePoint, pickComponent, pickTurret, pickWeaponCoverage, socketExposed, releaseViewportResources, setPaintPreview } from './game-renderer.js';
 import { liveBlocks, simplified, viewportHiddenIds, engineEffectHiddenIds } from './ship-structure.js';
 import { selectCubeView } from './view-cube.js';
 import { matchesBinding, modifierActive, bindingFor, shortcutLabel } from './keymaps.js';
@@ -176,7 +176,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
       ctx.fillStyle='#83b6e522';ctx.strokeStyle='#9fc8ed';ctx.lineWidth=1;ctx.setLineDash([5,4]);
       ctx.fillRect(rect.x,rect.y,rect.width,rect.height);ctx.strokeRect(rect.x,rect.y,rect.width,rect.height);ctx.setLineDash([]);
     }
-    const footer=body.querySelector('[data-render-status]');if(footer){footer.textContent=scene.renderPreparing?'Preparing large model…':scene.renderError||'';footer.hidden=!footer.textContent;}
+    const footer=body.querySelector('[data-render-status]');if(footer){footer.textContent=scene.renderPreparing?'Preparing large model…':scene.renderError||hullRendererStatus(scene);footer.hidden=!footer.textContent;}
     const hint=body.querySelector('.region-zoom-hint');if(hint)hint.textContent='Zoom region · '+shortcutLabel(bindingFor('regionIn',preferences))+' in / '+shortcutLabel(bindingFor('regionOut',preferences))+' out · '+shortcutLabel(bindingFor('cancel',preferences))+' cancel';
     const label = body.querySelector('.view-label');
     if (label) label.textContent = viewLabel(view);

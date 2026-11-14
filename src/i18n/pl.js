@@ -1,6 +1,11 @@
 // Polski interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+  "Hull Renderer": "Renderer kadłuba",
+  "Canonical rendering reduces hull geometry memory on eligible blocks. The viewport shows the renderer actually used. A legacy URL override takes precedence.": "Renderowanie kanoniczne zmniejsza użycie pamięci geometrii zgodnych bloków. Widok pokazuje aktywny renderer. Opcja Legacy w adresie URL ma pierwszeństwo.",
+  "Default (Legacy)": "Domyślny (Legacy)",
+  "Canonical (Experimental)": "Kanoniczny (eksperymentalny)",
+  "Force Legacy": "Wymuś Legacy",
  "Thin Block Threshold": "Próg cienkich bloków",
  "A block is thin if any dimension is below this cutoff in native units.": "Blok jest cienki, jeśli którykolwiek jego wymiar w jednostkach natywnych jest mniejszy od tego progu.",
  "Select Sockets Target Azimuth": "Azymut celu wyboru gniazd",

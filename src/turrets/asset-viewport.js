@@ -1,3 +1,4 @@
+import {diagnosticStart,diagnosticEnd,diagnosticFailure,diagnosticDrawStart,diagnosticDrawEnd,diagnosticRender} from '../performance-diagnostics.js';
 import * as THREE from '../vendor/three.module.js';
 import {blockSurfaceGeometry} from '../avorion/lib/geometry/blockSurface.js';
 import {defaultOrientationProfile} from '../avorion/lib/avorion/orientationProfile.js';
@@ -69,7 +70,7 @@ export function createLabViewport(canvas,onSelect,onFace){
     renderer.setSize(w,h,false);
     const b=basis(view),m=metrics(view,w,h),right=vector(viewToNative(b.right)),up=vector(viewToNative(b.up)),back=vector(viewToNative(b.back));
     camera.position.copy(vector(viewToNative(view.target))).addScaledVector(back,m.distance);camera.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(right,up,back));
-    camera.near=Math.max(.001,m.distance/10000);camera.far=Math.max(1000,m.distance*100);camera.fov=2*Math.atan(h/(2*m.focal))*180/Math.PI;camera.aspect=w/h;camera.updateProjectionMatrix();camera.updateMatrixWorld();renderer.render(world,camera);
+    camera.near=Math.max(.001,m.distance/10000);camera.far=Math.max(1000,m.distance*100);camera.fov=2*Math.atan(h/(2*m.focal))*180/Math.PI;camera.aspect=w/h;camera.updateProjectionMatrix();camera.updateMatrixWorld();const sample=diagnosticDrawStart(canvas,'asset editor');diagnosticRender(renderer,world,camera,'asset editor',sample);if(sample)diagnosticDrawEnd(sample,renderer,world);
   }
   function fit(id){
     content.updateMatrixWorld(true);const bounds=new THREE.Box3();for(const child of content.children)if(!id||child.userData.instanceId===id)bounds.expandByObject(child);
@@ -91,8 +92,20 @@ export function createLabViewport(canvas,onSelect,onFace){
   listen('pointercancel',()=>drag=null);
   listen('wheel',e=>{e.preventDefault();zoom(view,Math.exp(-e.deltaY*.001));draw();},{passive:false});
   const observer=new ResizeObserver(draw);observer.observe(canvas.parentElement);
-  function png(){const visible=guides.visible;try{guides.visible=false;draw();return new Promise(resolve=>canvas.toBlob(resolve,'image/png'));}finally{guides.visible=visible;draw();}}
+  function png(){
+    const op=diagnosticStart('export','asset png'),visible=guides.visible;
+    try{
+      guides.visible=false;draw();
+      return new Promise(resolve=>canvas.toBlob(blob=>{diagnosticEnd(op,blob?'completed':'failed',{blobBytes:blob?.size,width:canvas.width,height:canvas.height});resolve(blob);},'image/png'));
+    }catch(error){diagnosticFailure(op,error);throw error;}
+    finally{guides.visible=visible;draw();}
+  }
   function stl(){
+    const op=diagnosticStart('export','asset stl');
+    try{const blob=assemblyStl();diagnosticEnd(op,'completed',{blobBytes:blob.size});return blob;}
+    catch(error){diagnosticFailure(op,error);throw error;}
+  }
+  function assemblyStl(){
     if(designOnly)throw Error('Switch off Design view to export the mounted assembly.');
     content.updateMatrixWorld(true);let count=0;for(const m of content.children)count+=m.geometry.getAttribute('position').count;if(count>3000000)throw Error('STL lab limit: one million triangles. Export a smaller assembly.');
     const chunks=['solid turret_lab\n'],a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3(),normal=new THREE.Vector3();

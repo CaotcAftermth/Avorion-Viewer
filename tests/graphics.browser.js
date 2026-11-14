@@ -12,9 +12,14 @@ const scene={model:makeModel([makeBlock()]),loaded:true,visible:true,selected:fa
 const view={...area().view,grid:false,projection:'orthographic'};
 function render(block=makeBlock(),p=settings){scene.model=makeModel([block]);scene.revision++;drawGame(ctx,scene,view,240,240,p,1);return [...ctx.getImageData(120,120,1,1).data];}
 await check('XML identity, ship-space bounds, legacy attributes, unknown data and turret preservation',()=>{
-  const xml='<plan custom="keep"><meta value="yes"/><item index="42" parent="-1"><block index="100" material="2" look="5" up="3" color="80ffffff" secondaryColor="40112233" lx="10" ly="20" lz="30" ux="12" uy="24" uz="38"/></item><item index="99" parent="42"><block index="9999" lowerX="12" lowerY="20" lowerZ="30" upperX="14" upperY="24" upperZ="38" extra="keep"/></item><turretDesign><plan><item><block index="3" lx="0" ly="0" lz="0" ux="1" uy="1" uz="1"/></item></plan></turretDesign></plan>';
+  const xml='<plan custom="keep"><meta value="yes"/><item index="42" parent="-1"><block index="100" material="2" look="5" up="3" color="80ffffff" secondaryColor="40112233" lx="10" ly="20" lz="30" ux="12" uy="24" uz="38"/></item><item index="99" parent="42"><block index="9999" lowerX="12" lowerY="20" lowerZ="30" upperX="14" upperY="24" upperZ="38" extra="keep" empty="" xmlns:mod="urn:test" mod:note="a &amp; b"/></item><turretDesign><plan><item><block index="3" lx="0" ly="0" lz="0" ux="1" uy="1" uz="1"/></item></plan></turretDesign></plan>';
   const m=parseAvorionXml(xml,'fixture.xml',xml.length);assert(m.blocks.length===2,'turret must not render at origin');assert(m.blocks[1].parentId==='b0','parent map uses item IDs');assert(m.blocks[1].position.x===13,'no parent transform');assert(m.blocks[0].color==='80ffffff','alpha');
   const saved=new XMLSerializer().serializeToString(m.doc),again=parseAvorionXml(saved,'roundtrip.xml',saved.length);
+  for(const model of [m,again]){
+    const attrs=model.blocks[1].unknownAttrs;
+    assert(attrs.extra==='keep'&&attrs.empty===''&&attrs['mod:note']==='a & b'&&attrs['xmlns:mod']==='urn:test','unknown attributes retain their names and values');
+    assert(!Object.hasOwn(attrs,'index'),'known attributes stay out of unknownAttrs');
+  }
   assert(saved.includes('extra="keep"')&&saved.includes('<turretDesign>')&&saved.includes('secondaryColor="40112233"')&&saved.includes('value="yes"'),'unknown XML must survive');assert(again.blocks[0].size.z===8,'world bounds');
 });
 await check('invalid XML rejects and malformed orientation produces diagnostics',()=>{
@@ -44,8 +49,32 @@ await check('crew windows emit after lighting and retain raw secondary alpha',as
   const image=document.createElement('canvas');image.width=image.height=4;const c=image.getContext('2d');c.fillStyle='white';c.fillRect(0,0,4,4);
   const blob=await new Promise(resolve=>image.toBlob(resolve));await textureLibrary.loadFiles([new File([blob],'plates0_windows.png',{type:'image/png'})]);
   const p={...settings,shaderAmbient:0,shaderSkyAmbient:0,shaderLight:0,shaderSpecular:0,shaderMinReflection:0,shaderMaxReflection:0,shaderWindowColor:'#0000ff',shaderWindows:1};
-  const base=render(makeBlock({typeIndex:6,secondaryColor:'00ff0000'}),p),red=render(makeBlock({typeIndex:6,secondaryColor:'ffff0000'}),p);
-  assert(base[2]>250&&base[0]<5,'zero-alpha secondary uses default window color');assert(red[0]>250&&red[2]<5,'opaque secondary controls unlit window emission');
+  const colors=[undefined,'00ff0000','80800000','ff800000'];
+  const [missing,zero,partial,opaque]=colors.map(secondaryColor=>render(makeBlock({typeIndex:6,secondaryColor}),p));
+  assert(missing.every((value,i)=>value===zero[i]),'missing and zero-alpha use the same default window color');
+  assert(zero[2]>250&&zero[0]<5,'zero-alpha secondary uses default window color');
+  assert(partial[0]>0&&partial[2]>0&&partial[2]<zero[2],'partial secondary blends with default window color');
+  assert(opaque[0]>250&&opaque[2]<5,'opaque secondary controls unlit window emission');
+  const {configureDiagnostics,diagnosticReport}=await import('../src/performance-diagnostics.js');
+  configureDiagnostics(true);
+  try{
+    const blocks=Array.from({length:16},(_,i)=>makeBlock({typeIndex:6,id:'window'+i,position:{x:i*.01,y:1,z:0}}));
+    scene.model=makeModel(blocks);scene.revision++;
+    scene.hiddenIds=new Set(blocks.slice(1).map(block=>block.id));
+    for(const [i,expected] of [missing,zero,partial,opaque].entries()){
+      blocks[0].secondaryColor=colors[i];
+      scene.appearanceDirty=new Set(['window0']);
+      scene.appearanceRevision=(scene.appearanceRevision||0)+1;
+      drawGame(ctx,scene,view,240,240,p,1);
+      const actual=ctx.getImageData(120,120,1,1).data;
+      assert(expected.every((value,k)=>value===actual[k]),'instanced window color parity '+i+': '+actual+' vs '+expected);
+    }
+    assert(diagnosticReport().hull.instancedBlocks===16,'housing must use the instanced path');
+  }finally{
+    configureDiagnostics(false);
+    scene.hiddenIds=new Set();
+    scene.appearanceDirty=new Set();
+  }
 });
 await check('per-block visibility skips hidden geometry when picking; simplified rendering keeps visibility',()=>{
   scene.model=makeModel([makeBlock({id:'near',position:{x:0,y:1,z:2},color:'ffff3333'}),makeBlock({id:'far',position:{x:0,y:1,z:-2},color:'ff3333ff'})]);scene.revision++;
@@ -274,6 +303,84 @@ await check('infinite grid survives distant panning; axes honor width, brightnes
   renderer.dispose();for(const m of [guides.grid,...guides.axes])m.material.dispose();guides.grid.geometry.dispose();
 });
 
+await check('canonical Glow boxes link with fourteen inputs and match expanded lighting and blueprint',async()=>{
+  const THREE=await import('../src/vendor/three.module.js');
+  const {buildTexturedModel}=await import('../src/avorion/lib/geometry/texturedModel.js');
+  const {defaultOrientationProfile}=await import('../src/avorion/lib/avorion/orientation.js');
+  const {DEFAULT_GAME_SHADER}=await import('../src/avorion/types/index.js');
+  const blocks=Array.from({length:16},(_,i)=>makeBlock({id:'glow'+i,typeIndex:150,
+    look:5,up:3,position:{x:i%4/4,y:Math.floor(i/4)/4,z:0},
+    size:{x:.125+i/128,y:.125,z:.25},color:'ff347ac0'}));
+  const model=makeModel(blocks),profile=defaultOrientationProfile();
+  const canonical=buildTexturedModel(model,profile,{...DEFAULT_GAME_SHADER,simplified:true,canonicalBoxes:true});
+  const baked=buildTexturedModel(model,profile,{...DEFAULT_GAME_SHADER,simplified:true,instancing:false});
+  const renderer=new THREE.WebGLRenderer({preserveDrawingBuffer:true});
+  const world=new THREE.Scene(),camera=new THREE.OrthographicCamera(-.7,.7,.7,-.7,.1,10);
+  camera.position.set(2,1.5,3);camera.lookAt(.375,.375,0);camera.updateMatrixWorld();
+  renderer.setSize(128,128);
+  const gl=renderer.getContext();
+  const pixels=(m,blueprint)=>{
+    world.add(m.group);
+    for(const material of m.materials)material.uniforms.uBlueprint.value=blueprint;
+    renderer.render(world,camera);
+    const bytes=new Uint8Array(128*128*4);
+    gl.readPixels(0,0,128,128,gl.RGBA,gl.UNSIGNED_BYTE,bytes);
+    world.remove(m.group);
+    return bytes;
+  };
+  try{
+    assert(canonical.group.children.some(m=>m.geometry?.getAttribute('aScale')),'canonical layout used');
+    const lit=pixels(canonical,0),reference=pixels(baked,0);
+    const linked=renderer.info.programs.find(p=>Object.hasOwn(p.getAttributes(),'aScale'));
+    assert(linked&&gl.getProgramParameter(linked.program,gl.LINK_STATUS),'canonical shader linked');
+    assert(Object.keys(linked.getAttributes()).length===14,'canonical shader active inputs');
+    assert(lit.some((value,i)=>i%4!==3&&value>0),'lit Glow fixture rendered');
+    assert(lit.every((value,i)=>value===reference[i]),'Glow pixels match expanded path');
+    const technical=pixels(canonical,1),bakedTechnical=pixels(baked,1);
+    assert(technical.every((value,i)=>value===bakedTechnical[i]),'blueprint pixels match expanded path');
+  }finally{canonical.dispose();baked.dispose();renderer.dispose();}
+});
+await check('canonical Smart Hull and Glow wedges link with fourteen inputs and match expanded shading and wire thresholds',async()=>{
+  const THREE=await import('../src/vendor/three.module.js');
+  const {buildTexturedModel}=await import('../src/avorion/lib/geometry/texturedModel.js');
+  const {defaultOrientationProfile}=await import('../src/avorion/lib/avorion/orientation.js');
+  const {DEFAULT_GAME_SHADER}=await import('../src/avorion/types/index.js');
+  for(const typeIndex of [100,151]){
+  const blocks=Array.from({length:16},(_,i)=>makeBlock({id:'glow'+i,typeIndex,
+    look:5,up:3,position:{x:i%4/4,y:Math.floor(i/4)/4,z:0},
+    size:{x:.125+i/128,y:.125,z:.25},color:'ff347ac0'}));
+  const model=makeModel(blocks),profile=defaultOrientationProfile();
+  const canonical=buildTexturedModel(model,profile,{...DEFAULT_GAME_SHADER,simplified:true,canonicalWedges:true});
+  const baked=buildTexturedModel(model,profile,{...DEFAULT_GAME_SHADER,simplified:true,instancing:false});
+  const renderer=new THREE.WebGLRenderer({preserveDrawingBuffer:true});
+  const world=new THREE.Scene(),camera=new THREE.OrthographicCamera(-.7,.7,.7,-.7,.1,10);
+  camera.position.set(2,1.5,3);camera.lookAt(.375,.375,0);camera.updateMatrixWorld();
+  renderer.setSize(128,128);
+  const gl=renderer.getContext();
+  const pixels=(m,blueprint,threshold)=>{
+    world.add(m.group);
+    for(const material of m.materials){material.uniforms.uBlueprint.value=blueprint;material.uniforms.uWireThreshold.value=threshold;}
+    renderer.render(world,camera);
+    const bytes=new Uint8Array(128*128*4);
+    gl.readPixels(0,0,128,128,gl.RGBA,gl.UNSIGNED_BYTE,bytes);
+    world.remove(m.group);
+    return bytes;
+  };
+  try{
+    assert(canonical.group.children.some(m=>m.geometry?.getAttribute('aScale')),'canonical layout used');
+    const lit=pixels(canonical,0,.5),reference=pixels(baked,0,.5);
+    const linked=renderer.info.programs.find(p=>Object.hasOwn(p.getAttributes(),'aScale'));
+    assert(linked&&gl.getProgramParameter(linked.program,gl.LINK_STATUS),'canonical shader linked');
+    assert(Object.keys(linked.getAttributes()).length===14,'canonical shader active inputs');
+    assert(lit.some((value,i)=>i%4!==3&&value>0),'lit Glow fixture rendered');
+    assert(lit.every((value,i)=>value===reference[i]),'wedge '+typeIndex+' pixels match expanded path');
+    for(const threshold of [.05,.25,.5,.75,.95]){
+      const technical=pixels(canonical,1,threshold),bakedTechnical=pixels(baked,1,threshold);
+      assert(technical.every((value,i)=>value===bakedTechnical[i]),'wedge '+typeIndex+' blueprint pixels match at '+threshold);
+    }
+  }finally{canonical.dispose();baked.dispose();renderer.dispose();}
+  }
+});
 await check('instanced batches match merged pixels, picking, and color/selection edits',async()=>{
   const THREE=await import('../src/vendor/three.module.js'),{buildTexturedModel}=await import('../src/avorion/lib/geometry/texturedModel.js'),{defaultOrientationProfile}=await import('../src/avorion/lib/avorion/orientation.js'),{DEFAULT_GAME_SHADER}=await import('../src/avorion/types/index.js');
   const renderer=new THREE.WebGLRenderer({preserveDrawingBuffer:true});renderer.setSize(240,240);renderer.outputColorSpace=THREE.LinearSRGBColorSpace;
@@ -290,7 +397,16 @@ await check('instanced batches match merged pixels, picking, and color/selection
     const selectedA=frame(instanced),selectedB=frame(merged);changed=0;for(let i=0;i<a.length;i++)if(Math.abs(selectedA[i]-selectedB[i])>3)changed++;assert(changed<200,'selection parity');
     blocks[5].secondaryColor='00ffffff';blocks[5].color='ff11ff22';for(const m of [instanced,merged])m.updateColors(model,new Set(['instance5']));
     const colorA=frame(instanced),colorB=frame(merged);changed=0;for(let i=0;i<a.length;i++)if(Math.abs(colorA[i]-colorB[i])>3)changed++;assert(changed<200,'color parity');
-    world.add(instanced.group);world.updateMatrixWorld(true);const ray=new THREE.Raycaster(new THREE.Vector3(2,2,20),new THREE.Vector3(0,0,-1));const hits=ray.intersectObjects(instanced.group.children.filter(m=>m.userData.textured));assert(hits[0]?.blockId==='instance5','instance picking '+typeIndex);world.remove(instanced.group);
+    for(const rendered of [instanced,merged]){
+      world.add(rendered.group);world.updateMatrixWorld(true);
+      const pick=(x,y)=>new THREE.Raycaster(new THREE.Vector3(x,y,20),new THREE.Vector3(0,0,-1))
+        .intersectObjects(rendered.group.children.filter(m=>m.userData.textured))[0]?.blockId;
+      if(typeIndex===10){
+        assert(pick(2,2)===undefined,'Hangar center ray passes through opening');
+        assert(pick(2.65,2)==='instance5','Hangar rim returns the owning block');
+      }else assert(pick(2,2)==='instance5','block picking '+typeIndex);
+      world.remove(rendered.group);
+    }
     instanced.dispose();merged.dispose();
   }
   renderer.dispose();

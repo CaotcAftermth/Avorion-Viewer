@@ -17,7 +17,7 @@ export function defaults() {
   const armamentProperties = { 'object:Transform': true, 'object:Block': true, 'object:Appearance': true, 'object:Native Data': true, 'scene:Engine State': true, 'scene:Model Summary': true, 'scene:Capture': true, 'turrets:Turret sockets': true, 'turrets:Library asset': false, 'turrets:Turret pose and size': true, 'turrets:Directional fields of fire': true, 'turrets:Weapon Coverage': true, 'turrets:Analysis settings and assumptions': true, 'workspace:Window system': true, 'world:World': true, 'shaders:Surface': true, 'shaders:Lighting': true, 'shaders:Game Surface': true, 'shaders:Environment': true, 'shaders:Emission': true };
   const general = split('x', 0.77,
     split('y', 0.82,
-      viewportArea(view(0.88, 0.4828, 0.0701, 2.815, 18.829, 'perspective', { orthographicDistance: 174.12, interactionMode: 'object', display: { axisX: false, axisY: false, axisZ: false, gridScale: 2, shading: 'RENDERED', backgroundColor: '#000000', specular: false, clipEnd: 10000, axisLength: 500, axisWidth: 1.5, axisBrightness: 2, ambientStrength: 1.5, ambientDetail: 0.7 } })),
+      viewportArea(view(0.88, 0.4828, 0.0701, 2.815, 18.829, 'perspective', { orthographicDistance: 174.12, interactionMode: 'object', display: { axisX: false, axisY: false, axisZ: false, gridScale: 2, shading: 'RENDERED', backgroundColor: '#000000', specular: false, axisLength: 500, axisWidth: 1.5, axisBrightness: 2, ambientStrength: 1.5, ambientDetail: 0.7 } })),
       editorArea('info', { infoNewestFirst: true })),
     split('y', 0.3926, editorArea('outliner', { shipGrouping: 'type' }), editorArea('properties', propertyPanels('object', generalProperties))));
   const multi = split('y', 0.4718,

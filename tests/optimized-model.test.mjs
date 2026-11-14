@@ -42,3 +42,46 @@ test('surface preview state preserves selection and visibility in merged and ins
   }finally{model.dispose();}
  }
 });
+test('housing retains raw secondary color through repaint and pose expansion',()=>{
+  const colors=[undefined,'00ff0000','80112233','ffffffff'];
+  const blocks=Array.from({length:20},(_,i)=>makeBlock({id:'b'+i,typeIndex:6,
+    position:{x:(i%5)*.1,y:Math.floor(i/5)*.1,z:0},secondaryColor:colors[i%4]}));
+  const source=makeModel(blocks);
+  const bytes=(g,instanced)=>Object.values(g.attributes).filter(a=>!!a.isInstancedBufferAttribute===instanced)
+    .reduce((total,a)=>total+a.itemSize*a.array.BYTES_PER_ELEMENT,0);
+  for(const instancing of [false,true]){
+    const rendered=buildTexturedModel(source,defaultOrientationProfile(),{...DEFAULT_GAME_SHADER,simplified:true,instancing});
+    try{
+      const mesh=rendered.group.children.find(m=>m.userData.textured);
+      assert.equal(mesh.userData.instanced,instancing);
+      assert.equal(bytes(mesh.geometry,false),instancing?80:172);
+      assert.equal(bytes(mesh.geometry,true),instancing?104:0);
+      const rgba=id=>{
+        const attribute=mesh.geometry.getAttribute('aSecondary'),slot=mesh.userData.ranges.get(id)[0][0];
+        return Array.from(attribute.array.subarray(slot*4,slot*4+4));
+      };
+      assert.equal(mesh.geometry.getAttribute('aWindow'),undefined);
+      assert.deepEqual(rgba('b0'),[0,0,0,0]);
+      assert.deepEqual(rgba('b1'),[1,0,0,0]);
+      assert.deepEqual(rgba('b2'),[17,34,51,128].map(n=>Math.fround(n/255)));
+      assert.deepEqual(rgba('b3'),[1,1,1,1]);
+      const attribute=mesh.geometry.getAttribute('aSecondary');
+      const [slot,count]=mesh.userData.ranges.get('b2')[0],version=attribute.version;
+      const patches=applyBlockColors({model:source},[{id:'b2',secondaryColor:'4000ff00'}]);
+      rendered.updateColors(source,new Set(['b2']));
+      assert.deepEqual(rgba('b2'),[0,1,0,Math.fround(64/255)]);
+      assert.equal(attribute.version,version+1);
+      assert.deepEqual(attribute.updateRanges,[{start:slot*4,count:count*4}]);
+      rendered.setBlockTransforms(new Map([['b2',new THREE.Matrix4().makeTranslation(0,0,1)]]));
+      assert.equal(mesh.geometry.getAttribute('aWindow'),undefined);
+      assert.equal(bytes(mesh.geometry,false),172);
+      assert.deepEqual(rgba('b2'),[0,1,0,Math.fround(64/255)]);
+      rendered.setBlockTransforms(new Map());
+      applyBlockColors({model:source},patches.map(p=>p.before));
+      rendered.updateColors(source,new Set(['b2']));
+      assert.deepEqual(rgba('b2'),[17,34,51,128].map(n=>Math.fround(n/255)));
+      assert.equal(Object.hasOwn(blocks[0],'secondaryColor'),false);
+      assert.equal(blocks[1].secondaryColor,'00ff0000');
+    }finally{rendered.dispose();}
+  }
+});

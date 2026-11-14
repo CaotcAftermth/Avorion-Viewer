@@ -15,7 +15,7 @@ export function syncAttachmentTextures(group,scene,view,configureDepth,options){
   let cached=holder.userData.texturedAttachment;
   if(cached?.revision!==textureRevision){
    disposeAttachmentTextures(holder);
-   const model=makeModel(entry.asset.blocks,entry.asset.name),rendered=buildTexturedModel(model,defaultOrientationProfile(),options.params);
+   const model=makeModel(entry.asset.blocks,entry.asset.name),rendered=buildTexturedModel(model,defaultOrientationProfile(),{...options.params,canonicalBoxes:false,canonicalWedges:false,canonicalEndpointBoxes:false,canonicalDiscrete:false});
    rendered.setBlockTransforms(new Map(entry.asset.blocks.map(block=>[block.id,entry.matrices[entry.asset.parts?.[block.id]||'base']])));
    for(const material of rendered.materials)configureDepth(material);
    Object.assign(rendered.group.userData,{mountId:holder.userData.mountId,componentMountId:holder.userData.componentMountId,socketId:holder.userData.socketId,blockId:holder.userData.blockId});

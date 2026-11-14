@@ -1,3 +1,4 @@
+import {diagnosticStart,diagnosticClock,diagnosticPhase,diagnosticEnd,diagnosticFailure} from '../performance-diagnostics.js';
 import {textureLibrary} from '../game-renderer.js';
 import {reportError} from '../app-log.js';
 import {captureTurretProject, downloadSave, PROJECT_EXTENSION} from '../project-files.js';
@@ -11,7 +12,7 @@ export function openTurretWorkspace(asset,save){
  function close(force=false){if(closed||saving)return;if(!force&&editor&&JSON.stringify(editor.snapshot())!==initialSnapshot&&!window.confirm('Discard unsaved asset changes?'))return;closed=true;editor?.dispose();dialog.close();dialog.remove();}
  dialog.querySelector('[data-cancel]').onclick=close;dialog.oncancel=e=>{e.preventDefault();close();};
  saveButton.onclick=async()=>{if(!editor||saving)return;saving=true;saveButton.disabled=true;status.textContent='Saving asset…';try{await save(editor.snapshot());saving=false;close(true);}catch(error){reportError(error,'TURRET');status.textContent=error.message;saving=false;saveButton.disabled=false;}};
- exportButton.onclick=()=>{try{const record=captureTurretProject(editor.snapshot());downloadSave(record,record.name,PROJECT_EXTENSION);status.textContent='Project download started.';}catch(error){reportError(error,'TURRET');status.textContent=error.message;}};
+ exportButton.onclick=()=>{const op=diagnosticStart('export','turret avproject');try{const start=diagnosticClock(),record=captureTurretProject(editor.snapshot());diagnosticPhase('project snapshot created',op,start);downloadSave(record,record.name,PROJECT_EXTENSION,op);diagnosticEnd(op);status.textContent='Project download started.';}catch(error){diagnosticFailure(op,error);reportError(error,'TURRET');status.textContent=error.message;}};
  frame.onload=async()=>{try{const files=[...textureLibrary.blobs].map(([name,blob])=>new File([blob],textureLibrary.sourceOf.get(name)?.file||name+'.png',{type:blob.type}));const configured=await frame.contentWindow.assetWorkspace.configure(structuredClone(asset),files,{images:textureLibrary.images,blobs:textureLibrary.blobs,sourceOf:textureLibrary.sourceOf,resolution:textureLibrary.resolution});if(closed){configured.dispose();return;}editor=configured;initialSnapshot=JSON.stringify(editor.snapshot());status.textContent='';saveButton.disabled=exportButton.disabled=false;}catch(error){reportError(error,'TURRET');if(!closed)status.textContent=error.message;}};
  const url=new URL('./index.html',document.baseURI);url.searchParams.set('editor','turret');frame.src=url.href;
  document.body.append(dialog);dialog.showModal();return {close};

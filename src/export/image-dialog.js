@@ -1,3 +1,4 @@
+import {diagnosticClock,diagnosticPhase,diagnosticAllocation} from '../performance-diagnostics.js';
 import {fitGifSize,gifLimits,gifDimensionMax} from './gif-limits.js';
 import {exportTurntable,validateTurntable} from './turntable.js';
 import {imageDefaults,captureImage,validateImageOptions,imageFilename} from './image-options.js';
@@ -164,15 +165,17 @@ export function mountImageExport(host,scene,sourceView,context={}){
     try{const plan=validate(options,undefined,scene.model?.blocks.length||0);estimate.textContent=`Estimated working memory: ${Math.ceil(plan.estimatedBytes/1024**2)} MiB. Supersampling multiplies working pixels by ${options.supersampling**2}.`;}
     catch(error){estimate.textContent=error.message;}
   }
+  let releaseImage;
   async function run(previewOnly){
     if(busy)return;result=null;download.disabled=true;controller=new AbortController();busy=true;previewing=previewOnly;const version=revision;sync();
     try{
       validate(options,undefined,scene.model?.blocks.length||0);
-      const snapshot=captureImage(scene,view,context.preferences||FACTORY_PREFERENCES,size),overlays=await captureViewportOverlays(canvas);
+      const started=diagnosticClock(),snapshot=captureImage(scene,view,context.preferences||FACTORY_PREFERENCES,size),overlays=await captureViewportOverlays(canvas);
+      if(started!==undefined)diagnosticPhase('image snapshot and overlays captured',null,started,{blocks:snapshot.scene.model.blocks.length});
       const renderOptions={...options};if(previewOnly){const factor=Math.min(1,1000/options.width,700/options.height);renderOptions.width=Math.max(1,Math.round(options.width*factor));renderOptions.height=Math.max(1,Math.round(options.height*factor));renderOptions.supersampling=1;}
       if(options.type==='turntable'&&previewOnly){const factor=Math.min(1,360/renderOptions.width,360/renderOptions.height);renderOptions.width=Math.max(1,Math.round(renderOptions.width*factor));renderOptions.height=Math.max(1,Math.round(renderOptions.height*factor));renderOptions.fps=Math.min(10,options.fps);}
-      const prepared=await (options.type==='turntable'?exportTurntable:exportImage)(snapshot,renderOptions,{signal:controller.signal,overlays,onProgress:(value,message)=>{progress.value=value;status.textContent=message;}});
-      if(disposed||version!==revision||controller.signal.aborted){prepared.canvas.width=prepared.canvas.height=1;return;}if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(prepared.blob);image.src=url;image.hidden=false;placeholder.hidden=true;
+      const prepared=await (options.type==='turntable'?exportTurntable:exportImage)(snapshot,renderOptions,{signal:controller.signal,overlays,preview:previewOnly,onProgress:(value,message)=>{progress.value=value;status.textContent=message;}});
+      if(disposed||version!==revision||controller.signal.aborted){prepared.canvas.width=prepared.canvas.height=1;return;}if(url)URL.revokeObjectURL(url);releaseImage?.();releaseImage=diagnosticAllocation('encodedExportOutput',prepared.blob.size,'image result');url=URL.createObjectURL(prepared.blob);image.src=url;image.hidden=false;placeholder.hidden=true;
       prepared.canvas.width=prepared.canvas.height=1;
       if(previewOnly)status.textContent=`Preview ${prepared.width} × ${prepared.height}. Prepare ${options.type==='turntable'?'GIF':'Image'} to encode full resolution.`;
       else{result=prepared;download.disabled=false;status.textContent=`Ready: ${prepared.width} × ${prepared.height} · ${(prepared.blob.size/1024**2).toFixed(2)} MiB`;}
@@ -182,5 +185,5 @@ export function mountImageExport(host,scene,sourceView,context={}){
   previewButton.onclick=()=>request(true);renderButton.onclick=()=>request(false);cancel.onclick=()=>{clearTimeout(timer);pending=null;controller?.abort();};
   download.onclick=()=>{if(!result||!url)return;const link=el('a');link.href=url;link.download=result.name;link.click();};
   sync();{const initial=context.imageType||(['viewport','transparent','blueprint','turntable'].includes(stored.lastType)?stored.lastType:'viewport');fields.type.value=initial;initializing=!context.imageType;try{fields.type.onchange();}finally{initializing=false;}}
-  return {setActive(value){active=value;if(value)schedulePreview();else{clearTimeout(timer);pending=null;if(previewing)controller?.abort();}},dispose(){disposed=true;blueprintDialog?.close();clearTimeout(timer);pending=null;controller?.abort();if(url)URL.revokeObjectURL(url);},get busy(){return busy&&!previewing;}};
+  return {setActive(value){active=value;if(value)schedulePreview();else{clearTimeout(timer);pending=null;if(previewing)controller?.abort();}},dispose(){disposed=true;blueprintDialog?.close();clearTimeout(timer);pending=null;controller?.abort();if(url)URL.revokeObjectURL(url);releaseImage?.();releaseImage=null;},get busy(){return busy&&!previewing;}};
 }

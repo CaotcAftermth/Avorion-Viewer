@@ -1,6 +1,11 @@
 // Русский interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+  "Hull Renderer": "Рендерер корпуса",
+  "Canonical rendering reduces hull geometry memory on eligible blocks. The viewport shows the renderer actually used. A legacy URL override takes precedence.": "Канонический рендеринг уменьшает расход памяти на геометрию совместимых блоков. Активный рендерер указан в окне просмотра. Параметр Legacy в URL имеет приоритет.",
+  "Default (Legacy)": "По умолчанию (Legacy)",
+  "Canonical (Experimental)": "Канонический (экспериментальный)",
+  "Force Legacy": "Принудительно Legacy",
  "Thin Block Threshold": "Порог тонких блоков",
  "A block is thin if any dimension is below this cutoff in native units.": "Блок считается тонким, если любой его размер в исходных единицах меньше этого порога.",
  "Select Sockets Target Azimuth": "Азимут цели выбора сокетов",

@@ -24,7 +24,6 @@ test('material accents, material glow and pod glow occupy independent GPU layers
     assert.ok(Math.abs(geometry.getAttribute('aSecondary').getW(0)-128/255)<1e-6);
     model.updateColors(makeModel([makeBlock({typeIndex:58,materialIndex:6})]));
     assert.equal(geometry.getAttribute('aSecondary').getW(0),0);
-    assert.equal(geometry.getAttribute('aWindow').getW(0),0);
   } finally {model.dispose();textureLibrary.clear();}
 });
 

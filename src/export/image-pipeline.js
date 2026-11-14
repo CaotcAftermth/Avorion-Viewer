@@ -1,3 +1,4 @@
+import {diagnosticStart,diagnosticEnd,diagnosticFailure,diagnosticClock,diagnosticPhase,diagnosticAllocation,diagnosticImage,diagnosticTarget} from '../performance-diagnostics.js';
 import {beginImageRender,endImageRender,imageRenderLimits,createImageTarget,readImageTarget,drawGame,sceneClipRange,releaseViewportResources} from '../game-renderer.js';
 import {ensureViewportOptions,viewportPreferences} from '../viewport-options.js';
 import {alignView,metrics} from '../navigation.js';
@@ -72,11 +73,22 @@ function pixelsToCanvas(bytes,width,height){
   }
   ctx.putImageData(image,0,0);return canvas;
 }
-export async function exportImage(snapshot,options,{signal,onProgress=()=>{},overlays=[],tileLimit:forcedLimit,renderOwner,encode=true}={}){
+export function exportImage(snapshot,options,{signal,onProgress=()=>{},overlays=[],tileLimit:forcedLimit,renderOwner,encode=true,preview=false,operation:parentOperation}={}){
+  const operation=parentOperation||(!renderOwner&&diagnosticStart(encode&&!preview?'export':'image preview',options.type==='blueprint'?'blueprint':options.format,snapshot.scene.model.blocks.length,options));
+  const result=renderImage(snapshot,options,{signal,onProgress,overlays,forcedLimit,renderOwner,encode,operation});
+  if(!operation||parentOperation)return result;
+  return result.then(value=>{
+    diagnosticEnd(operation,'completed',{blobBytes:value.blob?.size});
+    return value;
+  },error=>{diagnosticFailure(operation,error);throw error;});
+}
+async function renderImage(snapshot,options,{signal,onProgress,overlays,forcedLimit,renderOwner,encode,operation}){
+
   const o={...options},owner=renderOwner||{},limits=imageRenderLimits(),plan=validateImageOptions(o,limits,snapshot.scene.model.blocks.length);
   const canvas=document.createElement('canvas');canvas.width=o.width;canvas.height=o.height;
   const ctx=canvas.getContext('2d',{willReadFrequently:true});
   if(!ctx||canvas.width!==o.width||canvas.height!==o.height)throw Error('Browser cannot allocate the requested image size.');
+  const releaseCanvas=operation?diagnosticAllocation('estimatedCanvas',o.width*o.height*4,'image destination',operation,!renderOwner):undefined;
   let target,acquired=false,lastView;const views=[];
   try{
     check(signal);onProgress(0,'Preparing image and local assets…');if(!renderOwner){await beginImageRender(owner,signal);acquired=true;}check(signal);
@@ -97,20 +109,23 @@ export async function exportImage(snapshot,options,{signal,onProgress=()=>{},ove
       if(w>limit||h>limit){padding=tilePadding(snapshot,view,viewportPreferences(p,view),o,w,h);limit=Math.min(maximum,Math.max(limit,padding*2+256));}
       const tiled=w>limit||h>limit;
       const tiles=tiled?imageTiles(w,h,limit,padding):[{x:0,y:0,width:w,height:h,coreX:0,coreY:0,coreWidth:w,coreHeight:h}];
+      if(operation)diagnosticImage(operation,sheet.width,sheet.height,tiles,padding,ss);
       views.push(view);lastView=view;
       ctx.save();ctx.translate(panel.x,panel.y);ctx.beginPath();ctx.rect(0,0,o.width,o.height);ctx.clip();
       for(let i=0;i<tiles.length;i++){
         check(signal);const tile=tiles[i];target=createImageTarget(tile.width,tile.height);
+        if(operation)diagnosticTarget(target,'image tile');
         const output={owner,target,tile,fullHeight:h,studioEffects:!!o.studioEffects,transparent:o.background==='transparent'||o.type==='blueprint'};
         const started=performance.now();
         while(!drawGame(null,snapshot.scene,view,w,h,p,1,null,output)){
           check(signal);if(performance.now()-started>120000)throw Error('Model preparation timed out. Try a smaller ship or reload the viewer.');await yieldUI();
         }
         check(signal);const pixels=readImageTarget(target),scratch=pixelsToCanvas(pixels,tile.width,tile.height);
+        const releaseTile=operation?diagnosticAllocation('estimatedCanvas',pixels.byteLength,'image scratch',operation,false):undefined;
         ctx.save();ctx.beginPath();ctx.rect(tile.coreX/ss,tile.coreY/ss,tile.coreWidth/ss,tile.coreHeight/ss);ctx.clip();
         ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
         ctx.drawImage(scratch,tile.x/ss,tile.y/ss,tile.width/ss,tile.height/ss);ctx.restore();
-        scratch.width=scratch.height=1;target.dispose();target=null;
+        scratch.width=scratch.height=1;releaseTile?.();target.dispose();target=null;
         onProgress(Math.round((panelIndex+(i+1)/tiles.length)/panels.length*85),`Rendering image ${i+1} / ${tiles.length}…`);await yieldUI();
       }
       check(signal);view.panX/=ss;view.panY/=ss;view.display.imageSampleScale=1;
@@ -138,8 +153,10 @@ export async function exportImage(snapshot,options,{signal,onProgress=()=>{},ove
     if(o.type==='blueprint')drawBlueprintPage(ctx,o,snapshot,o.width,o.height,true);
     if(!encode)return {canvas,width:o.width,height:o.height};
     onProgress(90,'Encoding image…');check(signal);
+    const encoding=diagnosticClock();
     const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('Image encoding failed. Reduce resolution or choose PNG.')),IMAGE_FORMATS[o.format],o.quality));
     check(signal);if(blob.type!==IMAGE_FORMATS[o.format])throw Error(`This browser does not support ${o.format.toUpperCase()} encoding. Choose PNG.`);
+    if(operation)diagnosticPhase('image encoded',operation,encoding,{blobBytes:blob.size});
     onProgress(100,'Image ready.');return {blob,canvas,name:imageFilename(snapshot.scene.model.fileName,o.type,o.format),width:o.width,height:o.height,estimatedBytes:plan.estimatedBytes};
-  }finally{target?.dispose();for(const view of views)releaseViewportResources(view);if(acquired)endImageRender(owner,lastView);}
+  }finally{releaseCanvas?.();target?.dispose();for(const view of views)releaseViewportResources(view);if(acquired)endImageRender(owner,lastView);}
 }

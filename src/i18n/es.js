@@ -1,6 +1,11 @@
 // Español interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+  "Hull Renderer": "Renderizador del casco",
+  "Canonical rendering reduces hull geometry memory on eligible blocks. The viewport shows the renderer actually used. A legacy URL override takes precedence.": "El renderizado canónico reduce la memoria de geometría de los bloques compatibles. La vista muestra el renderizador activo. La opción Legacy de la URL tiene prioridad.",
+  "Default (Legacy)": "Predeterminado (Legacy)",
+  "Canonical (Experimental)": "Canónico (experimental)",
+  "Force Legacy": "Forzar Legacy",
  "Thin Block Threshold": "Umbral de bloques delgados",
  "A block is thin if any dimension is below this cutoff in native units.": "Un bloque es delgado si alguna dimensión está por debajo de este límite en unidades nativas.",
  "Select Sockets Target Azimuth": "Azimut del objetivo de selección de sockets",

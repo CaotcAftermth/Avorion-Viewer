@@ -1,3 +1,4 @@
+import {diagnosticDownload} from '../performance-diagnostics.js';
 import {propertyPanel,propertyNote,propertyAction} from '../property-ui.js';
 import {mounts,editTurrets,selectTurrets} from './mounts.js';
 import {aimingConstraints} from './coverage-engine.js';
@@ -8,7 +9,7 @@ import {coverageStats,describeStats,makeBaseline,baselineCompatible,compareStats
 import {polarSummary,describePolar} from './coverage-polar.js';
 
 function download(name,text,type){
- const url=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ const blob=new Blob([text],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return blob;
 }
 // Statistics follow the worker's progressive results without rebuilding the
 // whole Properties panel; the listener detaches once the panel is replaced.
@@ -86,8 +87,8 @@ export function mountCoverageControls(host,scene,changed,showView=()=>{},openAim
   live.push([button('Save as comparison baseline',()=>{const r=latest();if(!r)return;scene.coverageBaseline=makeBaseline(r,window.prompt?.('Baseline name','')||'');changed();}),()=>!latest()||!currentCoverage(scene)?.final]);
   button('Clear baseline',()=>{scene.coverageBaseline=null;if(o.metric==='difference')update('metric','clear');else changed();},!scene.coverageBaseline);
   const name=(scene.model?.fileName||'ship').replace(/\.[^.]+$/,'').replace(/[^\w.-]+/g,'_');
-  live.push([button('Export coverage CSV',()=>{const r=latest();if(r)download(`${name}-coverage-${r.mode}.csv`,exportCoverage(r,'csv'),'text/csv');}),()=>!latest()]);
-  live.push([button('Export coverage JSON',()=>{const r=latest();if(r)download(`${name}-coverage-${r.mode}.json`,exportCoverage(r,'json'),'application/json');}),()=>!latest()]);
+  live.push([button('Export coverage CSV',()=>{const r=latest();if(r)diagnosticDownload('coverage csv',scene.model?.blocks.length,()=>download(`${name}-coverage-${r.mode}.csv`,exportCoverage(r,'csv'),'text/csv'));}),()=>!latest()]);
+  live.push([button('Export coverage JSON',()=>{const r=latest();if(r)diagnosticDownload('coverage json',scene.model?.blocks.length,()=>download(`${name}-coverage-${r.mode}.json`,exportCoverage(r,'json'),'application/json'));}),()=>!latest()]);
  }
  use('Advanced Analysis');
  {

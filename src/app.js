@@ -1,3 +1,6 @@
+import {openStressXmlDialog} from './stress-xml-dialog.js';
+import {diagnosticStart,diagnosticEnd,diagnosticFailure,diagnosticClock,diagnosticPhase,diagnosticModel,diagnosticAllocation,diagnosticAwaitFirstFrame} from './performance-diagnostics.js';
+import {openDiagnostics} from './performance-diagnostics-panel.js';
 import {assetSocketSetup,snapshotComponentAsset} from './components/asset-sockets.js';
 import {mountNativeTransform} from './native-transform.js';
 import {openQuickAssetLibrary} from './quick-asset-library.js';
@@ -76,6 +79,27 @@ import { currentLanguage } from './i18n.js';
 import { startLoading, nextPaint } from './loading-indicator.js';
 
 const $ = selector => document.querySelector(selector);
+
+// Editors and dialogs rebuild their controls independently. Give anonymous
+// controls an id while preserving identifiers provided by their own markup.
+const formControlSelector='input,select,textarea';
+let formControlId=0;
+function identifyFormControls(root){
+  function identify(field){
+    if(field.id||field.getAttribute('name'))return;
+    let id;
+    do{id='avorion-field-'+(++formControlId);}while(document.getElementById(id));
+    field.id=id;
+  }
+  if(root.matches(formControlSelector))identify(root);
+  root.querySelectorAll(formControlSelector).forEach(identify);
+}
+identifyFormControls(document.body);
+new MutationObserver(records=>{
+  for(const record of records)for(const node of record.addedNodes){
+    if(node.nodeType===Node.ELEMENT_NODE&&node.isConnected)identifyFormControls(node);
+  }
+}).observe(document.body,{childList:true,subtree:true});
 const escape = text => String(text).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const editorParam = new URLSearchParams(location.search).get('editor');
 const embeddedAsset = editorParam==='turret', embeddedBlock = editorParam==='block', embeddedComponent = editorParam==='component', embedded = embeddedAsset||embeddedBlock||embeddedComponent;
@@ -281,6 +305,7 @@ function installModel(next){
     selectedComponentMountId:null,selectedComponentMountIds:new Set(),selectedComponentSocketId:null,attachmentContext:null,
     project:null,projectViews:[],revision:scene.revision+1,...next
   });
+  diagnosticModel(scene);
   if(next.loaded)welcome?.close();
   prepareProjectFraming();
 }
@@ -331,32 +356,44 @@ function rememberProjectViews(){
 
 function saveProject(copy=false){
   if(embedded||!scene.loaded)return;
+  const operation=diagnosticStart('export','avproject',scene.model?.blocks.length);
   try{
     const current=scene.project;
     const name=!current||copy?window.prompt('Model Project name',current?`${current.name} Copy`:scene.model.fileName.replace(/\.xml$/i,''))?.trim():current.name;
-    if(!name)return;
+    if(!name){diagnosticEnd(operation,'cancelled');return;}
     const project=current&&!copy?current:{id:uid(),name};
-    downloadSave(captureProject(scene,project),name,PROJECT_EXTENSION);
+    const start=diagnosticClock(),record=captureProject(scene,project);
+    diagnosticPhase('project snapshot created',operation,start);
+    downloadSave(record,name,PROJECT_EXTENSION,operation);
     scene.project=project;
     savedProjectState=projectState();
     assetPersistence.changed();
     updateProjectTitle();
     notify(`Project download started: ${documentFileName(name,PROJECT_EXTENSION)}`);
-  }catch(error){notify(error.message);reportError(error,'FILE');}
+    diagnosticEnd(operation);
+  }catch(error){diagnosticFailure(operation,error);notify(error.message);reportError(error,'FILE');}
 }
 
 function saveWorkspaceProfile(){
+  const operation=diagnosticStart('export','workspace profile');
   try{
     const name=window.prompt('Workspace Profile name',workspaceProfileName||'My Workspace')?.trim();
-    if(!name)return;
-    downloadSave(captureProfile(name,state,preferences.value),name,PROFILE_EXTENSION);
+    if(!name){diagnosticEnd(operation,'cancelled');return;}
+    downloadSave(captureProfile(name,state,preferences.value),name,PROFILE_EXTENSION,operation);
+    diagnosticEnd(operation);
     workspaceProfileName=name;
     notify(`Workspace Profile download started: ${documentFileName(name,PROFILE_EXTENSION)}`);
-  }catch(error){notify(error.message);reportError(error,'FILE');}
+  }catch(error){diagnosticFailure(operation,error);notify(error.message);reportError(error,'FILE');}
 }
 
 async function openSavedFile(file){
-  const record=await readSaveFile(file);
+  const operation=diagnosticStart('import',file.name.toLowerCase().endsWith(PROJECT_EXTENSION)?'avproject':'workspace profile');
+  try{await restoreSavedFile(file,operation);}catch(error){diagnosticFailure(operation,error);throw error;}
+  finally{diagnosticEnd(operation);}
+}
+async function restoreSavedFile(file,operation){
+  const start=diagnosticClock(),record=await readSaveFile(file);
+  diagnosticPhase('save read and parsed',operation,start,{fileBytes:file.size});
   if(record?.format==='avorion-model-project'&&record.kind==='turret'){
     const asset=restoreTurretProject(record);
     welcome?.close();
@@ -365,7 +402,7 @@ async function openSavedFile(file){
   }
   if(record?.format==='avorion-workspace-profile'){
     const profile=restoreProfile(record);
-    if(!preferences.applyProfile(profile.preferences))throw Error(preferences.error);
+    if(!preferences.applyProfile({...profile.preferences,rendererMode:preferences.value.rendererMode}))throw Error(preferences.error);
     state=profile.layout;
     workspaceProfileName=profile.name;
     hovered=maximized=lastViewportId=null;
@@ -377,11 +414,12 @@ async function openSavedFile(file){
     return;
   }
   const restored=restoreProject(record);
-  if(!canLeaveProject())return;
+  if(!canLeaveProject()){diagnosticEnd(operation,'cancelled');return;}
   const previous=scene.model;
   const warningCount=restored.model.warnings.length;
   const failures=await registerProjectAssets(restored.model);
-  if(scene.model!==previous)return;
+  if(scene.model!==previous){diagnosticEnd(operation,'cancelled');return;}
+  diagnosticAwaitFirstFrame(operation,scene.revision+1);
   installModel(restored);
   savedProjectState=projectState();
   commit(`Project opened: ${restored.project.name}`);
@@ -398,18 +436,25 @@ function openSavePicker(extension=PROJECT_EXTENSION){
 function replaceSourceXml(){
   chooseFiles('.xml',false,async ([file])=>{
     if(!file||!scene.model?.sourceXml)return;
-    const original=scene.model;
-    const model=parseAvorionXml(await file.text(),file.name,file.size);
-    if(original!==scene.model)return;
-    placeImportedModel(model,original.placement||preferences.value.importPlacement);
-    const preview=previewReplacement(scene,model);
-    const choice=await confirmReplacement(file.name,preview);
-    if(!choice||original!==scene.model)return;
-    const project=scene.project,coverage=coverageSnapshot(scene);
-    const replacement=applyReplacement(preview,choice);
-    installModel({...replacement,project,loaded:true,weaponCoverage:coverage.options||undefined,showFireCoverage:coverage.show,fireDirection:coverage.direction,coverageBaseline:coverage.baseline});
-    rememberModel(file.name);
-    commit(`Source XML replaced: ${file.name} · ${replacement.matchedCount} blocks matched.`);
+    const operation=diagnosticStart('import','xml replacement');
+    try{
+      const original=scene.model,read=diagnosticClock(),text=await file.text();
+      diagnosticPhase('XML read',operation,read,{xmlBytes:file.size});
+      const model=parseAvorionXml(text,file.name,file.size);
+      if(original!==scene.model){diagnosticEnd(operation,'cancelled');return;}
+      placeImportedModel(model,original.placement||preferences.value.importPlacement);
+      const match=diagnosticClock(),preview=previewReplacement(scene,model);
+      diagnosticPhase('source replacement matched',operation,match,{blocks:model.blocks.length});
+      const choice=await confirmReplacement(file.name,preview);
+      if(!choice||original!==scene.model){diagnosticEnd(operation,'cancelled');return;}
+      const project=scene.project,coverage=coverageSnapshot(scene);
+      const replacement=applyReplacement(preview,choice);
+      diagnosticAwaitFirstFrame(operation,scene.revision+1);
+      installModel({...replacement,project,loaded:true,weaponCoverage:coverage.options||undefined,showFireCoverage:coverage.show,fireDirection:coverage.direction,coverageBaseline:coverage.baseline});
+      rememberModel(file.name);
+      commit(`Source XML replaced: ${file.name} · ${replacement.matchedCount} blocks matched.`);
+      diagnosticEnd(operation,'completed',{blocks:model.blocks.length,matched:replacement.matchedCount});
+    }catch(error){diagnosticFailure(operation,error);throw error;}
   });
 }
 function chooseFiles(accept,multiple,callback,folder=false){
@@ -431,19 +476,28 @@ function showImportError(fileName,error){
 }
 // Every model entry point (menu, drop, empty state, asset library) shares this path.
 async function openXmlFile(file){
+  const operation=diagnosticStart('import','xml');
+  if(operation)diagnosticPhase('import input',operation,undefined,{xmlBytes:file.size});
   let model;const loading=startLoading(t('Opening ship'),{percent:5,message:file.name,delay:0});
   try{
-    await nextPaint();const text=await file.text();
+    await nextPaint();const read=diagnosticClock(),text=await file.text();
+    diagnosticPhase('XML read',operation,read);
     loading.update(25,t('Reading blocks…'));await nextPaint();
     model=parseAvorionXml(text,file.name,file.size);
-    if(!canLeaveProject()){loading.done();return false;}
+    if(!canLeaveProject()){diagnosticEnd(operation,'cancelled');loading.done();return false;}
+    const assets=diagnosticClock();
     await restoreEmbeddedTurrets(model,{load:loadTurretLibrary,add:addTurretAsset});
     await restoreComponentSetup(model);
-  }catch(error){loading.done();showImportError(file.name,error);return false;}
+    diagnosticPhase('embedded assets restored',operation,assets);
+  }catch(error){diagnosticFailure(operation,error);loading.done();showImportError(file.name,error);return false;}
   try{
     loading.update(55,`${model.blocks.length.toLocaleString()} ${t('blocks')} · ${t('building geometry…')}`);await nextPaint();
+    diagnosticAwaitFirstFrame(operation,scene.revision+1);
     loadModel(model);rememberModel(file.name);await settleModelBuild(loading);
-  }finally{loading.done();}
+    if(scene.model!==model)diagnosticEnd(operation,'cancelled');
+    else if(scene.renderError)diagnosticEnd(operation,'failed');
+    else diagnosticEnd(operation,'completed',{blocks:model.blocks.length,revision:scene.revision,geometryPending:!!scene.renderPreparing});
+  }catch(error){diagnosticFailure(operation,error);throw error;}finally{loading.done();}
   return true;
 }
 // Viewports build geometry on their next frame; very large ships finish in a
@@ -461,8 +515,15 @@ async function settleModelBuild(loading){
 function importXml(){chooseFiles('.xml',false,async files=>{if(files[0])await openXmlFile(files[0]);});}
 function saveXml(){
   if(!scene.model?.doc)return;
-  const url=URL.createObjectURL(new Blob([exportPaintedXml(scene.model)],{type:'application/xml'}));
-  const a=document.createElement('a');a.href=url;a.download=scene.model.fileName;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  const operation=diagnosticStart('export','xml',scene.model.blocks.length);
+  try{
+    const start=diagnosticClock(),xml=exportPaintedXml(scene.model),blob=new Blob([xml],{type:'application/xml'});
+    diagnosticPhase('XML encoded',operation,start,{xmlCodeUnits:xml.length,outputBytes:blob.size});
+    const release=diagnosticAllocation('encodedExportOutput',blob.size,'XML download',operation);
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=scene.model.fileName;a.click();setTimeout(()=>{URL.revokeObjectURL(url);release?.();},1000);
+    diagnosticEnd(operation,'completed',{blobBytes:blob.size});
+  }catch(error){diagnosticFailure(operation,error);throw error;}
 }
 async function loadAssetTextures(files){
   const loading=startLoading(t('Loading textures'),{percent:0,message:`0 / ${files.length}`});
@@ -602,6 +663,8 @@ function renderTopbar(){
       {label:'Send feedback…',action:showFeedback},
       {label:'About Avorion Viewer',action:showAbout},
       null,{section:'Developer'},
+      ...(!embedded?[{label:'Generate Stress Test XML…',action:openStressXmlDialog}]:[]),
+      {label:'Performance Diagnostics…',action:()=>openDiagnostics(scene,()=>document.querySelectorAll('.area[data-editor="viewport"]').length)},
       {label:'Load Block Gallery',action:()=>{if(canLeaveProject())loadModel(blockGallery(),true);}},
       {label:'Load orientation gallery · 7 × 24',action:()=>{if(canLeaveProject())loadModel(orientationGallery());}}
     ]

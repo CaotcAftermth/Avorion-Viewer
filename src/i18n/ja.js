@@ -1,6 +1,11 @@
 // 日本語 interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+  "Hull Renderer": "船体レンダラー",
+  "Canonical rendering reduces hull geometry memory on eligible blocks. The viewport shows the renderer actually used. A legacy URL override takes precedence.": "対応ブロックでは正準レンダリングがジオメトリのメモリ使用量を削減します。使用中のレンダラーはビューポートに表示されます。URL のレガシー指定が優先されます。",
+  "Default (Legacy)": "既定（レガシー）",
+  "Canonical (Experimental)": "正準（実験的）",
+  "Force Legacy": "レガシーを強制",
  "Thin Block Threshold": "薄いブロックのしきい値",
  "A block is thin if any dimension is below this cutoff in native units.": "いずれかの寸法がネイティブ単位でこのしきい値を下回るブロックを薄いブロックとして扱います。",
  "Select Sockets Target Azimuth": "ソケット選択ターゲットの方位角",

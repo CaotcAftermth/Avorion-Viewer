@@ -5,7 +5,8 @@ import {getBlockDefinition} from '../avorion/lib/avorion/blockDefinitions.js';
 import {getShadingSpec} from '../avorion/lib/textures/shadingMap.js';
 import {indexTriangles,validateMesh,splitTJunctions,orientClosedBlock} from './mesh.js';
 import {unionSolids} from './solid.js';
-export async function prepareExport(snapshot,options,progress=()=>{}){
+export async function prepareExport(snapshot,options,progress=()=>{},measure){
+ const started=measure&&performance.now();
  if(!['stl','3mf','glb','gltf','obj'].includes(options.format)||!['shell','grouped','detailed'].includes(options.mode))throw Error('Unsupported export format or geometry mode.');
  if(!Number.isFinite(options.longest)||options.longest<.001||options.longest>1e6||!Number.isFinite(options.budget)||options.budget<64||options.budget>4096)throw Error('Invalid export size or memory budget.');
  const tolerance=options.mode==='shell'?(options.tolerance??0):0;if(!Number.isFinite(tolerance)||tolerance<0||tolerance>options.longest*.01)throw Error('Solid tolerance must be between 0 and 1% of the longest dimension.');
@@ -44,7 +45,7 @@ export async function prepareExport(snapshot,options,progress=()=>{}){
   }
   if(i%128===0)progress(5+25*i/blocks.length,'Building block geometry…');
  }
- if(options.mode!=='detailed'){geometries.length=0;if(options.mode==='shell'){geometries.push(await unionSolids(parts,progress,tolerance,options.cleanup,{scale:factor,precisionScale:['glb','gltf'].includes(options.format)?.001:1,fillCavities:options.fillCavities,maxTriangles:Math.floor(budget/600)}));objects.push({name:'Printable_shell',geometry:0,material:0,translation:[0,0,0],sourceIds:[]});warnings.push('Solid union removes internal surfaces. '+(options.fillCavities?'Sealed cavities are filled.':'Cavities are preserved.')+' Disconnected solids remain disconnected. Material boundaries are not retained in the printable shell. Source-block attribution after union is unavailable.');}
+ if(options.mode!=='detailed'){geometries.length=0;if(options.mode==='shell'){geometries.push(await unionSolids(parts,progress,tolerance,options.cleanup,{scale:factor,precisionScale:['glb','gltf'].includes(options.format)?.001:1,fillCavities:options.fillCavities,maxTriangles:Math.floor(budget/600),measure}));objects.push({name:'Printable_shell',geometry:0,material:0,translation:[0,0,0],sourceIds:[]});warnings.push('Solid union removes internal surfaces. '+(options.fillCavities?'Sealed cavities are filled.':'Cavities are preserved.')+' Disconnected solids remain disconnected. Material boundaries are not retained in the printable shell. Source-block attribution after union is unavailable.');}
  else for(const group of groups.values()){
   // Keep each block's topology. Welding equal positions across independent
   // blocks creates artificial non-manifold edges at shared faces and contacts.
@@ -55,9 +56,12 @@ export async function prepareExport(snapshot,options,progress=()=>{}){
  if(geometries[0]?.collapsedFaces)warnings.push(`Export cleanup removed ${geometries[0].collapsedFaces} faces after float32 output cleanup; the serialized geometry is validated again below.`);
  if(geometries[0]?.retriangulated)warnings.push(`Repaired ${geometries[0].retriangulated} collapsed triangles by retriangulation; cancelled ${geometries[0].cancelledFaces} opposite zero-volume faces and split ${geometries[0].splitContactEdges} contact edges. Maximum new-vertex rounding: ${geometries[0].repairRounding} mm. No hole filling or block removal.`);
  if(geometries[0]?.precisionCollapsedEdges)warnings.push(`Rounded ${geometries[0].precisionCollapsedEdges} contact edges without a representable float32 midpoint. Total displacement bound: ${geometries[0].repairDisplacement} mm. Closed topology is revalidated after repair.`);
+ const validation=measure&&performance.now();
+ if(measure)measure('export validation started',{buildMs:validation-started,geometryCount:geometries.length,objects:objects.length});
  progress(88,'Validating processed geometry…');
  const reports=geometries.map(g=>validateMesh(g,{maxTriangles:Math.floor(budget/600)})),issueIds=new Set();
  for(const o of objects){const r=reports[o.geometry];if(r.status==='Failed'){if(o.triangleRanges)for(const issue of r.issueTriangles){const range=o.triangleRanges.find(v=>issue>=v.start&&issue<v.start+v.count);if(range)issueIds.add(range.id);}else for(const id of o.sourceIds)issueIds.add(id);}}
+ if(measure)measure('export validation completed',{durationMs:performance.now()-validation,issues:issueIds.size});
  const totals={vertices:0,triangles:0,boundaryEdges:0,nonManifoldEdges:0,nonManifoldVertices:0,degenerateTriangles:0,duplicateFaces:0,components:0};for(const o of objects)for(const key of Object.keys(totals))totals[key]+=reports[o.geometry][key]||0;
  const unchecked=reports.some(r=>r.status==='Not checked'),closed=reports.every(r=>r.watertight==='Passed');
  const geometryBounds=geometries.map(g=>{const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];for(const index of g.indices)for(let a=0;a<3;a++){const v=g.positions[index*3+a];min[a]=Math.min(min[a],v);max[a]=Math.max(max[a],v);}return {min,max};}),outputMin=[Infinity,Infinity,Infinity],outputMax=[-Infinity,-Infinity,-Infinity];
