@@ -15,9 +15,11 @@
 import * as THREE from "../../../vendor/three.module.js";
 import { allTextureNames } from "./shadingMap.js";
 const EXTENSIONS = ["png", "bmp", "jpg", "jpeg", "webp"];
+export const TEXTURE_RESOLUTIONS = Object.freeze([256, 512, 1024, 2048]);
+export const DEFAULT_TEXTURE_RESOLUTION = 512;
 export const APP_TEXTURE_PATH = new URL('../../../../textures/blocks/', import.meta.url).href;
 export class TextureLibrary {
-    resolution = 512;
+    resolution = DEFAULT_TEXTURE_RESOLUTION;
     images = new Map();
     sourceOf = new Map();
     arrays = new Map();
@@ -40,22 +42,24 @@ export class TextureLibrary {
         });
     }
     setResolution(res) {
-        if (![256, 512, 1024].includes(res))
+        if (!TEXTURE_RESOLUTIONS.includes(res))
             return;
-        if (res === this.resolution)
-            return;
-        this.resolution = res;
-        // Keep the original blobs, including picked files, for lossless resizing.
-        this.images.clear();
-        this.disposeArrays();
-        void this.enqueue(async (generation) => {
+        return this.enqueue(async (generation) => {
+            if (res === this.resolution)
+                return;
+            // Decode from the saved originals so increasing resolution restores detail.
+            const images = new Map();
             for (const [name, blob] of this.blobs) {
                 if (generation !== this.generation)
                     return;
-                const img = await this.decode(blob);
-                if (img && generation === this.generation)
-                    this.images.set(name, img);
+                const img = await this.decode(blob, res);
+                if (img)
+                    images.set(name, img);
             }
+            if (generation !== this.generation)
+                return;
+            this.resolution = res;
+            this.images = images;
         });
     }
     enqueue(job) {
@@ -128,18 +132,18 @@ export class TextureLibrary {
         return done;
     }
     /** Load from a FileList (folder picker or multi-select). Base name = file name minus extension. */
-    async loadFiles(files, {retainUndecoded=false,sources=null,onProgress=null}={}) {
+    async loadFiles(files, {retainUndecoded=false,sources=null,onProgress=null,allowUnlisted=false}={}) {
         // Snapshot FileList before the input gets reset by its change handler.
         const input = Array.from(files);
         return (await this.enqueue(async (generation) => {
-            const wanted = new Set(allTextureNames());
+            const wanted = allowUnlisted ? null : new Set(allTextureNames());
             let n = 0, seen = 0;
             for (const f of input) {
                 if (generation !== this.generation)
                     return n;
                 onProgress?.(seen++, input.length);
                 const base = f.name.replace(/\.[^.]+$/, "").toLowerCase();
-                if (!wanted.has(base))
+                if (!base || (wanted && !wanted.has(base)))
                     continue;
                 const source=sources?.get(f.name)==='app'?'app':'folder';
                 // Restoring must not erase the only saved original if decoding fails.
@@ -188,10 +192,9 @@ export class TextureLibrary {
         this.disposeArrays();
         this.emit();
     }
-    async decode(blob) {
+    async decode(blob, size = this.resolution) {
         try {
             const bmp = await createImageBitmap(blob, { colorSpaceConversion: "none", premultiplyAlpha: "none" });
-            const size = this.resolution;
             const canvas = document.createElement("canvas");
             canvas.width = size;
             canvas.height = size;

@@ -1,3 +1,5 @@
+import { bloomDefaults, lightingDefaults } from './avorion/types/client-render-defaults.js';
+import { DEFAULT_TEXTURE_RESOLUTION, TEXTURE_RESOLUTIONS } from './avorion/lib/textures/textureLibrary.js';
 import { THRUSTER_DIRECTION_FIELDS } from './thruster-settings.js';
 import { KEYMAPS, validBinding } from './keymaps.js';
 import { WORLD_FIELDS } from './sky-settings.js';
@@ -133,8 +135,8 @@ PREFERENCE_SECTIONS.push({id:'shaders',label:'Shaders',scope:'render',panels:[
     {key:'shaderRoughness',label:'Roughness',type:'number',min:.05,max:1,step:.05,default:.5,description:'Higher values broaden reflections; lower values produce tighter highlights.'}
   ]},
   {label:'Lighting',fields:[
-    {key:'shaderAmbient',label:'Ambient Light',type:'number',min:0,max:2,step:.05,default:.35,suffix:'×',description:'Uniform lighting applied to every solid face.'},
-    {key:'shaderLight',label:'Directional Light',type:'number',min:0,max:3,step:.05,default:.8,suffix:'×',description:'Strength of the directional light illuminating the model.'},
+    {key:'shaderAmbient',label:'Ambient Light',type:'number',min:0,max:2,step:.01,default:lightingDefaults.lightAmbient,suffix:'×',description:'Uniform lighting applied to every solid face.'},
+    {key:'shaderLight',label:'Directional Light',type:'number',min:0,max:3,step:.05,default:(lightingDefaults.lightMinValue+lightingDefaults.lightMaxValue)/2,suffix:'×',description:'Strength of the directional light illuminating the model.'},
     {key:'shaderAzimuth',label:'Light Azimuth',type:'number',min:-180,max:180,step:5,default:-45,suffix:'°',description:'Horizontal direction of the light around the model.'},
     {key:'shaderElevation',label:'Light Elevation',type:'number',min:-90,max:90,step:5,default:55,suffix:'°',description:'Height of the light direction above or below the model.'},
     {key:'shaderAO',label:'Ambient Occlusion',type:'number',min:0,max:2,step:.05,default:1,suffix:'×',description:'Screen-space darkening of corners and crevices in Material and Rendered shading. 0 turns it off. Approximates the game\'s AO, which is ray-traced per block when a model is built.'},
@@ -144,6 +146,7 @@ PREFERENCE_SECTIONS.push({id:'shaders',label:'Shaders',scope:'render',panels:[
 ]});
 PREFERENCE_SECTIONS.find(s=>s.id==='shaders').panels.push(
   {label:'Game Surface',fields:[
+    {key:'textureResolution',label:'Texture Resolution',type:'select',numeric:true,default:DEFAULT_TEXTURE_RESOLUTION,options:TEXTURE_RESOLUTIONS.map(size=>[size,`${size} px`]),description:'Resolution per texture map. Higher resolutions preserve more source detail and use more memory.'},
     {key:'shaderTileScale',label:'Texture Scale',type:'number',min:.01,max:1,step:.01,default:.1,suffix:'/u',description:'World-space plating tiles per native coordinate unit; 0.1 gives one tile per ten units.'},
     {key:'shaderNormal',label:'Normal Strength',type:'number',min:0,max:2,step:.05,default:1,suffix:'×',description:'Tangent normal-map strength. Browser-decoded RGB is used without channel swapping.'},
     {key:'shaderMinReflection',label:'Facing Reflection',type:'number',min:0,max:1,step:.01,default:.05,description:'Sky reflection when facing the surface.'},
@@ -160,10 +163,10 @@ PREFERENCE_SECTIONS.find(s=>s.id==='shaders').panels.push(
     {key:'shaderWindows',label:'Window Emission',type:'number',min:0,max:3,step:.05,default:1,suffix:'×',description:'Independent crew-window emission, applied after lighting. Explicit XML secondary alpha controls window tint.'},
     {key:'shaderGlow',label:'Glow Strength',type:'number',min:0,max:3,step:.05,default:1,suffix:'×',description:'Surface and effect emission strength.'},
     {key:'shaderHologramGlow',label:'Hologram Glow',type:'number',min:0,max:2,step:.05,default:1.5,suffix:'×',description:'How much hologram blocks glow. Low values keep their translucent hologram look.'},
-    {key:'shaderBloom',label:'Bloom',type:'number',min:0,max:3,step:.05,default:1,suffix:'×',description:'Rendered-mode glow around bright emission, using the game\'s bloom passes. 0 turns it off. Native strength is uncalibrated.'},
+    {key:'shaderBloom',label:'Bloom',type:'number',min:0,max:3,step:.05,default:bloomDefaults.enabled?1:0,suffix:'×',description:'Rendered-mode glow around bright emission, using the game\'s bloom passes. 0 turns it off.'},
     {key:'shaderSpill',label:'Light Spill',type:'number',min:0,max:3,step:.05,default:1,suffix:'×',description:'Rendered-mode light that light blocks and engines cast on nearby hull. 0 turns it off. Native radius and intensity are uncalibrated.'},
     {key:'shaderSpillRadius',label:'Light Spill Radius',type:'number',min:1,max:50,step:.5,default:5,suffix:'u',description:'Distance in native units that spilled light reaches. Light passes through blocks; there are no spill shadows.'},
-    {key:'shaderBloomThreshold',label:'Bloom Threshold',type:'number',min:0,max:2,step:.05,default:.8,description:'Brightness above which surfaces and effects bloom. Native threshold is uncalibrated.'},
+    {key:'shaderBloomThreshold',label:'Bloom Threshold',type:'number',min:0,max:2,step:.05,default:bloomDefaults.threshold,description:'Brightness above which surfaces and effects bloom.'},
     {key:'shaderThinEnginePlumes',label:'Plumes from Hidden Thin Engines',type:'checkbox',default:true,description:'Keep engine plumes when zero-thickness or thin engine bodies are hidden by Show Thin Blocks. Manually hidden engines remain hidden.'},
     {key:'shaderEngineState',label:'Engine State',type:'select',numeric:true,default:1,options:[[0,'Idle'],[1,'Cruise'],[2,'Boost']],description:'Engine plumes as in game: none when idle, fixed lengths when cruising or boosting. Length does not depend on engine size.'},
     {key:'shaderCruiseLength',label:'Cruise Plume Length',type:'number',min:0,max:30,step:.25,default:5,suffix:'u',description:'Engine plume length in native units while cruising. Observed in game: 4 blocks.'},

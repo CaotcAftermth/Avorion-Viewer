@@ -55,11 +55,13 @@ import { viewportHeader, viewportViewPanel, closeViewportPopover } from './viewp
 import { ensureViewportOptions } from './viewport-options.js';
 import { wireTabs, wirePanels } from './editor-panels.js';
 import { mountShipStructure, liveBlocks, blockIds, blockLabel, simplified, reconcileStructure, selectBlocks, setBlockVisibility, viewportHiddenIds, isThinBlock } from './ship-structure.js';
-import { nativeToView, makeBlock, makeModel, modelCorners, blockFramePoints, orientationGallery, parseAvorionXml, placeImportedModel } from './block-model.js';
+import { nativeToView, makeBlock, makeModel, modelCorners, blockFramePoints, orientationGallery, parseAvorionXml, placeImportedModel, getBlockDefinition, MATERIALS } from './block-model.js';
+import { materialShadingFor } from './avorion/lib/geometry/gameShader.js';
+import { activeTextureAssignment, createTextureDraft, mountTextureAssignments, openTextureAssignments, snapshotTextureDraft } from './texture-assignments.js';
 import { mountBlockInspector } from './block-inspector.js';
 import { blockGallery, isBlockGallery, applyGalleryEdit, BLOCK_GALLERY_NAME } from './block-gallery.js';
 import { openBlockWorkspace } from './block-workspace.js';
-import { textureLibrary, releaseGameModel, socketExposed } from './game-renderer.js';
+import { textureLibrary, releaseGameModel, socketExposed, gameParams } from './game-renderer.js';
 import { matchesBinding, modifierActive, bindingFor, shortcutLabel, KEYMAPS } from './keymaps.js';
 import { mountViewCube, selectCubeView, homeCubeView, rotatePoleView } from './view-cube.js';
 import { EDITORS, uid, clamp, area, split, defaults, leaves, find, parentOf, cloneTree, splitArea, joinArea, swapAreas, minimum, ratioBounds, validateState } from './layout.js';
@@ -102,8 +104,10 @@ new MutationObserver(records=>{
 }).observe(document.body,{childList:true,subtree:true});
 const escape = text => String(text).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const editorParam = new URLSearchParams(location.search).get('editor');
-const embeddedAsset = editorParam==='turret', embeddedBlock = editorParam==='block', embeddedComponent = editorParam==='component', embedded = embeddedAsset||embeddedBlock||embeddedComponent;
+const embeddedAsset = editorParam==='turret', embeddedBlock = editorParam==='block', embeddedComponent = editorParam==='component';
+const embeddedTextures = editorParam==='texture-assignments', embedded = embeddedAsset||embeddedBlock||embeddedComponent||embeddedTextures;
 let assetDraft=null;
+let textureInspector=null;
 const STORAGE = 'avorion-viewer.window-system.v1';
 const preferences=createPreferencesStore({getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value)});
 const trackpadFallback=false;
@@ -663,7 +667,10 @@ function renderTopbar(){
       {label:'Send feedback…',action:showFeedback},
       {label:'About Avorion Viewer',action:showAbout},
       null,{section:'Developer'},
-      ...(!embedded?[{label:'Generate Stress Test XML…',action:openStressXmlDialog}]:[]),
+      ...(!embedded?[
+        {label:'Texture Assignments…',action:openTextureAssignments},
+        {label:'Generate Stress Test XML…',action:openStressXmlDialog}
+      ]:[]),
       {label:'Performance Diagnostics…',action:()=>openDiagnostics(scene,()=>document.querySelectorAll('.area[data-editor="viewport"]').length)},
       {label:'Load Block Gallery',action:()=>{if(canLeaveProject())loadModel(blockGallery(),true);}},
       {label:'Load orientation gallery · 7 × 24',action:()=>{if(canLeaveProject())loadModel(orientationGallery());}}
@@ -929,6 +936,8 @@ function headerFor(node){
     header.insertAdjacentHTML('beforeend','<span class="header-name">Ship structure</span><span class="spacer"></span><input class="outliner-search" type="search" placeholder="Search" aria-label="Search blocks">');
     header.querySelector('input').maxLength=1000;
     header.querySelector('input').addEventListener('input',e=>{node.search=e.target.value;renderers.find(r=>r.outlinerId===node.id)?.search();save();});header.querySelector('input').value=node.search||'';
+  }else if(node.editor==='properties'&&textureInspector){
+    header.insertAdjacentHTML('beforeend','<span class="header-name">Texture properties</span><span class="spacer"></span>');
   }else if(node.editor==='properties'){
     const field=document.createElement('span');field.className='property-search-field';
     const search=document.createElement('input');search.type='search';search.className='property-search';search.placeholder='Search properties';search.setAttribute('aria-label','Search properties, values and settings in every Properties tab');search.title='Find labels and values in every Properties tab. Enter jumps to the next match, Shift+Enter to the previous one, Escape clears.';search.value=node.propertySearch||'';search.maxLength=200;search.spellcheck=false;search.autocomplete='off';
@@ -960,7 +969,7 @@ function headerFor(node){
     }
     header.append(kinds);
   }
-  const options=button('Area options','⋮',e=>areaMenu(e,node),'icon-button');header.append(options);
+  const options=button('Area options','⋮',e=>areaMenu(e,node),'icon-button area-options');header.append(options);
   header.addEventListener('contextmenu',e=>{e.preventDefault();areaMenu(e,node);});
   return header;
 }
@@ -1180,6 +1189,7 @@ function stepPropertySearch(node,direction){
 let propertySearchTimer=0;
 function wireNumericProperties(content){const apply=()=>enhanceNumericFields(content,{begin:input=>{pendingNumericRefresh=false;const label=input.getAttribute('aria-label');beginPropertyEdit(scene,assetDraft,{view:captureViewport()?.view,runtime:scene.turretStudio,viewEdit:['Camera yaw','Camera pitch','Camera scale'].includes(label),timelineEdit:label==='Seek time (seconds)'});},end:(cancel,changed)=>endPropertyEdit(scene,cancel,changed),refresh:()=>{if(pendingNumericRefresh){pendingNumericRefresh=false;refreshStructure();}else{assetPersistence.changed();renderers.forEach(r=>r.draw?.());}}});apply();new MutationObserver(apply).observe(content,{childList:true,subtree:true});}
 function renderProperties(body,node){
+  if(textureInspector){mountTextureAssignments(body,textureInspector);return;}
   if(assetDraft){if(!body.propertyDisposer){body.propertyDisposer=true;renderers.push({dispose:()=>body.propertyCleanup?.()});}mountAssetProperties(body,node,assetDraft,scene,()=>{scene.blockTransforms=assetPoseTransforms(assetDraft);scene.appearanceRevision=(scene.appearanceRevision||0)+1;scene.appearanceDirty=new Set(scene.model.blocks.map(b=>b.id));refreshStructure();});layoutPropertyRows(body.querySelector('.property-content'));wireNumericProperties(body.querySelector('.property-content'));filterProperties(body,node);return;}
   const focused=body.contains(document.activeElement)?{label:document.activeElement.getAttribute('aria-label'),start:document.activeElement.selectionStart,end:document.activeElement.selectionEnd}:null;
   const previous=body.querySelector('.property-content'),scroll=previous?{top:previous.scrollTop,left:previous.scrollLeft}:null;
@@ -1351,7 +1361,17 @@ document.addEventListener('keydown',e=>{
   if(match('toolbar')){e.preventDefault();node.toolbar=!node.toolbar;commit();}
   if(match('selectAll')||match('deselectAll')){e.preventDefault();selectStructure(match('selectAll')?liveBlocks(scene).map(b=>b.id):[]);}
 });
+let requestedTextureResolution=preferences.value.textureResolution;
 preferences.subscribe(()=>{
+  const resolution=preferences.value.textureResolution;
+  if(resolution!==requestedTextureResolution){
+    requestedTextureResolution=resolution;
+    void textureLibrary.setResolution(resolution)?.then(()=>{
+      if(resolution!==requestedTextureResolution)return;
+      scene.revision++;
+      render();
+    }).catch(error=>{notify(error.message);reportError(error,'TEXTURES');});
+  }
   const enabled=preferences.value.trackpadNavigation;
   if(enabled!==trackpadEnabled){trackpadEnabled=enabled;trackpadDrawers.side=null;maximized=null;focusMode=false;render();}
   else applyPreferences();
@@ -1359,6 +1379,7 @@ preferences.subscribe(()=>{
 });
 // Load the interface language before the first paint so English does not flash.
 requestedLanguage=preferences.value.language;await setLanguage(requestedLanguage);translateStatic();
+if(textureLibrary.resolution!==requestedTextureResolution)await textureLibrary.setResolution(requestedTextureResolution);
 render();save();
 void Promise.resolve(assetPersistence.start()).then(async()=>{if(crashStorage)forgetCrashRecords(crashStorage,await crashesAtStart);if(!embedded&&!scene.loaded)welcome.open();});
 window.addEventListener('pagehide',event=>{if(event.persisted)assetPersistence.flush();else{assetPersistence.stop();crashGuard.close();}});
@@ -1417,6 +1438,77 @@ export async function configureBlockWorkspace(block, textureFiles=[], sharedText
  return {snapshot(){const {el,itemEl,...edited}=scene.model.blocks[0];return structuredClone(edited);},dispose(){clearInterval(watch);renderers.forEach(r=>r.dispose());renderers=[];releaseGameModel();}};
 }
 if(embeddedBlock)window.blockWorkspace={configure:configureBlockWorkspace};
+
+export async function configureTextureAssignments(textureFiles, sharedTextures, saved, localFiles, rememberFile){
+  if(!embeddedTextures)throw Error('Texture Assignments requires an isolated editor document.');
+  const fixtureUrl=new URL('./fixtures/texture_checks0.xml',import.meta.url);
+  const response=await fetch(fixtureUrl);
+  if(!response.ok)throw Error('Could not load texture_checks0.xml.');
+  const xml=await response.text();
+  const fixture=parseAvorionXml(xml,'texture_checks0.xml',xml.length);
+  const samples=fixture.blocks.map(({el,itemEl,...block})=>block);
+  if(sharedTextures&&textureLibrary.resolution!==sharedTextures.resolution)
+    await textureLibrary.setResolution(sharedTextures.resolution);
+  if(!textureLibrary.adopt(sharedTextures)&&textureFiles.length)
+    await textureLibrary.loadFiles(textureFiles,{retainUndecoded:true});
+  if(localFiles.length)await textureLibrary.loadFiles(localFiles,{allowUnlisted:true});
+
+  const draft=createTextureDraft(samples[0],saved);
+  const makeSamples=()=>{
+    const {typeIndex,materialIndex}=draft;
+    const type=getBlockDefinition(typeIndex).displayName,material=MATERIALS[materialIndex].name;
+    return makeModel(samples.map(block=>({...block,typeIndex,type,materialIndex,material})),fixture.fileName);
+  };
+  const updatePreview=rebuild=>{
+    scene.textureAssignment=activeTextureAssignment(draft);
+    scene.textureColorMask=!!textureInspector.colorMask;
+    if(rebuild)scene.revision++;
+    renderers.forEach(renderer=>renderer.draw?.());
+  };
+  textureInspector={
+    draft,library:textureLibrary,
+    stockShading:index=>materialShadingFor(index,gameParams(preferences.value)),
+    stockTileScale:()=>preferences.value.shaderTileScale,
+    stockWindowEmission:()=>preferences.value.shaderWindows,
+    changeSample(typeIndex,materialIndex){
+      Object.assign(draft,{typeIndex,materialIndex});
+      scene.model=makeSamples();
+      scene.textureAssignment=activeTextureAssignment(draft);
+      scene.revision++;
+      refreshStructure();
+    },
+    updatePreview,
+    async loadImages(files){
+      // Keep inherited images available for the stock comparison.
+      const available=new Map();
+      for(const file of files){
+        const name=file.name.replace(/\.[^.]+$/,'').toLowerCase();
+        if(!textureLibrary.blobs.has(name)&&!available.has(name))available.set(name,file);
+      }
+      const count=await textureLibrary.loadFiles(available.values(),{allowUnlisted:true});
+      for(const [name,file] of available)if(textureLibrary.blobs.get(name)===file)rememberFile(file);
+      updatePreview(true);
+      return count;
+    },
+  };
+  const viewport=area();
+  alignView(viewport.view,'back');
+  Object.assign(viewport.view,{projection:'orthographic',grid:false});
+  Object.assign(ensureViewportOptions(viewport.view),{shading:'RENDERED',shadeSelected:false,outlineSelected:false});
+  state={version:1,active:'texture-assignments',workspaces:[{
+    id:'texture-assignments',name:'Texture Assignments',root:split('x',.69,viewport,area('properties'))
+  }]};
+  maximized=null;hovered=null;document.body.classList.add('embedded-asset-workspace');
+  installModel({model:makeSamples(),loaded:true,textureAssignment:activeTextureAssignment(draft)});
+  render();
+  navigate(viewport,{action:'frame',interrupt:false});
+  renderers.forEach(renderer=>renderer.draw?.());
+  return {
+    snapshot:()=>snapshotTextureDraft(draft),
+    dispose(){renderers.forEach(renderer=>renderer.dispose());renderers=[];releaseGameModel();}
+  };
+}
+if(embeddedTextures)window.textureAssignments={configure:configureTextureAssignments};
 
 // Component close-up from the Asset Library: the component's own viewport, outliner and properties.
 export async function configureComponentWorkspace(asset, textureFiles=[], sharedTextures=null){

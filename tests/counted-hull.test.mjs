@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {makeBlock,makeModel,ORIENTATIONS} from '../src/block-model.js';
 import {defaultOrientationProfile} from '../src/avorion/lib/avorion/orientation.js';
 import {DEFAULT_GAME_SHADER} from '../src/avorion/types/index.js';
+import {MATERIAL_FLAG_STRIDE} from '../src/avorion/lib/geometry/gameShader.js';
 import {buildTexturedModel} from '../src/avorion/lib/geometry/texturedModel.js';
 import * as THREE from '../src/vendor/three.module.js';
 const block=(typeIndex,i,extra={})=>makeBlock({id:'b'+i,typeIndex,position:{x:i%150*2+.25,y:Math.floor(i/150)*2+.25,z:.25},secondaryColor:i%2?'804080ff':undefined,...extra});
@@ -36,7 +37,14 @@ for(const [name,blocks] of Object.entries(fixtures)){
    for(const m of meshes){
     const g=m.geometry;g.computeBoundingBox();
     json([m.userData.instanced,g.instanceCount,g.boundingBox,g.boundingSphere,[...m.userData.ranges],m.userData.pickTree,m.material.transparent,m.material.userData.hardwareCull]);
-    for(const [key,a] of Object.entries(g.attributes)){json([key,a.itemSize,a.usage]);array(a.array);}
+    for(const [key,attribute] of Object.entries(g.attributes)){
+     json([key,attribute.itemSize,attribute.usage]);
+     if(key!=='aParams'){array(attribute.array);continue;}
+     // Compare historic geometry and flags independently of the added material code.
+     const legacyParams=attribute.array.slice();
+     for(let offset=1;offset<legacyParams.length;offset+=4)legacyParams[offset]%=MATERIAL_FLAG_STRIDE;
+     array(legacyParams);
+    }
     if(g.index)array(g.index.array);
    }
    if(name==='glass16'||name==='glass32')assert.equal(meshes[0].geometry.index.array.constructor.name,name==='glass16'?'Uint16Array':'Uint32Array');

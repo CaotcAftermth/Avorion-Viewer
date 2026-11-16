@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ship_design>
+	<plan accumulateHealth="true" convex="false">
+		<item parent="34" index="58">
+			<block lx="-15" ly="3" lz="-1" ux="-5" uy="13" uz="9" index="6" material="1" look="1" up="3" color="bfbfbfbf" secondaryColor="00000000"/>
+		</item>
+		<item parent="-1" index="34">
+			<block lx="14" ly="3" lz="-1" ux="15" uy="4" uz="0" index="6" material="1" look="1" up="3" color="bfbfbfbf" secondaryColor="00000000"/>
+		</item>
+		<item parent="34" index="35">
+			<block lx="11" ly="3" lz="-1" ux="13" uy="5" uz="1" index="6" material="1" look="1" up="3" color="bfbfbfbf" secondaryColor="00000000"/>
+		</item>
+		<item parent="34" index="36">
+			<block lx="7.00000095" ly="3" lz="-1" ux="10.000001" uy="6" uz="2" index="6" material="1" look="1" up="3" color="bfbfbfbf" secondaryColor="00000000"/>
+		</item>
+		<item parent="34" index="37">
+			<block lx="2.00000095" ly="3" lz="-1" ux="6.00000095" uy="7" uz="3" index="6" material="1" look="1" up="3" color="bfbfbfbf" secondaryColor="00000000"/>
+		</item>
+		<item parent="34" index="38">
+			<block lx="-4" ly="3" lz="-1" ux="1" uy="8" uz="3.99999905" index="6" material="1" look="1" up="3" color="bfbfbfbf" secondaryColor="00000000"/>
+		</item>
+	</plan>
+</ship_design>

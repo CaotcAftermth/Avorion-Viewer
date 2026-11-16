@@ -5,7 +5,7 @@ import {boxTypes,supportsBoxInstances,isCanonicalBox,setBoxFaceAxes,placeBoxVert
 // Textured model builder. Shares repeated opaque geometry in bounded spatial
 // batches, with merged fallbacks. Attributes carry everything the shader needs:
 //   aColor, aSecondary, aLayers (albedo/normal/mask/overlay array layers),
-//   aParams (glow layer, flags, reflectivity scale, state: selection bit 1,
+//   aParams (glow layer, flags/material code, reflectivity scale, state: selection bit 1,
 //   paint-preview bit 2, region-highlight bit 4, or -1 for hidden).
 //   aMaterialLayers (material accent and material glow, separate from artwork).
 //   aEmission (material effect color; w packs the seam-side bit mask).
@@ -20,13 +20,13 @@ import {installBlockRaycast} from './blockRaycast.js';
 import { edgeAngles } from './edgeAngles.js';
 import { getBlockDefinition, getMaterial } from "../avorion/blockDefinitions.js";
 import { blockSurfaceVertexCount, blockSurfaceGeometry, surfaceKind } from "./blockSurface.js";
-import { getShadingSpec, textureName } from "../textures/shadingMap.js";
+import { getShadingSpec, resolveTextureNames } from "../textures/shadingMap.js";
 import { textureLibrary } from "../textures/textureLibrary.js";
 import { thrusterTier } from "./thrusterPorts.js";
 import { buildBlockEffects } from "./blockEffects.js";
 import { collectBlockLights, buildSpillGrid } from "./blockLights.js";
 import { BlockPose } from "./blockPose.js";
-import { createGameMaterial, applyGameParams, setSpillGrid, FLAG_DOUBLE_SIDED, FLAG_TINT, FLAG_EMISSIVE, FLAG_TRANSLUCENT, FLAG_CUTOUT, FLAG_OVERLAY_SECONDARY, } from "./gameShader.js";
+import { createGameMaterial, applyGameParams, setSpillGrid, packMaterialFlags, FLAG_DOUBLE_SIDED, FLAG_TINT, FLAG_EMISSIVE, FLAG_TRANSLUCENT, FLAG_CUTOUT, FLAG_OVERLAY_SECONDARY, } from "./gameShader.js";
 function parseColor(av, fallback) {
     if (!av)
         return fallback;
@@ -225,13 +225,9 @@ export function buildTexturedModel(model, profile, params) {
     }
     const resolved = live.map((b) => {
         const spec = getShadingSpec(b.typeIndex);
-        const m = b.materialIndex;
-        const names = {
-            albedo: textureName(spec.albedo, m), normal: textureName(spec.normal, m),
-            mask: textureName(spec.mask, m), overlay: spec.surface === "ship-name" ? nameKey : textureName(spec.overlay, m), glow: textureName(spec.glow, m),
-            normalOverlay: textureName(spec.normalOverlay, m),
-            materialOverlay: textureName(spec.materialOverlay, m), materialGlow: textureName(spec.materialGlow, m),
-        };
+        const names = resolveTextureNames(b.typeIndex, b.materialIndex, params.textureAssignment);
+        if (spec.surface === "ship-name" && names.overlay === "shipname")
+            names.overlay = nameKey;
         if (names.albedo)
             albedoNames.add(names.albedo);
         if (names.normal)
@@ -295,7 +291,7 @@ export function buildTexturedModel(model, profile, params) {
         if (spec.overlayIsSecondary)
             flags |= FLAG_OVERLAY_SECONDARY;
         const layers = [layer(albedo, names.albedo), layer(normal, names.normal), layer(aux, names.mask), layer(aux, names.overlay)];
-        const pars = [layer(aux, names.glow), flags, spec.reflect ?? 1, 0];
+        const pars = [layer(aux, names.glow), packMaterialFlags(flags, b.materialIndex), spec.reflect ?? 1, 0];
         const emission = parseColor("ff" + getMaterial(b.materialIndex).color.slice(1), [1, 1, 1, 1]).slice(0, 3);
         const blended = spec.translucent && !(spec.surface === "hologram" && color[3] >= 1);
         const args=[color,secondary,layers,pars,spec.surface,layer(aux,names.normalOverlay),emission,[layer(aux,names.materialOverlay),layer(aux,names.materialGlow),[7,13].includes(b.typeIndex)?thrusterTier(b.size.x,b.size.y,b.size.z).size:0],[b.typeIndex===10?0:seams.get(b.id)]];

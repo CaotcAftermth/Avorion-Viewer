@@ -24,7 +24,7 @@ const HULL_A = { ...HULL, kind: "Hull A", mask: `${P}_a_mask` };
 const HULL_B = { ...HULL, kind: "Hull B", mask: `${P}_b_mask` };
 const ARMOR = { ...PLATING, kind: "Armor", albedo: `${P}_armor`, normal: `${P}_n`, mask: `${P}_armor_mask`, tint: true };
 const ARMOR_A = { ...ARMOR, kind: "Armor (camo)", albedo: `${P}_armor_a`, mask: `${P}_armor_a_mask` };
-const HOUSING = { ...PLATING, kind: "Crew quarters", albedo: P, normal: `${P}_n`, overlay: `${P}_windows`, surface:'housing', tint: true };
+const HOUSING = { ...PLATING, kind: "Crew quarters", albedo: P, normal: `${P}_n`, overlay: `${P}_manywindows`, surface:'housing', tint: true };
 const CARGO = { ...PLATING, kind: "Cargo", albedo: `${P}_cargo`, normal: `${P}_cargo_n`, mask: `${P}_cargo_mask`, tint: true };
 const STRIPES = { ...HULL, kind: "Hull (stripes)", overlay: "stripes", overlayIsSecondary: true };
 const STONE = { kind: "Stone", albedo: "rock", normal: "rock_n", tint: true, reflect: 0.2 };
@@ -105,12 +105,28 @@ export function getShadingSpec(typeIndex) {
 export function textureName(pattern, material) {
     return pattern?.replace("{m}", String(Math.max(0, Math.min(6, material | 0))));
 }
+export const TEXTURE_SLOTS = Object.freeze([
+    ["albedo", "Albedo"], ["normal", "Normal"], ["mask", "Paint / cutout mask"],
+    ["overlay", "Overlay"], ["normalOverlay", "Overlay normal"], ["glow", "Glow"],
+    ["materialOverlay", "Material overlay"], ["materialGlow", "Material glow"],
+]);
+export function resolveTextureNames(typeIndex, materialIndex, assignment) {
+    const spec = getShadingSpec(typeIndex);
+    const override = assignment?.typeIndex === typeIndex && assignment.materialIndex === materialIndex
+        ? assignment.textures
+        : undefined;
+    const names = {};
+    for (const [slot] of TEXTURE_SLOTS)
+        names[slot] = override && Object.hasOwn(override, slot) ? override[slot] : textureName(spec[slot], materialIndex);
+    return names;
+}
 /** Every distinct base texture name any block could ask for (for scanning). */
 export function allTextureNames() {
     const out = new Set();
     const specs = new Set(BY_TYPE.values());
     for (const s of specs) {
-        for (const n of [s.albedo, s.normal, s.mask, s.overlay, s.glow, s.normalOverlay, s.materialOverlay, s.materialGlow]) {
+        for (const [slot] of TEXTURE_SLOTS) {
+            const n = s[slot];
             if (!n || n === "shipname")
                 continue; // ship-name images are generated from text
             if (n.includes("{m}"))

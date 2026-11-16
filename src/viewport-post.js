@@ -1,5 +1,6 @@
 import {diagnosticRender} from './performance-diagnostics.js';
 import * as THREE from './vendor/three.module.js';
+import {bloomDefaults} from './avorion/types/client-render-defaults.js';
 // Each viewport retains its targets while all viewports share one GPU context.
 // Avorion PostProcessing/brightnesspass.frag: subtract the threshold, then cap
 // lightness at 0.35 so bloom never overwhelms the source colour.
@@ -17,7 +18,7 @@ const BLUR=`varying vec2 vUv;uniform sampler2D source;uniform vec2 texelStep;
     gl_FragColor=sum/total;}`;
 const COPY=`varying vec2 vUv;uniform sampler2D source;void main(){gl_FragColor=texture2D(source,vUv);}`;
 const QUAD_VERTEX='varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}';
-const BLOOM_LEVELS=4;
+const BLOOM_LEVELS=bloomDefaults.levelAmplifications.length;
 const DEPTH_GLSL=`uniform sampler2D depthMap;uniform float nearPlane,farPlane,logDepth,perspective;
   float distanceAt(vec2 uv){float z=texture2D(depthMap,uv).r;
     if(logDepth>.5)return exp2(z*log2(1.+farPlane))-1.;
@@ -74,12 +75,13 @@ export function createViewportPost(samples=4,hdr=false){
     colorMap:{value:target.texture},depthMap:{value:target.depthTexture},selectionMap:{value:mask.texture},pixel:{value:new THREE.Vector2()},
     nearPlane:{value:1},farPlane:{value:1000},logDepth:{value:0},perspective:{value:1},focus:{value:10},blurStrength:{value:0},
     cavity:{value:0},outline:{value:0},selected:{value:0},outlineColor:{value:new THREE.Color()},selectionColor:{value:new THREE.Color()},
-    bloom:{value:0},bloomMap1:{value:null},bloomMap2:{value:null},bloomMap3:{value:null},bloomMap4:{value:null},
+    bloom:{value:0},bloomLevelAmplification:{value:new THREE.Vector4(...bloomDefaults.levelAmplifications)},bloomMap1:{value:null},bloomMap2:{value:null},bloomMap3:{value:null},bloomMap4:{value:null},
     ao:{value:0},aoMap:{value:null},preserveAlpha:{value:0},sampleScale:{value:1}
   },vertexShader:QUAD_VERTEX,fragmentShader:`
     varying vec2 vUv;
     uniform sampler2D colorMap,depthMap,selectionMap,bloomMap1,bloomMap2,bloomMap3,bloomMap4,aoMap;
     uniform float bloom,ao,preserveAlpha,sampleScale;
+    uniform vec4 bloomLevelAmplification;
     uniform vec2 pixel;
     uniform float nearPlane,farPlane,logDepth,perspective,focus,blurStrength,outline,selected,cavity;
     uniform vec3 outlineColor,selectionColor;
@@ -96,8 +98,11 @@ export function createViewportPost(samples=4,hdr=false){
         float other=distanceAt(uv);if(abs(other-depth)<max(1.,depth*.2)){sum+=texture2D(colorMap,uv).rgb;alphaSum+=texture2D(colorMap,uv).a;weight+=1.;}
       }color=sum/weight;alpha=alphaSum/weight;}
       if(ao>0.)color*=clamp(1.-ao*(1.-texture2D(aoMap,vUv).r),0.,1.);
-      // Avorion PostProcessing/addbloom.frag adds the four blurred levels at 0.9.
-      if(bloom>0.){vec3 glow=texture2D(bloomMap1,vUv).rgb+texture2D(bloomMap2,vUv).rgb+texture2D(bloomMap3,vUv).rgb+texture2D(bloomMap4,vUv).rgb;
+      // Avorion's composite weights the four blurred levels before the 0.9 gain.
+      if(bloom>0.){vec3 glow=texture2D(bloomMap1,vUv).rgb*bloomLevelAmplification.x
+        +texture2D(bloomMap2,vUv).rgb*bloomLevelAmplification.y
+        +texture2D(bloomMap3,vUv).rgb*bloomLevelAmplification.z
+        +texture2D(bloomMap4,vUv).rgb*bloomLevelAmplification.w;
         color+=max(vec3(0.),glow*bloom*.9);}
       float edge=0.,selEdge=0.;vec2 own=texture2D(selectionMap,vUv).rg;
       for(int i=0;i<4;i++){
@@ -168,7 +173,7 @@ export function createViewportPost(samples=4,hdr=false){
     const ao=aoActive(d,p)?p.shaderAO:0;u.ao.value=ao;
     aoPass.uniforms.tileOrigin.value.set(output?.tile?.x||0,output?.tile?(output.fullHeight-output.tile.y-output.tile.height):0);
     if(ao>0){renderAO(renderer,sourceCamera,u,p.shaderAORadius,sample);u.aoMap.value=aoTargets[1].texture;}
-    const bloom=bloomActive(d,p)?p.shaderBloom:0;u.bloom.value=bloom;
+    const bloom=bloomActive(d,p)?p.shaderBloom*bloomDefaults.amplification:0;u.bloom.value=bloom;
     if(bloom>0){
       let source=target.texture;
       if(renderBloomSource){
@@ -179,5 +184,5 @@ export function createViewportPost(samples=4,hdr=false){
       renderBloom(renderer,p.shaderBloomThreshold,d.imageSampleScale||1,source,sample);levels.forEach((level,i)=>{u['bloomMap'+(i+1)].value=level.target.texture;});}
     renderer.setRenderTarget(outputTarget);diagnosticRender(renderer,scene,camera,'post composite',sample);
   },resize(w,h){if(target.width!==w||target.height!==h){target.setSize(w,h);mask.setSize(w,h);aoTargets.forEach(t=>t.setSize(w,h));
-    levels.forEach((level,i)=>{const lw=Math.max(1,w>>(i+1)),lh=Math.max(1,h>>(i+1));level.target.setSize(lw,lh);level.scratch.setSize(lw,lh);});}}};
+    levels.forEach((level,i)=>{const downsample=bloomDefaults.downSampleFactor**(i+1);const lw=Math.max(1,Math.floor(w*downsample)),lh=Math.max(1,Math.floor(h*downsample));level.target.setSize(lw,lh);level.scratch.setSize(lw,lh);});}}};
 }

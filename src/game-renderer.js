@@ -107,13 +107,20 @@ const attachmentMasks=[0,1].map(selected=>{
   const material=new THREE.MeshBasicMaterial({toneMapped:false,side:THREE.DoubleSide});
   material.color.setRGB(selected,1,1);configureDepth(material);return material;
 });
-export function gameParams(p) {
+export function gameParams(p, textureAssignment) {
   return {...DEFAULT_GAME_SHADER,lightAzimuth:p.shaderAzimuth,lightElevation:p.shaderElevation,
     lightIntensity:p.shaderDirectionalEnabled===false?0:p.shaderLight,ambientFillIntensity:p.shaderAmbientEnabled===false?0:p.shaderAmbient,specularity:p.shaderSpecular,
     glossyness:2/(p.shaderRoughness*p.shaderRoughness),lightColor:p.shaderLightColor,
     ambientFillColor:p.shaderAmbientColor,ambientIntensity:p.shaderSkyEnabled===false?0:p.shaderSkyAmbient,
     minReflectivity:p.shaderMinReflection,maxReflectivity:Math.max(p.shaderMinReflection,p.shaderMaxReflection),
-    normalStrength:p.shaderNormal,glowStrength:p.shaderGlow,hologramGlow:p.shaderHologramGlow??1.5,tileScale:p.shaderTileScale,
+    materialShadingScale:{
+      facingReflection:p.shaderMinReflection/.05,
+      grazingReflection:Math.max(p.shaderMinReflection,p.shaderMaxReflection)/.35,
+      specular:p.shaderSpecular/.25,
+      gloss:(.5/p.shaderRoughness)**2,
+    },
+    textureAssignment,
+    normalStrength:p.shaderNormal,glowStrength:p.shaderGlow,hologramGlow:p.shaderHologramGlow??1.5,tileScale:textureAssignment?.tileScale??p.shaderTileScale,
     engineState:p.shaderEngineState??0,thrustPreview:p.shaderThrust,thrustDirections:thrusterDirectionVectors(p),plumeLength:[0,p.shaderCruiseLength??4,p.shaderBoostLength??8.25][p.shaderEngineState??0]??0,barrierStrength:p.shaderBarrier,shadowStrength:0,bloomStrength:0,
     spillStrength:p.shaderSpill??0,spillRadius:p.shaderSpillRadius??5};
 }
@@ -282,7 +289,7 @@ function startAttempt(attempt,defer=false){
   generation=attempt;
   const {scene,model,layout,simple,count,p}=attempt;
   const appearanceAtDispatch=scene.appearanceRevision;
-  const params={...gameParams(p),simplified:simple,...layout,...(model.imageShipName?{shipName:model.imageShipName}:{})};
+  const params={...gameParams(p,scene.textureAssignment),simplified:simple,...layout,...(model.imageShipName?{shipName:model.imageShipName}:{})};
   const finish=(prepared,method)=>{
     if(!ownsAttempt(attempt)||contextLost||renderer.getContext().isContextLost())return;
     try{
@@ -382,7 +389,7 @@ function prepare(scene,p,view) {
     rendered.appearanceRevision=scene.appearanceRevision;scene.appearanceDirty?.clear();
   }
   rendered.group.visible=scene.loaded&&scene.visible;
-  rendered.setParams(gameParams(p));
+  rendered.setParams(gameParams(p,scene.textureAssignment));
   const selectedIds=socketToolActive(view)||scene.turretDragging?emptySelection:view.display?.showOverlays===false||(view.display?.shadeSelected===false&&view.display?.outlineSelected!==true)?emptySelection:scene.selectedIds||emptySelection;
   if(rendered.selection!==selectedIds){rendered.setSelection(selectedIds);rendered.selection=selectedIds;}
   const regionIds=socketToolActive(view)||scene.turretDragging||view.display?.showOverlays===false||view.display?.shadeSelected===false?emptySelection:regionHighlightIds(scene);
@@ -414,8 +421,9 @@ function prepare(scene,p,view) {
     material.uniforms.uPaintColor.value.setStyle(preview?.locked?'#f1a777':'#80c6ff',THREE.LinearSRGBColorSpace);
     material.uniforms.uExposure.value=2**p.shaderExposure;
     material.uniforms.uDebug.value=p.shaderDebug;
+    material.uniforms.uColorMask.value=scene.textureColorMask ? 1 : 0;
     material.uniforms.uWindowColor.value.setStyle(p.shaderWindowColor,THREE.LinearSRGBColorSpace);
-    material.uniforms.uWindowStrength.value=p.shaderWindows;
+    material.uniforms.uWindowStrength.value=scene.textureAssignment?.windowEmission??p.shaderWindows;
   }
   const time=view.imageTime??performance.now()/1000;rendered.setTime(time);if(!exportOwner)frameTimes.set(view,time);
 }
@@ -514,7 +522,7 @@ export function drawGame(ctx,scene,view,width,height,p,dpr,crop=null,output=null
     dimensionCage.object.visible=false;if(activeBounds)activeBounds.visible=false;
   }
   const sortStart=sample&&performance.now();
-  if(rendered){for(const mat of rendered.materials)mat.wireframe=!d&&view.wire;rendered.group.children.filter(c=>c.userData.blockEffects).forEach(c=>c.visible=d?d.shading==='RENDERED'&&!d.blueprint:!view.wire);rendered.prepare(camera);}
+  if(rendered){for(const mat of rendered.materials)mat.wireframe=!d&&view.wire;rendered.group.children.filter(c=>c.userData.blockEffects).forEach(c=>c.visible=!scene.textureColorMask&&(d?d.shading==='RENDERED'&&!d.blueprint:!view.wire));rendered.prepare(camera);}
   const transparentPreparationMs=sample?performance.now()-sortStart:0;
   const shipVisible=rendered?.group.visible,turretsVisible=turretGroup.visible;
   if(scene.showFireCoverage&&!output&&!crop&&!coverageOptions(scene).showShip){if(rendered)rendered.group.visible=false;turretGroup.visible=false;}
@@ -550,7 +558,7 @@ export function drawGame(ctx,scene,view,width,height,p,dpr,crop=null,output=null
   let outlineMask=null;
   const selected=!socketToolActive(view)&&!scene.turretDragging&&!!d&&d.showOverlays&&d.outlineSelected&&(scene.selectedIds?.size||scene.selected||showAttachmentSelection);
   const ambientCavity=!!d&&d.ambientOnly&&(d.ambientDetail??.35)>0&&d.shading!=='WIREFRAME'&&!d.xray&&p.shaderDebug===0;
-  if(d&&!coverageGroup.visible&&(ambientCavity||d.objectOutline||selected||d.dof&&d.shading==='RENDERED'||bloomActive(d,p)||aoActive(d,p))){
+  if(d&&!scene.textureColorMask&&!coverageGroup.visible&&(ambientCavity||d.objectOutline||selected||d.dof&&d.shading==='RENDERED'||bloomActive(d,p)||aoActive(d,p))){
     // Half-float scene color keeps emission above 1.0 for bloom.
     let post=viewportPosts.get(view);if(!post){post=createViewportPost(Math.min(4,renderer.capabilities.maxSamples||0),renderer.extensions.has('EXT_color_buffer_float'));viewportPosts.set(view,post);}
     post.resize(w,h);renderer.setRenderTarget(post.target);renderCoverageScene(camera,coverageGroup,sample);

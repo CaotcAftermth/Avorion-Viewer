@@ -49,3 +49,31 @@ test('non-plated surfaces do not inherit material lights',()=>{
   for(const type of [4,9,150,170,180,190,530])assert.equal(getShadingSpec(type).materialGlow,undefined);
   for(const type of [1,2,3,5,6,10,11,18,22,50,52,58,210,250,600,650])assert.equal(getShadingSpec(type).materialGlow,'plates{m}_glow');
 });
+
+test('draft texture slots and material shading apply to the preview and reset independently',()=>{
+  const name='preview-window-map', size=textureLibrary.resolution;
+  textureLibrary.images.set(name,{width:size,height:size,data:new Uint8Array(size*size*4)});
+  const materialIndex=1;
+  const textureAssignment={typeIndex:6,materialIndex,textures:{overlay:name,albedo:null},scaling:{albedo:'fit',overlay:'fixed'},
+    shading:{minReflectivity:.3,maxReflectivity:.65,specularity:2,glossyness:120,glow:.4}};
+  const stock={...DEFAULT_GAME_SHADER,simplified:true};
+  const preview=buildTexturedModel(makeModel([
+    makeBlock({id:'crew',typeIndex:6,materialIndex}),
+    makeBlock({id:'hull',typeIndex:2,materialIndex,position:{x:4,y:1,z:0}}),
+  ]),defaultOrientationProfile(),{...stock,textureAssignment});
+  try {
+    const mesh=preview.group.children.find(quad=>quad.userData.textured);
+    const layers=mesh.geometry.getAttribute('aLayers');
+    const overlays=new Set();
+    for(let i=0;i<layers.count;i++)overlays.add(layers.getW(i));
+    assert.deepEqual([...overlays].sort(),[0,1]);
+    const {uMaterialShading,uMaterialGlow,uTextureScaling}=preview.materials[0].uniforms;
+    assert.deepEqual(uMaterialShading.value[2].toArray(),[.3,.65,2,120]);
+    assert.equal(uMaterialGlow.value[2],.4);
+    assert.deepEqual([...uTextureScaling.value],[1,0,0,2,0,0,0,0]);
+    preview.setParams(stock);
+    assert.deepEqual(uMaterialShading.value[2].toArray(),[.15,.4,1,500]);
+    assert.equal(uMaterialGlow.value[2],.85);
+    assert.ok(uTextureScaling.value.every(mode=>mode===0));
+  } finally {preview.dispose();textureLibrary.clear();}
+});
