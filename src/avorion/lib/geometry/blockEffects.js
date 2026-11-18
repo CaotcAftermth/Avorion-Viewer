@@ -2,6 +2,7 @@ import * as THREE from "../../../vendor/three.module.js";
 import { resolvedSecondaryColor } from "../avorion/secondaryColor.js";
 import { localScaleFor, resolveOrientation } from "../avorion/orientation.js";
 import { thrusterPorts, thrusterTier, DIRECTIONAL_THRUSTER_SIDES } from "./thrusterPorts.js";
+import { HANGAR_OPENING_FRACTION } from "./blockSurface.js";
 import { createPortObstruction } from "./portObstruction.js";
 import {secondaryColor} from '../../../block-colors.js';
 import { getMaterial } from "../avorion/blockDefinitions.js";
@@ -52,7 +53,7 @@ export function buildBlockEffects(blocks, profile, params) {
         const center = new THREE.Vector3(b.position.x, b.position.y, b.position.z);
         const world = (v) => v.applyQuaternion(quaternion).add(center);
         if (b.typeIndex === 10) {
-            const x = size.x * .5 - Math.min(size.x * .15, .3), y = size.y * .5 - Math.min(size.y * .15, .3);
+            const x = size.x * HANGAR_OPENING_FRACTION / 2, y = size.y * HANGAR_OPENING_FRACTION / 2;
             for(const sign of [-1,1]){
                 const z=sign*size.z*.48,origin=world(new THREE.Vector3(0,0,z));
                 append(b, [[-x, -y], [x, -y], [x, y], [-x, y]].map(([u, v]) => world(new THREE.Vector3(u, v, z))), coords, origin, 3, effectColor(b));

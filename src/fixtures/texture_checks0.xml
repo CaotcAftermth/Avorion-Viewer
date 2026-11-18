@@ -19,5 +19,8 @@
 		<item parent="34" index="38">
 			<block lx="-4" ly="3" lz="-1" ux="1" uy="8" uz="3.99999905" index="6" material="1" look="1" up="3" color="bfbfbfbf" secondaryColor="00000000"/>
 		</item>
+		<item parent="34" index="39">
+			<block lx="-4" ly="9" lz="-1" ux="15" uy="13" uz="4" index="6" material="1" look="1" up="3" color="bfbfbfbf" secondaryColor="00000000"/>
+		</item>
 	</plan>
 </ship_design>

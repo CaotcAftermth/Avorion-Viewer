@@ -1,3 +1,4 @@
+import {createShipNameImage} from './shipName.js';
 import {CanonicalRendererError,resourceFailure} from '../../../renderer-layout.js';
 import {wedgeTypes,wedgeBoundsWriter,endpointBoundsWriter,isWedgeInstance,hasCanonicalEndpoints,hasDiscreteOrientation,instanceOrientation,encodeOrientationSeams,decodeSeams,placeWedgeVertex,expandWedgeShading,setWedgeCreaseAxes} from './wedgeInstances.js';
 import {boxTypes,supportsBoxInstances,isCanonicalBox,setBoxFaceAxes,placeBoxVertex,boxInstanceBounds} from './boxInstances.js';
@@ -207,21 +208,7 @@ export function buildTexturedModel(model, profile, params) {
     const nameText = (params.shipName?.trim() || model.doc?.documentElement.getAttribute("name") || model.fileName.replace(/\.[^.]+$/, "")).slice(0, 80);
     const nameKey = "__shipname:" + nameText;
     if (live.some(b => b.typeIndex === 600 || b.typeIndex === 601)) {
-        const canvas = document.createElement("canvas"), r = textureLibrary.resolution;
-        canvas.width = canvas.height = r;
-        const ctx = canvas.getContext("2d");
-        ctx.fillStyle = "black";
-        ctx.fillRect(0, 0, r, r);
-        ctx.fillStyle = "white";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.font = `bold ${Math.min(r * .24, r * .84 / Math.max(1, nameText.length * .65))}px sans-serif`;
-        // Texture rows start at face V=0 (the bottom edge), so draw the text flipped
-        // vertically to read upright.
-        ctx.translate(0, r);
-        ctx.scale(1, -1);
-        ctx.fillText(nameText, r / 2, r / 2, r * .9);
-        generated.set(nameKey, ctx.getImageData(0, 0, r, r));
+        generated.set(nameKey, createShipNameImage(nameText, textureLibrary.resolution));
     }
     const resolved = live.map((b) => {
         const spec = getShadingSpec(b.typeIndex);
@@ -584,7 +571,13 @@ export function buildTexturedModel(model, profile, params) {
             if (radius !== spillRadius) { spillRadius = radius; rebuildSpill(); }
         },
         setTime(time) { effects.setTime(time); },
-        setGlassDepth(texture, logDepth) { effects.setGlassDepth(texture, logDepth); },
+        setGlassDepth(texture, logDepth) {
+            effects.setGlassDepth(texture, logDepth);
+            for (const material of materials) {
+                material.uniforms.uNearestTransparentDepth.value = texture;
+                material.uniforms.uLimitTransparentDepth.value = texture ? 1 : 0;
+            }
+        },
         setBlockTransforms(poses) {
             effectPose.apply(poses);
             for (const mesh of meshes) {

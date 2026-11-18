@@ -226,6 +226,8 @@ uniform vec3 uPaintColor;
 uniform vec3 uRegionColor;
 uniform vec3 uMirrorOrigin;
 uniform vec3 uMirrorVisible;
+uniform highp sampler2D uNearestTransparentDepth;
+uniform float uLimitTransparentDepth;
 uniform float uColorMask;
 uniform float uDebug;   // 0 off, 1 albedo, 2 mask, 3 normal, 4 weights, 5 lighting
 uniform sampler2D uShadowMap;
@@ -262,11 +264,21 @@ vec3 shadowCoord;
 vec3 shadowDx;
 vec3 shadowDy;
 
-vec4 sampleBlockUV(sampler2DArray tex, float layer, int mode) {
+vec4 sampleBlockUV(sampler2DArray tex, float layer, int mode, float tileFactor) {
   if (layer < 0.5) return textureLod(tex, vec3(0.0), 0.0);
-  vec2 scale = mode == 2 ? vSurface.xy * uTileScale : vec2(1.0);
+  vec2 scale = mode == 2 ? vSurface.xy * (uTileScale * tileFactor) : vec2(1.0);
   vec2 uv = mode == 2 ? vFaceUV * scale : clamp(vFaceUV, vec2(0.001), vec2(0.999));
   return textureGrad(tex, vec3(uv, layer), faceDx * scale, faceDy * scale);
+}
+
+vec4 sampleBlockUV(sampler2DArray tex, float layer, int mode) {
+  return sampleBlockUV(tex, layer, mode, 1.0);
+}
+
+vec4 sampleFrameworkMask(sampler2DArray tex, float layer, int slot) {
+  int mode = uTextureScaling[slot];
+  // Build up from the face base, clipping the last cell on a fractional face.
+  return mode == 0 ? sampleBlockUV(tex, layer, 2, 20.0) : sampleBlockUV(tex, layer, mode);
 }
 
 vec4 sampleFace(sampler2DArray tex, float layer, float scale, int slot) {
@@ -280,19 +292,58 @@ vec4 sampleFace(sampler2DArray tex, float layer, float scale, int slot) {
 
 // Keep the middle of a tile at the face center as its physical dimensions change.
 // A negative factor keeps the native inverted UV orientation for functional decals.
-vec4 sampleCenteredFace(sampler2DArray tex, float layer, float factor, int slot) {
+vec4 sampleCenteredFace(sampler2DArray tex, float layer, float factor, float center, int slot) {
   if (uTextureScaling[slot] != 0) return sampleBlockUV(tex, layer, uTextureScaling[slot]);
   if (layer < 0.5) return textureLod(tex, vec3(0.0), 0.0);
   vec2 scale = vSurface.xy * (uTileScale * factor);
-  vec2 uv = 0.5 + (vFaceUV - 0.5) * scale;
+  vec2 uv = center + (vFaceUV - 0.5) * scale;
   return textureGrad(tex, vec3(uv, layer), faceDx * scale, faceDy * scale);
 }
 
+vec4 sampleCenteredFace(sampler2DArray tex, float layer, float factor, int slot) {
+  return sampleCenteredFace(tex, layer, factor, 0.5, slot);
+}
+
 // Dock artwork uses an inverted face fit.
-vec4 sampleDecal(sampler2DArray tex, float layer, int slot) {
+vec4 sampleFunctional(sampler2DArray tex, float layer, float surface, int slot) {
   if (uTextureScaling[slot] != 0) return sampleBlockUV(tex, layer, uTextureScaling[slot]);
   if (layer < 0.5) return textureLod(tex, vec3(0.0), 0.0);
-  return textureGrad(tex, vec3(clamp(1.0 - vFaceUV, vec2(0.001), vec2(0.999)), layer), -faceDx, -faceDy);
+  if (surface == 28.0 || surface >= 36.0) {
+    // The frontal opening occupies about one third of each face axis.
+    vec2 scale = surface == 37.0 ? vec2(-2.34, -.78) : vec2(-1.0);
+    vec2 uv = clamp(0.5 + (vFaceUV - 0.5) * scale, vec2(0.001), vec2(0.999));
+    return textureGrad(tex, vec3(uv, layer), faceDx * scale, faceDy * scale);
+  }
+  // Relative to the normal plating repeat rate. Rotation lock and turret base
+  // contain multiple motifs per source tile.
+  float factor = 1.0;
+  if (surface == 31.0) factor = 5.0;
+  if (surface == 32.0) factor = 6.0;
+  if (surface == 34.0) factor = 10.0;
+  if (surface == 33.0 || surface == 35.0) factor = 2.0;
+  return sampleCenteredFace(tex, layer, -factor, surface == 31.0 ? 0.0 : 0.5, slot);
+}
+
+vec4 sampleGeneratorDetail(sampler2DArray tex, float layer, float surface, int slot) {
+  // One full highlight and matching normal tile per five native units at stock scale.
+  return sampleCenteredFace(tex, layer, 2.0, surface == 38.0 ? 0.0 : 0.5, slot);
+}
+
+vec4 sampleShipName(float layer) {
+  if (uTextureScaling[MAP_OVERLAY] != 0) return sampleBlockUV(uAux, layer, uTextureScaling[MAP_OVERLAY]);
+  if (layer < 0.5) return vec4(0.0);
+  // Fit the 4:1 name region uniformly. Only face width and height matter.
+  float aspect = vSurface.x / max(vSurface.y, .0001);
+  vec2 scale = vec2(max(1.0, aspect / 4.0), max(1.0, 4.0 / max(aspect, .0001)));
+  vec2 uv = 0.5 + (vFaceUV - 0.5) * scale;
+  if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) return vec4(0.0);
+  vec2 dx = faceDx * scale, dy = faceDy * scale;
+  float glyph = textureGrad(uAux, vec3(uv, layer), dx, dy).r;
+  float outline = 0.0;
+  for (int y = -1; y <= 1; ++y)
+    for (int x = -1; x <= 1; ++x)
+      outline += textureGrad(uAux, vec3(uv + vec2(float(x) * .004, float(y) * .016), layer), dx, dy).r;
+  return vec4(vec3(glyph), max(glyph, min(outline, 1.0)));
 }
 
 vec3 faceNormal(vec3 decoded, vec3 n) {
@@ -398,10 +449,10 @@ void main() {
   int materialCode = int(floor(vParams.y / ${MATERIAL_FLAG_STRIDE}.0));
   if (uCull>.5 && !gl_FrontFacing && !hasFlag(flags, 32.0)) discard;
   float surface = vSurface.z;
-  bool generator = surface == 4.0 || surface == 5.0;
+  bool generator = surface == 4.0 || surface == 5.0 || surface == 38.0;
   bool ore = surface >= 10.0 && surface <= 13.0;
   bool stripes = surface >= 20.0 && surface <= 25.0;
-  bool decal = surface == 3.0 || surface == 28.0;
+  bool decal = surface == 3.0 || surface == 28.0 || (surface >= 31.0 && surface <= 37.0);
   float portSize = max(vMaterialLayers.z, 0.1);
   vec2 portPoint = thrusterPortPoint(vFaceUV, vSurface.xy, portSize);
   float portCoverage = surface == 2.0 ? thrusterCoverage(portPoint, portSize) : 0.0;
@@ -411,7 +462,7 @@ void main() {
 
   // framework.bmp is RGB. Its red channel is a separate face-local hole mask.
   // Missing masks keep the block visible, matching the other texture fallbacks.
-  if (surface == 6.0 && vLayers.z > 0.5 && sampleCenteredFace(uAux, vLayers.z, 1.0, MAP_MASK).r <= 0.2) discard;
+  if (surface == 6.0 && vLayers.z > 0.5 && sampleFrameworkMask(uAux, vLayers.z, MAP_MASK).r <= 0.2) discard;
   vec4 base = sampleTri(uAlbedo, vLayers.x, p, w, MAP_ALBEDO);
   if (surface == 4.0) base = sampleCenteredFace(uAlbedo, vLayers.x, 1.5, MAP_ALBEDO);
   if (surface == 30.0) base = sampleTriScaled(uAlbedo, vLayers.x, p, w, 2.0, MAP_ALBEDO);
@@ -428,6 +479,14 @@ void main() {
   if(uMaskPass>.5){gl_FragColor=vec4(mod(vParams.w,2.0)>.5?1.0:0.0,1.0,0.0,1.0);return;}
   // Pass 1 is the shadow map (holograms cast none); pass 2 is the translucent depth map.
   if(uDepthPass>.5){if(surface==9.0&&uDepthPass<1.5)discard;gl_FragColor=vec4(1.0);return;}
+  if (uLimitTransparentDepth > .5 && (surface == 8.0 || surface == 9.0) && vColor.a < 1.0) {
+    float depth = gl_FragCoord.z;
+    #ifdef USE_LOGDEPTHBUF
+      depth = gl_FragDepth;
+    #endif
+    float nearest = texelFetch(uNearestTransparentDepth, ivec2(gl_FragCoord.xy), 0).r;
+    if (depth > nearest + .0000002) discard;
+  }
 
   // Blueprint keeps geometry and cutouts but bypasses material lighting and effects.
   if(uBlueprint>.5 && uColorMask<.5){
@@ -459,21 +518,26 @@ void main() {
     if (surface == 6.0) mask = vec4(0.0); // framework mask is not secondary paint
     vec3 secondary = mix(vColor.rgb * uSecondaryFactor, vSecondary.rgb, vSecondary.a);
     col = mix(col, base.rgb * secondary, mask.a);
-    // Vivid Colors hull: in-game, Trinium Vivid measured ~17% brighter than Blank Hull at the same color.
-    if (surface == 29.0) col *= 1.17;
+    // Vivid paint gains brightness without shifting hue.
+    if (surface == 29.0) col *= 1.20;
     col = mix(col, materialOverlay.rgb, materialOverlay.a);
     paintLocation = mix(mix(paintLocation, secondaryMask, mask.a), neutralMask, materialOverlay.a);
     // overlay decal
     vec4 overlay = sampleTri(uAux, vLayers.w, p, w, MAP_OVERLAY);
-    if (surface == 3.0) overlay = sampleCenteredFace(uAux, vLayers.w, -1.0, MAP_OVERLAY);
-    if (surface == 28.0) overlay = sampleDecal(uAux, vLayers.w, MAP_OVERLAY);
+    if (decal) overlay = sampleFunctional(uAux, vLayers.w, surface, MAP_OVERLAY);
     if (surface == 2.0) {
       overlay = sampleThruster(vLayers.w, portPoint, portSize, MAP_OVERLAY);
-      overlay.a = portCoverage;
+      // Limit each soot sample to its port neighborhood so the outside
+      // of the finite emitter grid cannot acquire repeating ghost ports.
+      float artwork = step(max(abs(portPoint.x), abs(portPoint.y)), portSize * 1.6);
+      if (uTextureScaling[MAP_OVERLAY] == 0) overlay.a *= artwork;
+      overlay.rgb = mix(overlay.rgb, vec3(0.0), portCoverage);
+      overlay.a = max(overlay.a, portCoverage);
     }
     // Directional thruster artwork only belongs to its two thrust faces.
     if (surface == 0.0 && vMaterialLayers.z > 0.0) overlay = vec4(0.0);
-    if (surface == 16.0 || surface == 17.0) overlay = sampleFace(uAux, vLayers.w, 1.0, MAP_OVERLAY);
+    if (surface == 16.0) overlay = sampleShipName(vLayers.w);
+    if (surface == 17.0) overlay = sampleFace(uAux, vLayers.w, 1.0, MAP_OVERLAY);
     if (stripes && vLayers.w > 0.5) {
       float variant = mod(surface - 20.0, 3.0);
       // Preserve world, inverted-world and face-centered stripe variants.
@@ -487,8 +551,8 @@ void main() {
     if (generator || surface == 18.0 || surface == 26.0) overlay = vec4(0.0); // emission is applied later; decal backs remain plated
     if (surface == 14.0) overlay = mix(overlay, vec4(1.0, 1.0, 1.0, overlay.a) * vSecondary, vSecondary.a);
     else if (surface == 16.0) {
-      overlay.a = overlay.r;
-      overlay.rgb = mix((base.rgb * 0.5 + 0.5) * vEmission, vSecondary.rgb, vSecondary.a);
+      if (uTextureScaling[MAP_OVERLAY] != 0) overlay.a = overlay.r;
+      overlay.rgb = overlay.rrr * mix((base.rgb * 0.5 + 0.5) * vEmission, vSecondary.rgb, vSecondary.a);
     } else if (surface == 17.0) overlay.rgb *= base.rgb * 0.5 + 0.5;
     else if (hasFlag(flags, 16.0) && !stripes) {
       overlay = mix(overlay, vec4(1.0, 1.0, 1.0, 0.7 * overlay.a) * vSecondary, vSecondary.a);
@@ -496,7 +560,7 @@ void main() {
     col = mix(col, overlay.rgb, overlay.a);
     decalCoverage = overlay.a;
     if (hasFlag(flags, 16.0) && !stripes || surface == 16.0 || surface == 2.0)
-      paintLocation = mix(paintLocation, secondaryMask, decalCoverage);
+      paintLocation = mix(paintLocation, secondaryMask, surface == 2.0 ? portCoverage : decalCoverage);
     else if (!stripes && surface != 28.0)
       paintLocation = mix(paintLocation, neutralMask, decalCoverage);
     if (surface == 28.0) {
@@ -527,8 +591,8 @@ void main() {
   if (uTextureScaling[MAP_NORMAL] != 0 && vLayers.y > 0.5)
     N = faceNormal(sampleBlockUV(uNormal, vLayers.y, uTextureScaling[MAP_NORMAL]).rgb * 2.0 - 1.0, n);
   if ((decal || generator) && vSurface.w > 0.5) {
-    vec4 detail = surface == 28.0 ? sampleDecal(uAux, vSurface.w, MAP_NORMALOVERLAY)
-      : sampleCenteredFace(uAux, vSurface.w, decal ? -1.0 : 1.0, MAP_NORMALOVERLAY);
+    vec4 detail = decal ? sampleFunctional(uAux, vSurface.w, surface, MAP_NORMALOVERLAY)
+      : sampleGeneratorDetail(uAux, vSurface.w, surface, MAP_NORMALOVERLAY);
     vec3 decoded = detail.rgb * 2.0 - 1.0;
     if (decal && uTextureScaling[MAP_NORMALOVERLAY] == 0) decoded.xy = -decoded.xy;
     N = normalize(mix(N, faceNormal(decoded, n), detail.a));
@@ -580,7 +644,7 @@ void main() {
   vec3 effectColor = mix(vEmission, vSecondary.rgb, vSecondary.a);
   float materialGlow = uMaterialGlow[materialCode] * uGlowStrength;
   if (generator) {
-    vec4 highlight = sampleCenteredFace(uAux, vLayers.w, 1.0, MAP_OVERLAY);
+    vec4 highlight = sampleGeneratorDetail(uAux, vLayers.w, surface, MAP_OVERLAY);
     vec3 energy = (effectColor + 0.6) * (highlight.rgb + 0.3) * materialGlow;
     outc = mix(outc, energy, highlight.a);
     paintLocation = mix(paintLocation, secondaryMask, highlight.a);
@@ -592,7 +656,7 @@ void main() {
     if (surface == 4.0) glow = sampleCenteredFace(uAux, vMaterialLayers.y, 1.5, MAP_MATERIALGLOW);
     if (surface == 27.0) glow = sampleFace(uAux, vMaterialLayers.y, 2.0, MAP_MATERIALGLOW);
     float coverage = (decal || surface == 14.0 || stripes) ? 1.0 - decalCoverage : 1.0;
-    if (surface == 5.0) outc += glow.rgb * 2.0 * materialGlow;
+    if (surface == 5.0 || surface == 38.0) outc += glow.rgb * 2.0 * materialGlow;
     else outc = mix(outc, glow.rgb * 2.0 * materialGlow, glow.a * coverage);
   }
 
@@ -641,7 +705,7 @@ void main() {
 
   if (uDebug > 0.5) {
     if (uDebug < 1.5) outc = base.rgb;
-    else if (uDebug < 2.5) outc = vec3(surface == 6.0 ? sampleCenteredFace(uAux, vLayers.z, 1.0, MAP_MASK).r : sampleTri(uAux, vLayers.z, p, w, MAP_MASK).a);
+    else if (uDebug < 2.5) outc = vec3(surface == 6.0 ? sampleFrameworkMask(uAux, vLayers.z, MAP_MASK).r : sampleTri(uAux, vLayers.z, p, w, MAP_MASK).a);
     else if (uDebug < 3.5) outc = N * 0.5 + 0.5;
     else if (uDebug < 4.5) outc = w;
     else if (uDebug < 5.5) outc = lighting;
@@ -748,6 +812,7 @@ export function createGameMaterial(albedo, normal, aux, params, transparent = fa
             uRegionColor: { value: new THREE.Color().setStyle("#5ec27a", THREE.LinearSRGBColorSpace) },
             uDebug: { value: 0 },
             uColorMask: { value: 0 },
+            uNearestTransparentDepth: { value: null }, uLimitTransparentDepth: { value: 0 },
             uShadowMap: { value: null }, uShadowMatrix: { value: new THREE.Matrix4() },
             uShadowStrength: { value: 0 }, uDepthPass: { value: 0 },
             uSpillTable: { value: EMPTY_SPILL.table }, uSpillList: { value: EMPTY_SPILL.list },

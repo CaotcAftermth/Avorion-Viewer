@@ -27,7 +27,7 @@ try {
   assert.equal(await frame.locator('[data-editor=outliner]').count(),0);
   assert.match(await picker.textContent(),/Crew Quarters \(6\)/);
   assert.equal(await frame.getByLabel('Material',{exact:true}).inputValue(),'1');
-  await frame.getByText('Blocks 6 visible / 6',{exact:false}).waitFor();
+  await frame.getByText('Blocks 7 visible / 7',{exact:false}).waitFor();
   await frame.getByText('Back Orthographic',{exact:true}).waitFor();
   await frame.getByRole('button',{name:'Material Shading',exact:true}).click();
   const emission=frame.getByLabel('Window emission',{exact:true});
@@ -115,7 +115,7 @@ try {
   ]);
   // Execute the production mapping helper with a repeating 4-step texture.
   const shaderSource=await readFile('src/avorion/lib/geometry/gameShader.js','utf8');
-  const uvHelpers=shaderSource.slice(shaderSource.indexOf('vec4 sampleBlockUV('),shaderSource.indexOf('// Dock artwork uses'));
+  const uvHelpers=shaderSource.slice(shaderSource.indexOf('vec4 sampleBlockUV('),shaderSource.indexOf('vec4 sampleShipName('));
   const tileSamples=await page.evaluate(helpers=>{
     const canvas=document.createElement('canvas');
     canvas.width=100; canvas.height=1;
@@ -136,6 +136,7 @@ try {
       uniform sampler2DArray tiles;
       uniform float width;
       uniform int mode;
+      uniform float surface;
       int uTextureScaling[1];
       vec4 vSurface;
       const float uTileScale=.1;
@@ -147,7 +148,9 @@ try {
         vSurface=vec4(width,1.,0.,0.);
         vFaceUV=vec2(gl_FragCoord.x/100.,.5);
         faceDx=dFdx(vFaceUV);faceDy=dFdy(vFaceUV);
-        color=sampleCenteredFace(tiles,1.,1.,0);
+        if (surface == 6.0) color=sampleFrameworkMask(tiles,1.,0);
+        else if (surface == 4.0 || surface == 5.0 || surface == 38.0) color=sampleGeneratorDetail(tiles,1.,surface,0);
+        else color=surface > 0.0 ? sampleFunctional(tiles,1.,surface,0) : sampleCenteredFace(tiles,1.,1.,0);
       }`));
     gl.linkProgram(program);
     if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
@@ -156,9 +159,10 @@ try {
     gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
     gl.texImage3D(gl.TEXTURE_2D_ARRAY,0,gl.R8,4,1,2,0,gl.RED,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,0,32,96,160,224]));
-    return [[10,0],[20,0],[20,1]].map(([width,mode])=>{
+    return [[10,0,0],[20,0,0],[20,1,0],[2,0,31],[2,1,31],[5,0,33],[5,0,35],[5,0,4],[5,0,5],[.5,0,6],[.75,0,6],[.75,1,6]].map(([width,mode,surface])=>{
       gl.uniform1f(gl.getUniformLocation(program,'width'),width);
       gl.uniform1i(gl.getUniformLocation(program,'mode'),mode);
+      gl.uniform1f(gl.getUniformLocation(program,'surface'),surface);
       gl.drawArrays(gl.TRIANGLES,0,3);
       return [10,30,40,55,60,80].map(x=>{
         const pixel=new Uint8Array(4);
@@ -167,7 +171,10 @@ try {
       });
     });
   },uvHelpers);
-  assert.deepEqual(tileSamples,[[32,96,96,160,160,224],[160,32,96,160,160,32],[32,96,96,160,160,224]]);
+  assert.deepEqual(tileSamples,[[32,96,96,160,160,224],[160,32,96,160,160,32],[32,96,96,160,160,224],[96,32,32,224,224,160],[32,96,96,160,160,224],
+    [224,160,160,96,96,32],[224,160,160,96,96,32],
+    [32,96,96,160,160,224],[32,96,96,160,160,224],
+    [32,96,96,160,160,224],[32,96,160,224,224,32],[32,96,96,160,160,224]]);
   const parentHasTexture=await page.evaluate(async()=>{
     const {textureLibrary}=await import('/src/avorion/lib/textures/textureLibrary.js');
     return textureLibrary.has('preview-map');

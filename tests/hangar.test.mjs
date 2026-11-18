@@ -49,6 +49,9 @@ test('tunnel walls face inward and both openings have barrier geometry',async()=
   const normal=b.clone().sub(a).cross(c.clone().sub(a)),center=a.clone().add(b).add(c).divideScalar(3);center.z=0;
   assert.ok(normal.dot(center)<0,'interior normal points into passage');
  }
+ assert.equal(Math.max(...Array.from({length:24},(_,i)=>Math.min(
+  Math.abs(positions[(72+i)*3]),Math.abs(positions[(72+i)*3+1])
+ ))),1.5);
  const effects=buildBlockEffects([block],defaultOrientationProfile(),{}),roots=effects.mesh.geometry.getAttribute('aRoot');
  assert.equal(roots.count,12);assert.equal(roots.getZ(0),-roots.getZ(6));assert.ok(roots.getZ(0)<0);effects.dispose();
 });

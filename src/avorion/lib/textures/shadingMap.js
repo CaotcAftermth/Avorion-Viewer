@@ -20,6 +20,7 @@ const P = "plates{m}";
 // Material accents and lights are independent of functional artwork/pod glow.
 const PLATING = { materialOverlay: `${P}_overlay`, materialGlow: `${P}_glow` };
 const HULL = { ...PLATING, kind: "Hull", albedo: P, normal: `${P}_n`, tint: true };
+const WINDOWED_HULL = { ...HULL, overlay: `${P}_windows`, surface: "housing" };
 const HULL_A = { ...HULL, kind: "Hull A", mask: `${P}_a_mask` };
 const HULL_B = { ...HULL, kind: "Hull B", mask: `${P}_b_mask` };
 const ARMOR = { ...PLATING, kind: "Armor", albedo: `${P}_armor`, normal: `${P}_n`, mask: `${P}_armor_mask`, tint: true };
@@ -36,7 +37,7 @@ const REFLECTOR = { ...HULL, kind: "Reflector", surface: "reflector", mask: unde
 const SCAFFOLD = { kind: "Scaffold", albedo: "scaffold", surface: "scaffold", tint: true, cutout: true };
 const FRAMEWORK = { kind: "Framework", albedo: P, mask: "framework", surface: "framework", tint: true, cutout: true };
 const WRECK = { ...PLATING, kind: "Wreckage", albedo: P, normal: `${P}_n`, overlay: "wreckage", tint: true, reflect: 0.3 };
-// Functional markings have their own face-local UVs and optional normal map.
+// Functional markings have face-local mapping and an optional normal map.
 // Engines/thrusters are separate surface effects, not generic overlay decals.
 function functional(kind, name, extra = {}) {
     return { ...PLATING, kind, albedo: P, normal: `${P}_n`, overlay: name, normalOverlay: `${name}_n`, surface: "decal", tint: true, ...extra };
@@ -45,7 +46,8 @@ const BY_TYPE = new Map();
 const fam = (spec, ...idx) => idx.forEach((i) => BY_TYPE.set(i, spec));
 const range8 = (start) => Array.from({ length: 8 }, (_, i) => start + i);
 // Hull families
-fam(HULL, 0, 1, 2, 100, 101, 102, 103, 108, 109, 112, 121, 122, 123, 124, 125, 126, 127, 128, 129);
+fam(HULL, 0, 1, 121);
+fam(WINDOWED_HULL, 2, 100, 101, 102, 103, 108, 109, 112, 122, 123, 124, 125, 126, 127, 128, 129);
 fam(HULL_A, ...range8(210)); // Hull alternate A
 fam(HULL_B, ...range8(220)); // Hull alternate B
 fam({ ...HULL, kind: "Hull (vivid colors)", surface: "vivid" }, ...range8(240)); // Vivid Colors: same plating, brighter paint
@@ -73,24 +75,24 @@ fam({ kind: "Directional thruster", overlay: "thruster", normalOverlay: "thruste
 fam(FRAMEWORK, 9);
 fam({ ...PLATING, kind: "Hangar", materialOverlay: undefined, albedo: P, normal: `${P}_n`, tint: true, surface: "hangar" }, 10);
 fam(functional("Dock", "dock", { surface: "dock" }), 11);
-fam(functional("Rotation lock", "lock"), 12, 23);
-fam(functional("Gyro", "gyro"), 14);
-fam(functional("Inertia dampener", "inertiadampener"), 15);
+fam(functional("Rotation lock", "lock", { surface: "rotation-lock" }), 12, 23);
+fam(functional("Gyro", "gyro", { surface: "five-unit-decal" }), 14);
+fam(functional("Inertia dampener", "inertiadampener", { surface: "five-unit-decal" }), 15);
 fam(functional("Flight recorder", "blackbox"), 16);
-fam(functional("Assembly", "academy"), 17);
+fam(functional("Assembly", "ventilation", { surface: "assembly" }), 17);
 fam(functional("Torpedo storage", "torpedostorage"), 19);
-fam(functional("Turret base", "turretbase"), 20, 21);
-fam(functional("Armored turret base", "turretbase", { albedo: `${P}_armor`, mask: `${P}_armor_mask` }), 24, 25);
-fam(functional("Torpedo launcher", "torpedotube"), 18);
+fam(functional("Turret base", "turretbase", { surface: "turret-base" }), 20, 21);
+fam(functional("Armored turret base", "turretbase", { surface: "turret-base", albedo: `${P}_armor`, mask: `${P}_armor_mask` }), 24, 25);
+fam(functional("Torpedo launcher", "torpedotube", { surface: "torpedo" }), 18);
 fam(functional("Frontal torpedo launcher", "torpedotube", { surface: "front-torpedo" }), 22);
 fam(functional("Shield generator", "shieldgenerator", { surface: "generator-world" }), 50);
 fam(functional("Energy container", "battery", { surface: "generator-world" }), 51);
 fam(functional("Generator", "generator", { surface: "generator" }), 52);
 fam(functional("Integrity field", "integritygenerator", { surface: "generator-world" }), 53);
-fam(functional("Computer core", "computercore", { surface: "generator-world" }), 54);
+fam(functional("Computer core", "computercore", { surface: "computer-core" }), 54);
 fam(functional("Hyperspace core", "generator", { surface: "generator" }), 55);
-fam(functional("Transporter", "ventilation"), 56);
-fam(functional("Academy", "academy"), 57);
+fam(functional("Transporter", "ventilation", { surface: "five-unit-decal" }), 56);
+fam(functional("Academy", "academy", { surface: "academy" }), 57);
 fam({ ...PLATING, kind: "Cloning pods", albedo: P, normal: `${P}_n`, overlay: `${P}_pods`, glow: `${P}_pods_glow`, tint: true, surface: "pods", overlayIsSecondary: true }, 58);
 fam({ kind: "Solar panel", albedo: P, normal: `${P}_n`, materialOverlay: `${P}_overlay`, tint: true, surface: "solar" }, 60);
 // Light blocks are plated fixtures with separate sprites, not solid glow cubes.
@@ -117,7 +119,9 @@ export function resolveTextureNames(typeIndex, materialIndex, assignment) {
         : undefined;
     const names = {};
     for (const [slot] of TEXTURE_SLOTS)
-        names[slot] = override && Object.hasOwn(override, slot) ? override[slot] : textureName(spec[slot], materialIndex);
+        names[slot] = override && Object.hasOwn(override, slot) ? override[slot]
+            : textureName(spec[slot], spec.surface === "pods" && (slot === "overlay" || slot === "glow")
+                ? Math.max(4, materialIndex) : materialIndex);
     return names;
 }
 /** Every distinct base texture name any block could ask for (for scanning). */

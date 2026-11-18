@@ -4,7 +4,7 @@ import * as THREE from '../src/vendor/three.module.js';
 import {makeBlock, makeModel, ORIENTATIONS} from '../src/block-model.js';
 import {defaultOrientationProfile, resolveOrientation} from '../src/avorion/lib/avorion/orientation.js';
 import {blockSurfaceGeometry, surfaceKind} from '../src/avorion/lib/geometry/blockSurface.js';
-import {getShadingSpec, allTextureNames} from '../src/avorion/lib/textures/shadingMap.js';
+import {getShadingSpec, allTextureNames, resolveTextureNames} from '../src/avorion/lib/textures/shadingMap.js';
 import {textureLibrary} from '../src/avorion/lib/textures/textureLibrary.js';
 import {buildTexturedModel} from '../src/avorion/lib/geometry/texturedModel.js';
 import {DEFAULT_GAME_SHADER} from '../src/avorion/types/index.js';
@@ -27,22 +27,54 @@ test('material accents, material glow and pod glow occupy independent GPU layers
   } finally {model.dispose();textureLibrary.clear();}
 });
 
-test('frontal launcher artwork stays on local +Z through every orientation and unequal scale',()=>{
-  const profile=defaultOrientationProfile(),spec=getShadingSpec(22);
-  for(const orientation of ORIENTATIONS){
-    const block=makeBlock({typeIndex:22,...orientation,size:{x:2,y:4,z:8}});
-    const {positions,faces}=blockSurfaceGeometry(block,profile);
-    const forward=new THREE.Vector3(0,0,1).applyQuaternion(resolveOrientation(profile,block.look,block.up,22).quaternion);
-    let triangles=0;
-    for(let i=0;i<positions.length/3;i+=3){
-      const active=surfaceKind(spec.surface,faces[i*3+2])===3;
-      const a=new THREE.Vector3().fromArray(positions,i*3),b=new THREE.Vector3().fromArray(positions,(i+1)*3),c=new THREE.Vector3().fromArray(positions,(i+2)*3);
-      const normal=b.sub(a).cross(c.sub(a)).normalize();
-      assert.equal(active,normal.dot(forward)>.9999);
-      if(active)triangles++;
+test('launcher ports and dock artwork stay on their observed local faces',()=>{
+  const profile=defaultOrientationProfile();
+  const cases=[
+    [18,36,new THREE.Vector3(0,0,1),false],
+    [22,37,new THREE.Vector3(1,0,0),false],
+    [11,28,new THREE.Vector3(1,0,0),true],
+  ];
+  for(const [typeIndex,route,axis,opposing] of cases){
+    for(const orientation of ORIENTATIONS){
+      const block=makeBlock({typeIndex,...orientation,size:{x:2,y:4,z:8}});
+      const {positions,faces}=blockSurfaceGeometry(block,profile);
+      const forward=axis.clone().applyQuaternion(resolveOrientation(profile,block.look,block.up,typeIndex).quaternion);
+      let triangles=0;
+      for(let i=0;i<positions.length/3;i+=3){
+        const active=surfaceKind(getShadingSpec(typeIndex).surface,faces[i*3+2])===route;
+        const a=new THREE.Vector3().fromArray(positions,i*3),b=new THREE.Vector3().fromArray(positions,(i+1)*3),c=new THREE.Vector3().fromArray(positions,(i+2)*3);
+        const facing=b.sub(a).cross(c.sub(a)).normalize().dot(forward);
+        assert.equal(active,(opposing?Math.abs(facing):facing)>.9999);
+        if(active)triangles++;
+      }
+      assert.equal(triangles,opposing?4:2);
     }
-    assert.equal(triangles,2);
   }
+  assert.equal(getShadingSpec(17).overlay,'ventilation');
+  assert.equal(getShadingSpec(57).overlay,'academy');
+});
+
+test('five-unit texture calibration routes each block to its functional mapping',()=>{
+  for(const type of [14,15,56]) assert.equal(surfaceKind(getShadingSpec(type).surface,0),33);
+  for(const type of [24,25]) assert.equal(surfaceKind(getShadingSpec(type).surface,0),35);
+  for(const type of [50,51,53]) assert.equal(surfaceKind(getShadingSpec(type).surface,0),5);
+  assert.equal(surfaceKind(getShadingSpec(54).surface,0),38);
+  for(const type of [52,55]) assert.equal(surfaceKind(getShadingSpec(type).surface,0),4);
+});
+
+test('windowed hull and cloning pods resolve distinct stock artwork',()=>{
+  assert.equal(resolveTextureNames(1,0).overlay,undefined);
+  assert.equal(resolveTextureNames(121,0).overlay,undefined);
+  for(const type of [2,100,122,123]) assert.equal(resolveTextureNames(type,0).overlay,'plates0_windows');
+  assert.equal(resolveTextureNames(6,0).overlay,'plates0_manywindows');
+  for(const material of [0,1,2,3,4,5,6]){
+    const names=resolveTextureNames(58,material);
+    const tier=Math.max(4,material);
+    assert.equal(names.overlay,'plates'+tier+'_pods');
+    assert.equal(names.glow,'plates'+tier+'_pods_glow');
+    assert.equal(names.albedo,'plates'+material);
+  }
+  assert.equal(resolveTextureNames(58,0,{typeIndex:58,materialIndex:0,textures:{overlay:null}}).overlay,null);
 });
 
 test('non-plated surfaces do not inherit material lights',()=>{

@@ -641,12 +641,12 @@ function renderCoverageScene(camera,coverageGroup,sample,label='scene'){
 // effects in front draw after it.
 function renderGlassDepth(camera,w,h,sample){
   if(!rendered)return;
-  const effectsVisible=rendered.group.visible&&rendered.group.children.some(c=>c.userData.blockEffects&&c.visible);
-  const translucent=effectsVisible?rendered.group.children.filter(c=>c.userData.translucent&&c.visible):[];
+  const translucent=rendered.group.visible?rendered.group.children.filter(c=>c.userData.translucent&&c.visible):[];
   if(!translucent.length){rendered.setGlassDepth(null,false);return;}
   if(!glassTarget){glassTarget=new THREE.WebGLRenderTarget(w,h);glassTarget.depthTexture=new THREE.DepthTexture(w,h,THREE.UnsignedIntType);}
   if(glassTarget.width!==w||glassTarget.height!==h)glassTarget.setSize(w,h);
   const materials=[...new Set(translucent.map(m=>m.material))],background=world.background,layers=camera.layers.mask;
+  rendered.setGlassDepth(null,false);
   world.background=null;camera.layers.set(2);
   for(const m of materials){m.uniforms.uDepthPass.value=2;m.depthWrite=true;m.colorWrite=false;}
   renderer.setRenderTarget(glassTarget);diagnosticRender(renderer,world,camera,'glass depth',sample);renderer.setRenderTarget(null);

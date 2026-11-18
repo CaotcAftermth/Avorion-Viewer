@@ -1454,10 +1454,12 @@ export async function configureTextureAssignments(textureFiles, sharedTextures, 
   if(localFiles.length)await textureLibrary.loadFiles(localFiles,{allowUnlisted:true});
 
   const draft=createTextureDraft(samples[0],saved);
+  // Face the functional artwork toward the initial Back view.
+  const comparisonLooks = new Map([[11, 5], [18, 0], [22, 4], [600, 5], [601, 5], [650, 5], [651, 5]]);
   const makeSamples=()=>{
     const {typeIndex,materialIndex}=draft;
     const type=getBlockDefinition(typeIndex).displayName,material=MATERIALS[materialIndex].name;
-    return makeModel(samples.map(block=>({...block,typeIndex,type,materialIndex,material})),fixture.fileName);
+    return makeModel(samples.map(block=>({...block,typeIndex,type,materialIndex,material,look:comparisonLooks.get(typeIndex) ?? block.look})),fixture.fileName);
   };
   const updatePreview=rebuild=>{
     scene.textureAssignment=activeTextureAssignment(draft);

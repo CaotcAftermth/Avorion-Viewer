@@ -6,8 +6,9 @@ import { getUnitGeometry } from "./blockGeometry.js";
 /** Per-triangle face metadata. IDs mirror the game's -X,+X,-Y,+Y,-Z,+Z convention. */
 export const SURFACE_PLAIN = 0, SURFACE_ENGINE = 1, SURFACE_THRUSTER = 2, SURFACE_DECAL = 3, SURFACE_GENERATOR = 4, SURFACE_GENERATOR_WORLD = 5, SURFACE_FRAMEWORK = 6;
 export function surfaceKind(surface, side) {
-    if (surface === "front-torpedo") return side === 5 ? SURFACE_DECAL : 18;
-    if (surface === "dock") return 28;
+    if (surface === "torpedo") return side === 5 ? 36 : 18;
+    if (surface === "front-torpedo") return side === 1 ? 37 : 18;
+    if (surface === "dock") return side < 2 ? 28 : 18;
     if(surface==='housing')return 26;
     if(surface==='hangar'&&side>=6)return 27;
     if (surface === "engine")
@@ -20,6 +21,7 @@ export function surfaceKind(surface, side) {
         return SURFACE_DECAL;
     if (surface === "generator")
         return SURFACE_GENERATOR;
+    if (surface === "computer-core") return 38;
     if (surface === "generator-world")
         return SURFACE_GENERATOR_WORLD;
     if (surface === "framework")
@@ -27,6 +29,7 @@ export function surfaceKind(surface, side) {
     const extra = {
         solar: 7, glass: 8, hologram: 9, "rich-stone": 10, "super-rich-stone": 11,
         "rich-rift": 12, "super-rich-rift": 13, pods: 14, hangar: 15, reflector: 19,
+        academy: 31, assembly: 32, "five-unit-decal": 33, "rotation-lock": 34, "turret-base": 35,
         "stripes-a": 20, "stripes-b": 21, "stripes-c": 22, "dark-a": 23, "dark-b": 24, "dark-c": 25, vivid: 29, scaffold: 30,
     };
     // The name faces away from the block's look axis (local -X): Avorion ships
@@ -39,9 +42,11 @@ export function surfaceKind(surface, side) {
         return extra[surface];
     return SURFACE_PLAIN;
 }
-/** Open hangar tunnel along local Z. Rim width remains a viewer approximation. */
-export function hangarPositions(size) {
-    const x = 0.5 - Math.min(0.15, 0.3 / size.x), y = 0.5 - Math.min(0.15, 0.3 / size.y);
+// The reference opening spans about 75% of each face dimension.
+export const HANGAR_OPENING_FRACTION = 0.75;
+/** Open hangar tunnel along local Z. */
+export function hangarPositions() {
+    const x = HANGAR_OPENING_FRACTION / 2, y = x;
     const z = 0.5, out = [];
     const quad = (a, b, c, d) => out.push(...a, ...b, ...c, ...a, ...c, ...d);
     // Four outer walls; both ends stay open.
@@ -68,13 +73,13 @@ export function hangarPositions(size) {
         for(let axis=0;axis<3;axis++)[out[i+3+axis],out[i+6+axis]]=[out[i+6+axis],out[i+3+axis]];
     return new THREE.Float32BufferAttribute(out, 3);
 }
-function unitPositions(typeIndex, scale) {
-    return typeIndex === 10 ? hangarPositions(scale)
+function unitPositions(typeIndex) {
+    return typeIndex === 10 ? hangarPositions()
         : getUnitGeometry(getBlockDefinition(typeIndex).geometryKind).getAttribute("position");
 }
 
-// Hangar dimensions change the rim, while the number of quads is fixed.
-const hangarVertexCount = hangarPositions({x:1,y:1}).count;
+// Hangar geometry has a fixed vertex count.
+const hangarVertexCount = hangarPositions().count;
 export function blockSurfaceVertexCount(typeIndex) {
     return typeIndex === 10 ? hangarVertexCount : unitPositions(typeIndex).count;
 }
@@ -83,7 +88,7 @@ export function blockSurfaceVertexCount(typeIndex) {
 export function blockSurfaceGeometry(block, profile) {
     const { quaternion, base } = resolveOrientation(profile, block.look, block.up, block.typeIndex);
     const scale = localScaleFor(base, block.size);
-    const unit = unitPositions(block.typeIndex, scale);
+    const unit = unitPositions(block.typeIndex);
     const matrix = new THREE.Matrix4().compose(new THREE.Vector3(block.position.x, block.position.y, block.position.z), quaternion, scale);
     const positions = new Float32Array(unit.count * 3), uv = new Float32Array(unit.count * 2);
     const faces = new Float32Array(unit.count * 3); // physical face width, height, local side
