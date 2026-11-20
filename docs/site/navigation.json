@@ -1,0 +1,275 @@
+[
+  {
+    "id": "introduction",
+    "title": "Introduction",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "import",
+    "title": "Open Your First Ship",
+    "description": " Before you start",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "user-interface",
+    "title": "User Interface",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "window-system",
+    "title": "Window System",
+    "description": "This is Avorion Viewer’s own window-system guide. Its Blender-inspired controls operate on editor areas inside your browser, not operating-system windows.",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "splash-screen",
+    "title": "Splash Screen",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "topbar",
+    "title": "Topbar",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "workspaces",
+    "title": "Workspaces",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "status-bar",
+    "title": "Status Bar",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "areas",
+    "title": "Areas",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "ui-regions",
+    "title": "Regions",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "tabs-panels",
+    "title": "Tabs & Panels",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "editors",
+    "title": "Editors",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "editor-viewport",
+    "title": "3D Viewport",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "navigation",
+    "title": "Navigation",
+    "description": " Mouse and Laptop navigation",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "inspection",
+    "title": "Selection & Inspection",
+    "description": " Select in the viewport",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "display",
+    "title": "Display",
+    "description": " Choose shading",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "painting",
+    "title": "Painting",
+    "description": " Make a controlled first change",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "editor-outliner",
+    "title": "Outliner",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "editor-properties",
+    "title": "Properties",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "world",
+    "title": "World & Shaders",
+    "description": " Choose a background",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "turrets",
+    "title": "Turrets & Components",
+    "description": " Select turret sockets",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "coverage",
+    "title": "Weapon Coverage",
+    "description": " Start an analysis",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "editor-info",
+    "title": "Info",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "preferences",
+    "title": "Preferences",
+    "description": " Open and search Preferences",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "shortcuts",
+    "title": "Shortcut Reference",
+    "description": "Keyboard reference for current default bindings",
+    "source": "src/keymaps.js",
+    "status": "Generated from current keymap; customized bindings differ"
+  },
+  {
+    "id": "colors",
+    "title": "Color Editor",
+    "description": " Open the Color Editor",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "assets",
+    "title": "Asset Library",
+    "description": " Turrets and Components",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "studio",
+    "title": "Turret Studio",
+    "description": " Open the turret asset workspace",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "timelines",
+    "title": "Cameras & Timelines",
+    "description": " Choose a camera preset",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "model-project",
+    "title": "Model Project",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "saving",
+    "title": "Saving & Recovery",
+    "description": " Use the save route for your result",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "workspace-profile",
+    "title": "Workspace Profile",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "export",
+    "title": "Export",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "image-export",
+    "title": "Images & Blueprints",
+    "description": " Choose an image goal",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "model-export",
+    "title": "3D Models & Print Geometry",
+    "description": " Choose a starting goal",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "textures",
+    "title": "Textures",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "reference",
+    "title": "Reference",
+    "status": "Manual chapter; source-reviewed, release validation ongoing",
+    "source": "Current app UI and manual authoring"
+  },
+  {
+    "id": "troubleshooting",
+    "title": "Troubleshooting",
+    "description": " Find the likely control",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  },
+  {
+    "id": "glossary",
+    "title": "Glossary",
+    "description": "| Term | Meaning |",
+    "source": "WEB_APP_USER_GUIDE.md",
+    "sourceVersion": "0.12.0 deployed snapshot",
+    "status": "Migrated — release review required"
+  }
+]

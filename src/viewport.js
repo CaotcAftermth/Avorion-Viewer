@@ -18,7 +18,7 @@ import {drawSockets} from './turrets/sockets.js';
 import {drawDimensions,drawSymmetryPlanes} from './viewport-annotations.js';
 import {paintOptions} from './paint-tools.js';
 import {cursorCSS,viewportCursor,drawBrushRing} from './viewport-cursors.js';
-import {nativeToView,viewToNative} from './block-model.js';
+import {nativeToView,viewToNative,getBlockDefinition} from './block-model.js';
 import {modelExtents,dimensionRulers,exteriorRuler} from './model-overlays.js';
 import {gridSpacing} from './world-guides.js';
 import { frameVisibleModel } from './model-framing.js';
@@ -44,6 +44,11 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   const originalCursor=canvas.style?.cursor||'';
   const hoverLabel=globalThis.document?.createElement('div');if(hoverLabel){hoverLabel.className='paint-hover-label';hoverLabel.hidden=true;body.append?.(hoverLabel);}
   let statsKey=[],width = 1, height = 1, frame = 0, drag = null, regionMode = false, projectedFaces = [];
+  let fpsTimer=0, fpsFrames=0, fpsStarted=0, fpsValue=0, renderMs='0.0';
+  function updatePerformanceText() {
+    const timing=body.querySelector('.viewport-performance');
+    if(timing)timing.textContent=`Render ${renderMs} ms\nFPS ${fpsValue.toFixed(1)}`;
+  }
   const dimensionCache={};
   let socketHits=[],componentSocketHits=[];
   const componentTools=createComponentTools(scene,view,getPreferences);
@@ -53,6 +58,57 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   const events = new AbortController();
   const listen = (target, type, handler, options = {}) => target.addEventListener(type, handler, { ...options, signal: events.signal });
   const invalidate = () => { if (!frame) frame = requestAnimationFrame(draw); };
+  const blockTooltip=globalThis.document?.createElement('div');
+  if(blockTooltip){
+    blockTooltip.className='selected-block-tooltip';blockTooltip.hidden=true;
+    blockTooltip.setAttribute('role','tooltip');
+    blockTooltip.style.cssText='position:absolute;z-index:100;pointer-events:none;white-space:pre;background:#202124;color:#eee;border:1px solid #666;border-radius:4px;padding:6px 9px;font:12px monospace;';
+    body.append?.(blockTooltip);
+  }
+  let blockHoverTimer=0,blockHoverId=null,blockHoverPoint=null;
+  const tooltipEligible=()=>view.interactionMode!=='paint'&&!socketToolActive(view)&&!drag&&!placement.state;
+  function clearBlockTooltip(){clearTimeout(blockHoverTimer);blockHoverTimer=0;blockHoverId=null;if(blockTooltip)blockTooltip.hidden=true;}
+  function selectedHover(point){
+    const component=pickComponent(scene,view,width,height,...point,getPreferences());
+    if(component){
+      const id=component.componentMountId;
+      if(scene.selectedComponentMountId!==id&&!scene.selectedComponentMountIds?.has(id))return null;
+      const mount=scene.model?.componentSetup?.mounts.find(m=>m.id===id);
+      return mount?{id:'component:'+id,name:mount.name||mount.asset?.name||'Component'}:null;
+    }
+    const turret=pickTurret(scene,view,width,height,...point,getPreferences());
+    if(turret){
+      const id=turret.mountId;
+      if(scene.selectedTurretId!==id&&!scene.selectedTurretIds?.has(id))return null;
+      const mount=mounts(scene).find(m=>m.id===id);
+      return mount?{id:'turret:'+id,name:mount.name||mount.asset?.name||'Turret'}:null;
+    }
+    const id=pickGame(scene,view,width,height,...point,getPreferences());
+    if(!id||!scene.selectedIds?.has(id))return null;
+    const block=liveBlocks(scene).find(b=>b.id===id);
+    return block?{id:'block:'+id,name:getBlockDefinition(block.typeIndex).displayName,size:block.size}:null;
+  }
+  function hoverSelectedBlock(event){
+    if(!blockTooltip||event.pointerType==='touch'||event.buttons||!tooltipEligible()){clearBlockTooltip();return;}
+    const point=position(event),target=selectedHover(point);
+    if(!target){clearBlockTooltip();return;}
+    blockHoverPoint=point;
+    if(target.id===blockHoverId)return;
+    clearBlockTooltip();blockHoverId=target.id;
+    blockHoverTimer=setTimeout(()=>{
+      const current=tooltipEligible()&&selectedHover(blockHoverPoint);
+      if(!current||current.id!==blockHoverId){clearBlockTooltip();return;}
+      const format=n=>Number(n.toPrecision(6));
+      blockTooltip.textContent=current.name+(current.size?`\nWidth:   ${format(current.size.x)} u\nHeight:  ${format(current.size.y)} u\nLength:  ${format(current.size.z)} u`:'');
+      blockTooltip.hidden=false;
+      const rect=canvas.getBoundingClientRect(),parent=body.getBoundingClientRect();
+      blockTooltip.style.left=Math.max(0,Math.min(rect.left-parent.left+blockHoverPoint[0]+14,body.clientWidth-blockTooltip.offsetWidth-4))+'px';
+      blockTooltip.style.top=Math.max(0,Math.min(rect.top-parent.top+blockHoverPoint[1]+14,body.clientHeight-blockTooltip.offsetHeight-4))+'px';
+    },1000);
+  }
+  listen(canvas,'pointermove',hoverSelectedBlock);
+  for(const event of ['pointerdown','pointerleave','pointercancel','wheel'])listen(canvas,event,clearBlockTooltip);
+
   listen(window,'avorion-sky-ready',invalidate);
   listen(window,'avorion-model-ready',invalidate);
   listen(body,'pointerenter',()=>{activePlacementViewport=area.id;});listen(body,'focusin',()=>{activePlacementViewport=area.id;});
@@ -123,6 +179,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     if(frameOnLoad(width,height))onChange();
     updateCursor();
     const started=performance.now();
+    if(blockHoverId){const split=blockHoverId.indexOf(':'),kind=blockHoverId.slice(0,split),id=blockHoverId.slice(split+1),selected=kind==='block'?scene.selectedIds?.has(id):kind==='turret'?(scene.selectedTurretId===id||scene.selectedTurretIds?.has(id)):(scene.selectedComponentMountId===id||scene.selectedComponentMountIds?.has(id));if(!tooltipEligible()||!selected)clearBlockTooltip();}
     frame = 0;
     if(placement.state&&placement.state.model!==scene.model)placement.cancel();
     if(imageRenderBusy())return;
@@ -192,7 +249,23 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     if(display){
       let timing=body.querySelector('.viewport-performance');
       if(!timing&&typeof document!=='undefined'){timing=document.createElement('div');timing.className='viewport-performance';body.append(timing);}
-      if(timing){timing.hidden=!(display.showOverlays&&display.showPerformance);timing.textContent=`Render ${(performance.now()-started).toFixed(1)} ms`;}
+      if(timing){
+        timing.hidden=!(display.showOverlays&&display.showPerformance);
+        timing.style.whiteSpace='pre-line';
+        renderMs=(performance.now()-started).toFixed(1);
+        if(!timing.hidden){
+          if(!fpsTimer){
+            fpsFrames=0;fpsValue=0;fpsStarted=performance.now();
+            fpsTimer=setInterval(()=>{
+              const now=performance.now();
+              fpsValue=fpsFrames*1000/Math.max(1,now-fpsStarted);
+              fpsFrames=0;fpsStarted=now;updatePerformanceText();
+            },500);
+          }
+          fpsFrames++;
+        } else if(fpsTimer){clearInterval(fpsTimer);fpsTimer=0;}
+        updatePerformanceText();
+      }
     }
     if (projection) projection.setAttribute('aria-pressed', String(view.projection === 'perspective'));
     body.querySelector('.view-cube')?.updateView(view);
@@ -509,7 +582,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   listen(canvas,'pointerenter',trackButtons);
   listen(canvas,'pointermove',event=>{trackButtons(event);if(handlesTouch(event))touchMove(event);else move(event);});
   listen(canvas,'pointerleave',()=>{if(!drag&&!magnifier){paintPointer=null;scene.coverageHover=null;invalidate();}});
-  listen(canvas,'pointerup',event=>{trackButtons(event);if(handlesTouch(event))touchUp(event);else up(event);updateCursor();});
+  listen(canvas,'pointerup',event=>{trackButtons(event);if(handlesTouch(event))touchUp(event);else up(event);updateCursor();hoverSelectedBlock(event);});
   listen(canvas,'pointercancel',cancel);
   listen(canvas,'lostpointercapture',event=>{if(drag||magnifier||touches.has(event.pointerId))cancel();});
   listen(window,'blur',cancel);
@@ -588,7 +661,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     get statusActivity() { return statusActivity(); },
     get navigating() { return !!drag || regionMode || !!magnifier; },
     startRegion() {cancel();regionMode=true;body.classList.add('region-zoom');canvas.focus({preventScroll:true});invalidate();},
-    dispose() {socketEditor.dispose();turretToolbar.dispose();if(activePlacementViewport===area.id)activePlacementViewport=null;placement.cancel();placement.dispose();releaseViewportResources(view);cancel();events.abort();observer.disconnect();cancelAnimationFrame(frame);hoverLabel?.remove?.();if(canvas.style)canvas.style.cursor=originalCursor;}
+    dispose() {clearBlockTooltip();blockTooltip?.remove?.();clearInterval(fpsTimer);socketEditor.dispose();turretToolbar.dispose();if(activePlacementViewport===area.id)activePlacementViewport=null;placement.cancel();placement.dispose();releaseViewportResources(view);cancel();events.abort();observer.disconnect();cancelAnimationFrame(frame);hoverLabel?.remove?.();if(canvas.style)canvas.style.cursor=originalCursor;}
   };
 }
 

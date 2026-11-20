@@ -1,0 +1,567 @@
+{
+  "fixture": "docs/site/examples/tutorial-ship.xml",
+  "temporaryFixture": true,
+  "density": 3,
+  "entries": [
+    {
+      "id": "editor-viewport-select-1",
+      "label": "Select",
+      "section": "editor-viewport",
+      "kind": "control",
+      "file": "controls/editor-viewport-select-1.png",
+      "status": "captured"
+    },
+    {
+      "id": "editor-viewport-select-sockets-2",
+      "label": "Select Sockets",
+      "section": "editor-viewport",
+      "kind": "control",
+      "file": "controls/editor-viewport-select-sockets-2.png",
+      "status": "captured"
+    },
+    {
+      "id": "editor-viewport-orbit-3",
+      "label": "Orbit",
+      "section": "editor-viewport",
+      "kind": "control",
+      "file": "controls/editor-viewport-orbit-3.png",
+      "status": "captured"
+    },
+    {
+      "id": "editor-viewport-pan-4",
+      "label": "Pan",
+      "section": "editor-viewport",
+      "kind": "control",
+      "file": "controls/editor-viewport-pan-4.png",
+      "status": "captured"
+    },
+    {
+      "id": "editor-viewport-frame-all-5",
+      "label": "Frame all",
+      "section": "editor-viewport",
+      "kind": "control",
+      "file": "controls/editor-viewport-frame-all-5.png",
+      "status": "captured"
+    },
+    {
+      "id": "topbar-file-6",
+      "label": "File",
+      "section": "topbar",
+      "kind": "control",
+      "file": "controls/topbar-file-6.png",
+      "status": "captured"
+    },
+    {
+      "id": "topbar-edit-7",
+      "label": "Edit",
+      "section": "topbar",
+      "kind": "control",
+      "file": "controls/topbar-edit-7.png",
+      "status": "captured"
+    },
+    {
+      "id": "topbar-window-8",
+      "label": "Window",
+      "section": "topbar",
+      "kind": "control",
+      "file": "controls/topbar-window-8.png",
+      "status": "captured"
+    },
+    {
+      "id": "topbar-help-9",
+      "label": "Help",
+      "section": "topbar",
+      "kind": "control",
+      "file": "controls/topbar-help-9.png",
+      "status": "captured"
+    },
+    {
+      "id": "viewport-header-editor-type-10",
+      "label": "Editor type",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-editor-type-10.png",
+      "status": "captured"
+    },
+    {
+      "id": "viewport-header-view-menu-11",
+      "label": "View menu",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-view-menu-11.png",
+      "status": "captured"
+    },
+    {
+      "id": "viewport-header-select-menu-12",
+      "label": "Select menu",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-select-menu-12.png",
+      "status": "captured"
+    },
+    {
+      "id": "viewport-header-toggle-grid-13",
+      "label": "Toggle grid",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-toggle-grid-13.png",
+      "status": "captured"
+    },
+    {
+      "id": "viewport-header-show-hide-0-thickness-blocks-14",
+      "label": "Show/Hide 0 thickness blocks",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-show-hide-0-thickness-blocks-14.png",
+      "status": "captured"
+    },
+    {
+      "id": "viewport-header-show-gizmos-15",
+      "label": "Show Gizmos",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-show-gizmos-15.png",
+      "status": "captured"
+    },
+    {
+      "id": "viewport-header-show-overlays-16",
+      "label": "Show Overlays",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-show-overlays-16.png",
+      "status": "captured"
+    },
+    {
+      "id": "viewport-header-viewport-overlays-17",
+      "label": "Viewport Overlays",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-viewport-overlays-17.png",
+      "status": "captured"
+    },
+    {
+      "id": "viewport-header-toggle-x-ray-18",
+      "label": "Toggle X-Ray",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-toggle-x-ray-18.png",
+      "status": "captured"
+    },
+    {
+      "id": "viewport-header-wireframe-shading-19",
+      "label": "Wireframe shading",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-wireframe-shading-19.png",
+      "status": "captured"
+    },
+    {
+      "id": "viewport-header-solid-shading-20",
+      "label": "Solid shading",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-solid-shading-20.png",
+      "status": "captured"
+    },
+    {
+      "id": "viewport-header-material-preview-shading-21",
+      "label": "Material Preview shading",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-material-preview-shading-21.png",
+      "status": "captured"
+    },
+    {
+      "id": "viewport-header-rendered-shading-22",
+      "label": "Rendered shading",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-rendered-shading-22.png",
+      "status": "captured"
+    },
+    {
+      "id": "viewport-header-viewport-shading-23",
+      "label": "Viewport Shading",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-viewport-shading-23.png",
+      "status": "captured"
+    },
+    {
+      "id": "viewport-header-toggle-sidebar-24",
+      "label": "Toggle sidebar",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-toggle-sidebar-24.png",
+      "status": "captured"
+    },
+    {
+      "id": "viewport-header-area-options-25",
+      "label": "Area options",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-area-options-25.png",
+      "status": "captured"
+    },
+    {
+      "id": "painting-select-26",
+      "label": "Select",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-select-26.png",
+      "status": "captured"
+    },
+    {
+      "id": "painting-brush-27",
+      "label": "Brush",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-brush-27.png",
+      "status": "captured"
+    },
+    {
+      "id": "painting-eyedropper-28",
+      "label": "Eyedropper",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-eyedropper-28.png",
+      "status": "captured"
+    },
+    {
+      "id": "painting-replace-color-with-selected-29",
+      "label": "Replace Color with Selected",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-replace-color-with-selected-29.png",
+      "status": "captured"
+    },
+    {
+      "id": "painting-connected-fill-30",
+      "label": "Connected Fill",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-connected-fill-30.png",
+      "status": "captured"
+    },
+    {
+      "id": "painting-restore-31",
+      "label": "Restore",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-restore-31.png",
+      "status": "captured"
+    },
+    {
+      "id": "painting-brush-color-32",
+      "label": "Brush color",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-brush-color-32.png",
+      "status": "captured"
+    },
+    {
+      "id": "painting-paint-symmetry-33",
+      "label": "Paint symmetry",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-paint-symmetry-33.png",
+      "status": "captured"
+    },
+    {
+      "id": "painting-hide-turrets-and-components-34",
+      "label": "Hide Turrets and Components",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-hide-turrets-and-components-34.png",
+      "status": "captured"
+    },
+    {
+      "id": "painting-undo-35",
+      "label": "Undo",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-undo-35.png",
+      "status": "captured"
+    },
+    {
+      "id": "painting-redo-36",
+      "label": "Redo",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-redo-36.png",
+      "status": "captured"
+    },
+    {
+      "id": "painting-paint-palettes-37",
+      "label": "Paint palettes",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-paint-palettes-37.png",
+      "status": "captured"
+    },
+    {
+      "id": "painting-palette-dodger-blue-38",
+      "label": "Palette Dodger Blue",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-palette-dodger-blue-38.png",
+      "status": "captured"
+    },
+    {
+      "id": "painting-model-palette-39",
+      "label": "Model Palette",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-model-palette-39.png",
+      "status": "captured"
+    },
+    {
+      "id": "property-symbols-object-properties-40",
+      "label": "Object properties",
+      "section": "property-symbols",
+      "kind": "symbol",
+      "file": "controls/property-symbols-object-properties-40.png",
+      "status": "captured"
+    },
+    {
+      "id": "property-symbols-scene-properties-41",
+      "label": "Scene properties",
+      "section": "property-symbols",
+      "kind": "symbol",
+      "file": "controls/property-symbols-scene-properties-41.png",
+      "status": "captured"
+    },
+    {
+      "id": "editor-properties-scene-properties-model-summary-42",
+      "label": "Scene properties · Model Summary",
+      "section": "editor-properties",
+      "kind": "panel",
+      "file": "controls/editor-properties-scene-properties-model-summary-42.png",
+      "status": "captured"
+    },
+    {
+      "id": "editor-properties-scene-properties-capture-43",
+      "label": "Scene properties · Capture",
+      "section": "editor-properties",
+      "kind": "panel",
+      "file": "controls/editor-properties-scene-properties-capture-43.png",
+      "status": "captured"
+    },
+    {
+      "id": "property-symbols-world-sky-44",
+      "label": "World sky",
+      "section": "property-symbols",
+      "kind": "symbol",
+      "file": "controls/property-symbols-world-sky-44.png",
+      "status": "captured"
+    },
+    {
+      "id": "property-symbols-shaders-45",
+      "label": "Shaders",
+      "section": "property-symbols",
+      "kind": "symbol",
+      "file": "controls/property-symbols-shaders-45.png",
+      "status": "captured"
+    },
+    {
+      "id": "property-symbols-turrets-46",
+      "label": "Turrets",
+      "section": "property-symbols",
+      "kind": "symbol",
+      "file": "controls/property-symbols-turrets-46.png",
+      "status": "captured"
+    },
+    {
+      "id": "turrets-turrets-socket-display-47",
+      "label": "Turrets · Socket Display",
+      "section": "turrets",
+      "kind": "panel",
+      "file": "controls/turrets-turrets-socket-display-47.png",
+      "status": "captured"
+    },
+    {
+      "id": "turrets-turrets-mounting-48",
+      "label": "Turrets · Mounting",
+      "section": "turrets",
+      "kind": "panel",
+      "file": "controls/turrets-turrets-mounting-48.png",
+      "status": "captured"
+    },
+    {
+      "id": "turrets-turrets-socket-details-49",
+      "label": "Turrets · Socket Details",
+      "section": "turrets",
+      "kind": "panel",
+      "file": "controls/turrets-turrets-socket-details-49.png",
+      "status": "captured"
+    },
+    {
+      "id": "property-symbols-components-50",
+      "label": "Components",
+      "section": "property-symbols",
+      "kind": "symbol",
+      "file": "controls/property-symbols-components-50.png",
+      "status": "captured"
+    },
+    {
+      "id": "turrets-components-create-sockets-51",
+      "label": "Components · Create Sockets",
+      "section": "turrets",
+      "kind": "panel",
+      "file": "controls/turrets-components-create-sockets-51.png",
+      "status": "captured"
+    },
+    {
+      "id": "turrets-components-component-socket-52",
+      "label": "Components · Component Socket",
+      "section": "turrets",
+      "kind": "panel",
+      "file": "controls/turrets-components-component-socket-52.png",
+      "status": "captured"
+    },
+    {
+      "id": "turrets-components-ship-component-files-53",
+      "label": "Components · Ship Component Files",
+      "section": "turrets",
+      "kind": "panel",
+      "file": "controls/turrets-components-ship-component-files-53.png",
+      "status": "captured"
+    },
+    {
+      "id": "property-symbols-weapon-coverage-54",
+      "label": "Weapon Coverage",
+      "section": "property-symbols",
+      "kind": "symbol",
+      "file": "controls/property-symbols-weapon-coverage-54.png",
+      "status": "captured"
+    },
+    {
+      "id": "coverage-weapon-coverage-visualization-55",
+      "label": "Weapon Coverage · Visualization",
+      "section": "coverage",
+      "kind": "panel",
+      "file": "controls/coverage-weapon-coverage-visualization-55.png",
+      "status": "captured"
+    },
+    {
+      "id": "coverage-weapon-coverage-turret-scope-56",
+      "label": "Weapon Coverage · Turret Scope",
+      "section": "coverage",
+      "kind": "panel",
+      "file": "controls/coverage-weapon-coverage-turret-scope-56.png",
+      "status": "captured"
+    },
+    {
+      "id": "coverage-weapon-coverage-analysis-57",
+      "label": "Weapon Coverage · Analysis",
+      "section": "coverage",
+      "kind": "panel",
+      "file": "controls/coverage-weapon-coverage-analysis-57.png",
+      "status": "captured"
+    },
+    {
+      "id": "coverage-weapon-coverage-slice-settings-58",
+      "label": "Weapon Coverage · Slice Settings",
+      "section": "coverage",
+      "kind": "panel",
+      "file": "controls/coverage-weapon-coverage-slice-settings-58.png",
+      "status": "captured"
+    },
+    {
+      "id": "coverage-weapon-coverage-appearance-colors-59",
+      "label": "Weapon Coverage · Appearance & Colors",
+      "section": "coverage",
+      "kind": "panel",
+      "file": "controls/coverage-weapon-coverage-appearance-colors-59.png",
+      "status": "captured"
+    },
+    {
+      "id": "coverage-weapon-coverage-inspection-statistics-60",
+      "label": "Weapon Coverage · Inspection & Statistics",
+      "section": "coverage",
+      "kind": "panel",
+      "file": "controls/coverage-weapon-coverage-inspection-statistics-60.png",
+      "status": "captured"
+    },
+    {
+      "id": "coverage-weapon-coverage-comparison-export-61",
+      "label": "Weapon Coverage · Comparison & Export",
+      "section": "coverage",
+      "kind": "panel",
+      "file": "controls/coverage-weapon-coverage-comparison-export-61.png",
+      "status": "captured"
+    },
+    {
+      "id": "coverage-weapon-coverage-advanced-analysis-62",
+      "label": "Weapon Coverage · Advanced Analysis",
+      "section": "coverage",
+      "kind": "panel",
+      "file": "controls/coverage-weapon-coverage-advanced-analysis-62.png",
+      "status": "visible-portion"
+    },
+    {
+      "id": "property-symbols-workspace-settings-63",
+      "label": "Workspace settings",
+      "section": "property-symbols",
+      "kind": "symbol",
+      "file": "controls/property-symbols-workspace-settings-63.png",
+      "status": "captured"
+    },
+    {
+      "id": "workspaces-workspace-settings-window-system-64",
+      "label": "Workspace settings · Window system",
+      "section": "workspaces",
+      "kind": "panel",
+      "file": "controls/workspaces-workspace-settings-window-system-64.png",
+      "status": "captured"
+    },
+    {
+      "id": "colors-editor-type-65",
+      "label": "Editor type",
+      "section": "colors",
+      "kind": "control",
+      "file": "controls/colors-editor-type-65.png",
+      "status": "captured"
+    },
+    {
+      "id": "colors-area-options-66",
+      "label": "Area options",
+      "section": "colors",
+      "kind": "control",
+      "file": "controls/colors-area-options-66.png",
+      "status": "captured"
+    },
+    {
+      "id": "assets-editor-type-67",
+      "label": "Editor type",
+      "section": "assets",
+      "kind": "control",
+      "file": "controls/assets-editor-type-67.png",
+      "status": "captured"
+    },
+    {
+      "id": "assets-show-turrets-in-the-asset-library-68",
+      "label": "Show turrets in the Asset Library",
+      "section": "assets",
+      "kind": "control",
+      "file": "controls/assets-show-turrets-in-the-asset-library-68.png",
+      "status": "captured"
+    },
+    {
+      "id": "assets-show-components-in-the-asset-library-69",
+      "label": "Show components in the Asset Library",
+      "section": "assets",
+      "kind": "control",
+      "file": "controls/assets-show-components-in-the-asset-library-69.png",
+      "status": "captured"
+    },
+    {
+      "id": "assets-area-options-70",
+      "label": "Area options",
+      "section": "assets",
+      "kind": "control",
+      "file": "controls/assets-area-options-70.png",
+      "status": "captured"
+    }
+  ]
+}

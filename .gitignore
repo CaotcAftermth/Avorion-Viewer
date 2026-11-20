@@ -1,5 +1,6 @@
 node_modules/
 dist/
+docs/site/public/
 test-results/
 output/
 _backup*/
@@ -17,3 +18,6 @@ Thumbs.db
 .dev.vars
 .dev.vars.*
 .wrangler/
+
+.venv-docs/
+docs/site/.sphinx-source/

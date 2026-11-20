@@ -1,0 +1,7 @@
+{
+  "fixture": "../examples/tutorial-ship.xml",
+  "method": "Actual application renderer via captureImage/exportImage; comparison sheets contain labeled outputs",
+  "paint": "recordBlockColors: side panels at |x| > 4.5 and z > -6 change from ff626a73 to ff23bdb3",
+  "camera": "isometric orthographic, fitted, 1100 × 650",
+  "sourceVersion": "0.12.0"
+}

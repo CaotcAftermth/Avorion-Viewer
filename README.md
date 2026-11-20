@@ -62,6 +62,12 @@ Imported XML structure and coordinates are preserved when saving paint edits. Me
 
 ## Documentation
 
+The manual uses Sphinx, MyST Markdown and the Furo theme. Before running documentation builds, create `.venv-docs` with Python 3.12 and install `docs/site/requirements.txt`; see [manual authoring](docs/site/README.md). The published documentation has no Python runtime requirement.
+
+
+Use **Help > Documentation** for the new searchable wiki, including the Avorion Viewer window system. `npm run dev` builds the local preview; `npm run build` includes `dist/docs/`. The Blender manual is retained while the new documentation completes release review.
+
+
 - [Getting started: modes, views, and exports](docs/GETTING_STARTED.md)
 
 - [User guide and design references](docs/USER_GUIDE.md)

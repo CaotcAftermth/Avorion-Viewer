@@ -2,7 +2,8 @@ import http from 'node:http';
 import { readFile, stat, realpath } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-const types = { '.wasm': 'application/wasm', '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.json': 'application/json', '.png': 'image/png', '.bmp': 'image/bmp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.txt': 'text/plain' };
+import { buildDocs } from './build-docs.mjs';
+const types = { '.wasm': 'application/wasm', '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.json': 'application/json', '.gif': 'image/gif', '.woff2': 'font/woff2', '.xml': 'application/xml', '.png': 'image/png', '.bmp': 'image/bmp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.txt': 'text/plain' };
 const ORIGIN = 'http://127.0.0.1:5173';
 export function viewerHandler(directory) {
   const root = resolve(directory);
@@ -17,12 +18,21 @@ export function viewerHandler(directory) {
       const segments = urlPath.split('/').filter(Boolean);
       // Serve only application assets, not repository metadata, logs or credentials.
       if (urlPath.includes('\\') || urlPath.includes(':') || segments.some(s => s.startsWith('.')) ||
-          !(segments.length === 0 || ['src', 'prototypes'].includes(segments[0]) ||
+          !(segments.length === 0 || ['src', 'prototypes', 'docs'].includes(segments[0]) ||
             (segments.length === 1 && ['index.html', 'favicon.svg'].includes(segments[0])))) {
         res.writeHead(403).end(); return;
       }
       let path = resolve(root, '.' + urlPath);
-      if ((await stat(path)).isDirectory()) path = resolve(path, 'index.html');
+      if (segments[0] === 'docs') {
+        if (segments.includes('site')) { res.writeHead(403).end(); return; }
+        const docsRoot = root === resolve('.') ? resolve(root, 'docs/site/public') : resolve(root, 'docs');
+        path = resolve(docsRoot, ...segments.slice(1));
+        if (path !== docsRoot && !path.startsWith(docsRoot + sep)) { res.writeHead(403).end(); return; }
+      }
+      if ((await stat(path)).isDirectory()) {
+        if (segments[0] === 'docs' && !urlPath.endsWith('/')) { res.writeHead(308, { Location: urlPath + '/' }).end(); return; }
+        path = resolve(path, 'index.html');
+      }
       const [canonicalRoot, canonicalPath] = await Promise.all([realpath(root), realpath(path)]);
       if (!canonicalPath.startsWith(canonicalRoot + sep)) { res.writeHead(403).end(); return; }
       const content = await readFile(canonicalPath);
@@ -33,5 +43,6 @@ export function viewerHandler(directory) {
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const root = resolve(process.argv.includes('--dist') ? 'dist' : '.');
+  if (!process.argv.includes('--dist')) await buildDocs('docs/site/public');
   http.createServer(viewerHandler(root)).listen(5173, '127.0.0.1', () => console.log('Avorion Viewer: ' + ORIGIN));
 }

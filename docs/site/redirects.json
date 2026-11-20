@@ -1,0 +1,11 @@
+{
+  "tasks": "import",
+  "folders": "assets#folders-saved-models",
+  "components": "turrets#component-attachments",
+  "effects": "studio#effects-comparison-calibration",
+  "editor-preferences": "preferences",
+  "editor-color": "colors",
+  "editor-assets": "assets",
+  "screen": "user-interface",
+  "control-reference": "editors"
+}

@@ -1,0 +1,45 @@
+import {chromium} from 'file:///C:/Users/joshu/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import http from 'node:http';
+import assert from 'node:assert/strict';
+import {mkdir} from 'node:fs/promises';
+import {viewerHandler} from '../scripts/serve.mjs';
+import {buildDocs} from '../scripts/build-docs.mjs';
+await buildDocs('docs/site/public');await mkdir('test-results/documentation',{recursive:true});
+const handler=viewerHandler('.');const server=http.createServer((req,res)=>{if(req.headers.origin===`http://127.0.0.1:${server.address().port}`)req.headers.origin='http://127.0.0.1:5173';req.headers.host='127.0.0.1:5173';handler(req,res);});await new Promise(r=>server.listen(0,'127.0.0.1',r));
+const browser=await chromium.launch({headless:true,channel:'msedge',args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+try{
+ const page=await browser.newPage({viewport:{width:1500,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));const root=`http://127.0.0.1:${server.address().port}`;
+ for(const id of ['', 'window-system/','editor-viewport/','areas/','image-export/']){
+  await page.goto(root+'/docs/'+id);assert.equal(await page.locator('h1').count(),1);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  assert.equal(await page.locator('.sidebar-tree').count(),1);for(const image of await page.locator('article img').all()){await image.evaluate(el=>el.decode());const size=await image.boundingBox();if(await image.evaluate(el=>el.classList.contains('manual-small-image')))assert.ok(Math.abs(size.height-50)<1);else assert.ok(size.height<=801);assert.ok(size.width<=((await image.evaluate(e=>e.classList.contains('manual-bar-image')))?1227:801));}
+  await page.screenshot({path:`test-results/documentation/furo-${id.replace('/','')||'home'}.png`});
+ }
+ await page.emulateMedia({colorScheme:'dark'});await page.goto(root+'/docs/window-system/');
+ const demo=page.frameLocator('iframe.manual-window-frame');await demo.locator('.area').first().waitFor();assert.equal(await demo.locator('.area').count(),2);
+ const divider=demo.getByRole('separator').first();const original=await divider.getAttribute('aria-valuenow');await divider.focus();await page.keyboard.press('ArrowLeft');assert.notEqual(await divider.getAttribute('aria-valuenow'),original);await divider.dblclick();assert.equal(await divider.getAttribute('aria-valuenow'),'50');
+ const border=await divider.boundingBox();await page.mouse.move(border.x+2,border.y+30);await page.mouse.down();await page.mouse.move(border.x-35,border.y+30);await page.mouse.up();assert.notEqual(await divider.getAttribute('aria-valuenow'),'50');await divider.dblclick();
+ const cancelBorder=await divider.boundingBox();await page.mouse.move(cancelBorder.x+2,cancelBorder.y+30);await page.mouse.down();await page.mouse.move(cancelBorder.x+30,cancelBorder.y+30);await page.keyboard.press('Escape');await page.mouse.up();assert.equal(await divider.getAttribute('aria-valuenow'),'50');
+ await demo.getByRole('button',{name:'Area actions',exact:true}).first().click();await demo.getByRole('menuitem',{name:'Horizontal split',exact:true}).click();assert.equal(await demo.locator('.area').count(),3);
+ await demo.getByLabel('Editor type',{exact:true}).first().selectOption('properties');await demo.getByRole('button',{name:'Area actions',exact:true}).first().click();await demo.getByRole('menuitem',{name:'Swap with neighbor',exact:true}).click();assert.equal(await demo.locator('.area').nth(1).getAttribute('data-editor'),'properties');
+ await demo.getByRole('button',{name:'Area actions',exact:true}).first().click();await demo.getByRole('menuitem',{name:'Join neighbor · keep this editor',exact:true}).click();assert.equal(await demo.locator('.area').count(),2);
+ await demo.getByRole('button',{name:'Area actions',exact:true}).first().click();await demo.getByRole('menuitem',{name:'Maximize area',exact:true}).click();assert.equal(await demo.locator('.area').count(),1);await page.keyboard.press('Escape');assert.equal(await demo.locator('.area').count(),2);
+ await demo.getByRole('button',{name:'Reset example',exact:true}).click();await page.screenshot({path:'test-results/documentation/window-example.png'});
+ await page.goto(root+'/docs/topbar/');const thumbnail=page.locator('article figure .image-open').first();await thumbnail.click();const modal=page.getByRole('dialog',{name:'Image',exact:true});await modal.waitFor();assert.equal(await modal.locator('.image-focus').count(),1);await modal.locator('img').click();assert.ok(await modal.isVisible());await modal.getByRole('button',{name:'Expand image',exact:true}).click();assert.ok(await modal.evaluate(e=>e.classList.contains('full-size')));const expanded=await modal.locator('img').boundingBox();assert.ok(expanded.width<=1227&&expanded.height<=801);await page.keyboard.press('Escape');assert.ok(await modal.isHidden());assert.ok(await thumbnail.evaluate(e=>e===document.activeElement));
+ await thumbnail.click();await page.mouse.click(3,3);assert.ok(await modal.isHidden());
+ await page.goto(root+'/docs/topbar/');await page.screenshot({path:'test-results/documentation/annotated-header.png'});
+ await page.goto(root+'/docs/painting/');await page.locator('td .inline-control-image').first().click();await page.getByRole('dialog',{name:'Image',exact:true}).waitFor();await page.keyboard.press('Escape');
+ await page.goto(root+'/docs/areas/');const animation=page.locator('[data-animation]');assert.match(await animation.locator('img').getAttribute('src'),/poster/);await animation.getByRole('button',{name:'Play animation'}).click();await animation.locator('img').evaluate(el=>el.decode());assert.match(await animation.locator('img').getAttribute('src'),/\.gif/);await animation.getByRole('button',{name:'Stop animation'}).click();assert.match(await animation.locator('img').getAttribute('src'),/poster/);
+ await page.emulateMedia({reducedMotion:'reduce'});await page.reload();assert.match(await page.locator('[data-animation] img').getAttribute('src'),/poster/);
+ await page.goto(root+'/docs/painting/');await page.locator('input[name=q]').first().fill('Brush');await page.locator('input[name=q]').first().press('Enter');await page.locator('#search-results a').first().waitFor();
+ await page.setViewportSize({width:390,height:844});await page.goto(root+'/docs/window-system/');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.locator('label.nav-overlay-icon[for=__navigation]').first().click();assert.ok(await page.locator('#__navigation').isChecked());await page.screenshot({path:'test-results/documentation/furo-mobile.png'});
+ // Content and figure captions are still available without JavaScript.
+ const nojs=await browser.newContext({javaScriptEnabled:false,viewport:{width:1280,height:900}});const plain=await nojs.newPage();await plain.goto(root+'/docs/window-system/');assert.match(await plain.locator('h1').innerText(),/Window System/);assert.ok(await plain.locator('iframe.manual-window-frame').isVisible());await nojs.close();
+ for(const path of ['/docs/site/conf.py','/docs/DOCUMENTATION_PLAN.md','/docs/site/manual.json','/docs/.doctrees/environment.pickle'])assert.ok((await page.request.get(root+path)).status()>=400);
+ await page.setViewportSize({width:1500,height:1000});await page.goto(root+'/');await page.locator('.area-options').first().waitFor();await page.evaluate(()=>document.querySelectorAll('dialog[open]').forEach(d=>d.close()));
+ const areaId=await page.locator('.area').first().getAttribute('data-area-id');const area=page.locator('[data-area-id="'+areaId+'"]');
+ for(const [label,section]of [['Outliner','editor-outliner'],['Properties','editor-properties'],['Info','editor-info'],['Preferences','preferences'],['Color Editor','colors'],['Asset Library','assets'],['3D Viewport','editor-viewport']]){
+  await area.locator('.editor-switch').click();await page.getByRole('menuitem',{name:label,exact:true}).click();await area.locator('.area-options').click();const opening=page.waitForEvent('popup');await page.getByRole('menuitem',{name:'Documentation ↗',exact:true}).click();const popup=await opening;await popup.waitForURL(root+'/docs/'+section+'/');await popup.close();
+ }
+ for(const density of [1,1.5,2]){const scaled=await browser.newContext({viewport:{width:1706,height:900},deviceScaleFactor:density});const view=await scaled.newPage();for(const route of ['tabs-panels','editor-outliner']){await view.goto(root+'/docs/'+route+'/');const image=view.locator('article figure img').first();await image.evaluate(e=>e.decode());const size=await image.boundingBox();assert.ok(size.height*density<=800.5,route+' screen height '+size.height*density);assert.ok(size.width*density<=800.5,route+' screen width '+size.width*density);}await scaled.close();}
+ assert.deepEqual(errors,[]);console.log('Furo nested navigation, search, media, reduced motion, mobile and no-JS checks passed.');
+}finally{await browser.close();await new Promise(r=>server.close(r));}

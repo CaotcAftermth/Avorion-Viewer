@@ -277,8 +277,12 @@ vec4 sampleBlockUV(sampler2DArray tex, float layer, int mode) {
 
 vec4 sampleFrameworkMask(sampler2DArray tex, float layer, int slot) {
   int mode = uTextureScaling[slot];
-  // Build up from the face base, clipping the last cell on a fractional face.
-  return mode == 0 ? sampleBlockUV(tex, layer, 2, 20.0) : sampleBlockUV(tex, layer, mode);
+  if (mode != 0) return sampleBlockUV(tex, layer, mode);
+  if (layer < 0.5) return textureLod(tex, vec3(0.0), 0.0);
+  // Fit whole, equally sized sections from the face base. At stock scale,
+  // counts increase at 0.75, 1.25, 1.75, ... native units on each axis.
+  vec2 sections = max(vec2(1.0), floor(vSurface.xy * (uTileScale * 20.0) + 0.5));
+  return textureGrad(tex, vec3(vFaceUV * sections, layer), faceDx * sections, faceDy * sections);
 }
 
 vec4 sampleFace(sampler2DArray tex, float layer, float scale, int slot) {
@@ -290,7 +294,7 @@ vec4 sampleFace(sampler2DArray tex, float layer, float scale, int slot) {
   return result;
 }
 
-// Keep the middle of a tile at the face center as its physical dimensions change.
+// Keep a tile corner at the face center as its physical dimensions change.
 // A negative factor keeps the native inverted UV orientation for functional decals.
 vec4 sampleCenteredFace(sampler2DArray tex, float layer, float factor, float center, int slot) {
   if (uTextureScaling[slot] != 0) return sampleBlockUV(tex, layer, uTextureScaling[slot]);
@@ -301,7 +305,7 @@ vec4 sampleCenteredFace(sampler2DArray tex, float layer, float factor, float cen
 }
 
 vec4 sampleCenteredFace(sampler2DArray tex, float layer, float factor, int slot) {
-  return sampleCenteredFace(tex, layer, factor, 0.5, slot);
+  return sampleCenteredFace(tex, layer, factor, 0.0, slot);
 }
 
 // Dock artwork uses an inverted face fit.
@@ -321,12 +325,12 @@ vec4 sampleFunctional(sampler2DArray tex, float layer, float surface, int slot) 
   if (surface == 32.0) factor = 6.0;
   if (surface == 34.0) factor = 10.0;
   if (surface == 33.0 || surface == 35.0) factor = 2.0;
-  return sampleCenteredFace(tex, layer, -factor, surface == 31.0 ? 0.0 : 0.5, slot);
+  return sampleCenteredFace(tex, layer, -factor, 0.0, slot);
 }
 
 vec4 sampleGeneratorDetail(sampler2DArray tex, float layer, float surface, int slot) {
   // One full highlight and matching normal tile per five native units at stock scale.
-  return sampleCenteredFace(tex, layer, 2.0, surface == 38.0 ? 0.0 : 0.5, slot);
+  return sampleCenteredFace(tex, layer, 2.0, 0.0, slot);
 }
 
 vec4 sampleShipName(float layer) {

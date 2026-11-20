@@ -20,7 +20,6 @@ const P = "plates{m}";
 // Material accents and lights are independent of functional artwork/pod glow.
 const PLATING = { materialOverlay: `${P}_overlay`, materialGlow: `${P}_glow` };
 const HULL = { ...PLATING, kind: "Hull", albedo: P, normal: `${P}_n`, tint: true };
-const WINDOWED_HULL = { ...HULL, overlay: `${P}_windows`, surface: "housing" };
 const HULL_A = { ...HULL, kind: "Hull A", mask: `${P}_a_mask` };
 const HULL_B = { ...HULL, kind: "Hull B", mask: `${P}_b_mask` };
 const ARMOR = { ...PLATING, kind: "Armor", albedo: `${P}_armor`, normal: `${P}_n`, mask: `${P}_armor_mask`, tint: true };
@@ -46,8 +45,8 @@ const BY_TYPE = new Map();
 const fam = (spec, ...idx) => idx.forEach((i) => BY_TYPE.set(i, spec));
 const range8 = (start) => Array.from({ length: 8 }, (_, i) => start + i);
 // Hull families
-fam(HULL, 0, 1, 121);
-fam(WINDOWED_HULL, 2, 100, 101, 102, 103, 108, 109, 112, 122, 123, 124, 125, 126, 127, 128, 129);
+fam(HULL, 0, 1, 121, 100, 101, 102, 103, 108, 109, 112, 123, 124, 125, 126, 127, 128, 129);
+fam(HULL, 2, 122); // Hull windows disabled pending in-game calibration.
 fam(HULL_A, ...range8(210)); // Hull alternate A
 fam(HULL_B, ...range8(220)); // Hull alternate B
 fam({ ...HULL, kind: "Hull (vivid colors)", surface: "vivid" }, ...range8(240)); // Vivid Colors: same plating, brighter paint
@@ -86,7 +85,7 @@ fam(functional("Armored turret base", "turretbase", { surface: "turret-base", al
 fam(functional("Torpedo launcher", "torpedotube", { surface: "torpedo" }), 18);
 fam(functional("Frontal torpedo launcher", "torpedotube", { surface: "front-torpedo" }), 22);
 fam(functional("Shield generator", "shieldgenerator", { surface: "generator-world" }), 50);
-fam(functional("Energy container", "battery", { surface: "generator-world" }), 51);
+fam(functional("Energy container", "battery", { surface: "energy-container" }), 51);
 fam(functional("Generator", "generator", { surface: "generator" }), 52);
 fam(functional("Integrity field", "integritygenerator", { surface: "generator-world" }), 53);
 fam(functional("Computer core", "computercore", { surface: "computer-core" }), 54);

@@ -1,0 +1,207 @@
+[
+  {
+    "id": "introduction",
+    "title": "Introduction",
+    "children": [
+      {
+        "id": "import",
+        "title": "Open Your First Ship",
+        "children": []
+      }
+    ]
+  },
+  {
+    "id": "user-interface",
+    "title": "User Interface",
+    "children": [
+      {
+        "id": "window-system",
+        "title": "Window System",
+        "children": []
+      },
+      {
+        "id": "splash-screen",
+        "title": "Splash Screen",
+        "children": []
+      },
+      {
+        "id": "topbar",
+        "title": "Topbar",
+        "children": []
+      },
+      {
+        "id": "workspaces",
+        "title": "Workspaces",
+        "children": []
+      },
+      {
+        "id": "status-bar",
+        "title": "Status Bar",
+        "children": []
+      },
+      {
+        "id": "areas",
+        "title": "Areas",
+        "children": []
+      },
+      {
+        "id": "ui-regions",
+        "title": "Regions",
+        "children": []
+      },
+      {
+        "id": "tabs-panels",
+        "title": "Tabs & Panels",
+        "children": []
+      }
+    ]
+  },
+  {
+    "id": "editors",
+    "title": "Editors",
+    "children": [
+      {
+        "id": "editor-viewport",
+        "title": "3D Viewport",
+        "children": [
+          {
+            "id": "navigation",
+            "title": "Navigation",
+            "children": []
+          },
+          {
+            "id": "inspection",
+            "title": "Selection & Inspection",
+            "children": []
+          },
+          {
+            "id": "display",
+            "title": "Display",
+            "children": []
+          },
+          {
+            "id": "painting",
+            "title": "Painting",
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": "editor-outliner",
+        "title": "Outliner",
+        "children": []
+      },
+      {
+        "id": "editor-properties",
+        "title": "Properties",
+        "children": [
+          {
+            "id": "world",
+            "title": "World & Shaders",
+            "children": []
+          },
+          {
+            "id": "turrets",
+            "title": "Turrets & Components",
+            "children": []
+          },
+          {
+            "id": "coverage",
+            "title": "Weapon Coverage",
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": "editor-info",
+        "title": "Info",
+        "children": []
+      },
+      {
+        "id": "preferences",
+        "title": "Preferences",
+        "children": [
+          {
+            "id": "shortcuts",
+            "title": "Shortcut Reference",
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": "colors",
+        "title": "Color Editor",
+        "children": []
+      },
+      {
+        "id": "assets",
+        "title": "Asset Library",
+        "children": [
+          {
+            "id": "studio",
+            "title": "Turret Studio",
+            "children": []
+          },
+          {
+            "id": "timelines",
+            "title": "Cameras & Timelines",
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "model-project",
+    "title": "Model Project",
+    "children": [
+      {
+        "id": "saving",
+        "title": "Saving & Recovery",
+        "children": []
+      }
+    ]
+  },
+  {
+    "id": "workspace-profile",
+    "title": "Workspace Profile",
+    "children": []
+  },
+  {
+    "id": "export",
+    "title": "Export",
+    "children": [
+      {
+        "id": "image-export",
+        "title": "Images & Blueprints",
+        "children": []
+      },
+      {
+        "id": "model-export",
+        "title": "3D Models & Print Geometry",
+        "children": []
+      }
+    ]
+  },
+  {
+    "id": "textures",
+    "title": "Textures",
+    "children": []
+  },
+  {
+    "id": "reference",
+    "title": "Reference",
+    "children": [
+      {
+        "id": "troubleshooting",
+        "title": "Troubleshooting",
+        "children": []
+      },
+      {
+        "id": "glossary",
+        "title": "Glossary",
+        "children": []
+      }
+    ]
+  }
+]

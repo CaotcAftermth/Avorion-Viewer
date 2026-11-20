@@ -21,7 +21,7 @@ export function surfaceKind(surface, side) {
         return SURFACE_DECAL;
     if (surface === "generator")
         return SURFACE_GENERATOR;
-    if (surface === "computer-core") return 38;
+    if (surface === "computer-core" || surface === "energy-container") return 38;
     if (surface === "generator-world")
         return SURFACE_GENERATOR_WORLD;
     if (surface === "framework")

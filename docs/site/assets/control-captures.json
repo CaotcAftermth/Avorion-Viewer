@@ -1,0 +1,1339 @@
+{
+  "density": 3,
+  "fixture": "docs/site/examples/tutorial-ship.xml",
+  "temporaryFixture": true,
+  "entries": [
+    {
+      "id": "editor-viewport-select-1",
+      "label": "Select",
+      "section": "editor-viewport",
+      "kind": "control",
+      "file": "controls/editor-viewport-select-1.png",
+      "cssWidth": 33.0,
+      "cssHeight": 33.0,
+      "pixelWidth": 99,
+      "pixelHeight": 99,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        36,
+        135,
+        135
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "editor-viewport-select-sockets-2",
+      "label": "Select Sockets",
+      "section": "editor-viewport",
+      "kind": "control",
+      "file": "controls/editor-viewport-select-sockets-2.png",
+      "cssWidth": 33.0,
+      "cssHeight": 33.0,
+      "pixelWidth": 99,
+      "pixelHeight": 99,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        36,
+        135,
+        135
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "editor-viewport-orbit-3",
+      "label": "Orbit",
+      "section": "editor-viewport",
+      "kind": "control",
+      "file": "controls/editor-viewport-orbit-3.png",
+      "cssWidth": 33.0,
+      "cssHeight": 33.0,
+      "pixelWidth": 99,
+      "pixelHeight": 99,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        36,
+        135,
+        135
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "editor-viewport-pan-4",
+      "label": "Pan",
+      "section": "editor-viewport",
+      "kind": "control",
+      "file": "controls/editor-viewport-pan-4.png",
+      "cssWidth": 33.0,
+      "cssHeight": 33.0,
+      "pixelWidth": 99,
+      "pixelHeight": 99,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        36,
+        135,
+        135
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "editor-viewport-frame-all-5",
+      "label": "Frame all",
+      "section": "editor-viewport",
+      "kind": "control",
+      "file": "controls/editor-viewport-frame-all-5.png",
+      "cssWidth": 33.0,
+      "cssHeight": 33.0,
+      "pixelWidth": 99,
+      "pixelHeight": 99,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        36,
+        135,
+        135
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "topbar-file-6",
+      "label": "File",
+      "section": "topbar",
+      "kind": "control",
+      "file": "controls/topbar-file-6.png",
+      "cssWidth": 32.0,
+      "cssHeight": 26.0,
+      "pixelWidth": 96,
+      "pixelHeight": 78,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        12,
+        132,
+        90
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "topbar-edit-7",
+      "label": "Edit",
+      "section": "topbar",
+      "kind": "control",
+      "file": "controls/topbar-edit-7.png",
+      "cssWidth": 34.0,
+      "cssHeight": 26.0,
+      "pixelWidth": 102,
+      "pixelHeight": 78,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        12,
+        138,
+        90
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "topbar-window-8",
+      "label": "Window",
+      "section": "topbar",
+      "kind": "control",
+      "file": "controls/topbar-window-8.png",
+      "cssWidth": 58.0,
+      "cssHeight": 26.0,
+      "pixelWidth": 174,
+      "pixelHeight": 78,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        12,
+        210,
+        90
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "topbar-help-9",
+      "label": "Help",
+      "section": "topbar",
+      "kind": "control",
+      "file": "controls/topbar-help-9.png",
+      "cssWidth": 39.0,
+      "cssHeight": 26.0,
+      "pixelWidth": 117,
+      "pixelHeight": 78,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        12,
+        154,
+        90
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "viewport-header-editor-type-10",
+      "label": "Editor type",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-editor-type-10.png",
+      "cssWidth": 36.0,
+      "cssHeight": 23.0,
+      "pixelWidth": 108,
+      "pixelHeight": 69,
+      "status": "captured",
+      "outlineCropPixels": [
+        27,
+        37,
+        135,
+        106
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "viewport-header-view-menu-11",
+      "label": "View menu",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-view-menu-11.png",
+      "cssWidth": 33.0,
+      "cssHeight": 23.0,
+      "pixelWidth": 99,
+      "pixelHeight": 69,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        37,
+        135,
+        106
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "viewport-header-select-menu-12",
+      "label": "Select menu",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-select-menu-12.png",
+      "cssWidth": 39.0,
+      "cssHeight": 23.0,
+      "pixelWidth": 117,
+      "pixelHeight": 69,
+      "status": "captured",
+      "outlineCropPixels": [
+        35,
+        37,
+        152,
+        106
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "viewport-header-toggle-grid-13",
+      "label": "Toggle grid",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-toggle-grid-13.png",
+      "cssWidth": 26.0,
+      "cssHeight": 20.0,
+      "pixelWidth": 78,
+      "pixelHeight": 60,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        36,
+        115,
+        96
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "viewport-header-show-hide-0-thickness-blocks-14",
+      "label": "Show/Hide 0 thickness blocks",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-show-hide-0-thickness-blocks-14.png",
+      "cssWidth": 26.0,
+      "cssHeight": 20.0,
+      "pixelWidth": 78,
+      "pixelHeight": 60,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        36,
+        115,
+        96
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "viewport-header-show-gizmos-15",
+      "label": "Show Gizmos",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-show-gizmos-15.png",
+      "cssWidth": 26.0,
+      "cssHeight": 20.0,
+      "pixelWidth": 78,
+      "pixelHeight": 60,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        36,
+        115,
+        96
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "viewport-header-show-overlays-16",
+      "label": "Show Overlays",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-show-overlays-16.png",
+      "cssWidth": 26.0,
+      "cssHeight": 20.0,
+      "pixelWidth": 78,
+      "pixelHeight": 60,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        36,
+        115,
+        96
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "viewport-header-viewport-overlays-17",
+      "label": "Viewport Overlays",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-viewport-overlays-17.png",
+      "cssWidth": 16.0,
+      "cssHeight": 23.0,
+      "pixelWidth": 48,
+      "pixelHeight": 69,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        85,
+        106
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "viewport-header-toggle-x-ray-18",
+      "label": "Toggle X-Ray",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-toggle-x-ray-18.png",
+      "cssWidth": 26.0,
+      "cssHeight": 20.0,
+      "pixelWidth": 78,
+      "pixelHeight": 60,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        36,
+        115,
+        96
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "viewport-header-wireframe-shading-19",
+      "label": "Wireframe shading",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-wireframe-shading-19.png",
+      "cssWidth": 26.0,
+      "cssHeight": 20.0,
+      "pixelWidth": 78,
+      "pixelHeight": 60,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        36,
+        115,
+        96
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "viewport-header-solid-shading-20",
+      "label": "Solid shading",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-solid-shading-20.png",
+      "cssWidth": 26.0,
+      "cssHeight": 20.0,
+      "pixelWidth": 78,
+      "pixelHeight": 60,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        36,
+        115,
+        96
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "viewport-header-material-preview-shading-21",
+      "label": "Material Preview shading",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-material-preview-shading-21.png",
+      "cssWidth": 26.0,
+      "cssHeight": 20.0,
+      "pixelWidth": 78,
+      "pixelHeight": 60,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        36,
+        115,
+        96
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "viewport-header-rendered-shading-22",
+      "label": "Rendered shading",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-rendered-shading-22.png",
+      "cssWidth": 26.0,
+      "cssHeight": 20.0,
+      "pixelWidth": 78,
+      "pixelHeight": 60,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        36,
+        115,
+        96
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "viewport-header-viewport-shading-23",
+      "label": "Viewport Shading",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-viewport-shading-23.png",
+      "cssWidth": 16.0,
+      "cssHeight": 23.0,
+      "pixelWidth": 48,
+      "pixelHeight": 69,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        85,
+        106
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "viewport-header-toggle-sidebar-24",
+      "label": "Toggle sidebar",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-toggle-sidebar-24.png",
+      "cssWidth": 26.0,
+      "cssHeight": 20.0,
+      "pixelWidth": 78,
+      "pixelHeight": 60,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        36,
+        115,
+        96
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "viewport-header-area-options-25",
+      "label": "Area options",
+      "section": "viewport-header",
+      "kind": "control",
+      "file": "controls/viewport-header-area-options-25.png",
+      "cssWidth": 25.0,
+      "cssHeight": 23.0,
+      "pixelWidth": 75,
+      "pixelHeight": 69,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        112,
+        106
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "painting-select-26",
+      "label": "Select",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-select-26.png",
+      "cssWidth": 33.0,
+      "cssHeight": 33.0,
+      "pixelWidth": 99,
+      "pixelHeight": 99,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        36,
+        135,
+        135
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "painting-brush-27",
+      "label": "Brush",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-brush-27.png",
+      "cssWidth": 33.0,
+      "cssHeight": 33.0,
+      "pixelWidth": 99,
+      "pixelHeight": 99,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        36,
+        135,
+        135
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "painting-eyedropper-28",
+      "label": "Eyedropper",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-eyedropper-28.png",
+      "cssWidth": 33.0,
+      "cssHeight": 33.0,
+      "pixelWidth": 99,
+      "pixelHeight": 99,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        36,
+        135,
+        135
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "painting-replace-color-with-selected-29",
+      "label": "Replace Color with Selected",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-replace-color-with-selected-29.png",
+      "cssWidth": 33.0,
+      "cssHeight": 33.0,
+      "pixelWidth": 99,
+      "pixelHeight": 99,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        36,
+        135,
+        135
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "painting-connected-fill-30",
+      "label": "Connected Fill",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-connected-fill-30.png",
+      "cssWidth": 33.0,
+      "cssHeight": 33.0,
+      "pixelWidth": 99,
+      "pixelHeight": 99,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        36,
+        135,
+        135
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "painting-restore-31",
+      "label": "Restore",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-restore-31.png",
+      "cssWidth": 33.0,
+      "cssHeight": 33.0,
+      "pixelWidth": 99,
+      "pixelHeight": 99,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        36,
+        135,
+        135
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "painting-brush-color-32",
+      "label": "Brush color",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-brush-color-32.png",
+      "cssWidth": 120.0,
+      "cssHeight": 24.0,
+      "pixelWidth": 360,
+      "pixelHeight": 72,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        37,
+        396,
+        109
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "painting-paint-symmetry-33",
+      "label": "Paint symmetry",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-paint-symmetry-33.png",
+      "cssWidth": 25.0,
+      "cssHeight": 24.0,
+      "pixelWidth": 75,
+      "pixelHeight": 72,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        112,
+        109
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "painting-hide-turrets-and-components-34",
+      "label": "Hide Turrets and Components",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-hide-turrets-and-components-34.png",
+      "cssWidth": 25.0,
+      "cssHeight": 24.0,
+      "pixelWidth": 75,
+      "pixelHeight": 72,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        112,
+        109
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "painting-undo-35",
+      "label": "Undo",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-undo-35.png",
+      "cssWidth": 25.0,
+      "cssHeight": 24.0,
+      "pixelWidth": 75,
+      "pixelHeight": 72,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        112,
+        109
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "painting-redo-36",
+      "label": "Redo",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-redo-36.png",
+      "cssWidth": 25.0,
+      "cssHeight": 24.0,
+      "pixelWidth": 75,
+      "pixelHeight": 72,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        112,
+        109
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "painting-paint-palettes-37",
+      "label": "Paint palettes",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-paint-palettes-37.png",
+      "cssWidth": 25.0,
+      "cssHeight": 24.0,
+      "pixelWidth": 75,
+      "pixelHeight": 72,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        112,
+        109
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "painting-palette-dodger-blue-38",
+      "label": "Palette Dodger Blue",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-palette-dodger-blue-38.png",
+      "cssWidth": 18.0,
+      "cssHeight": 20.0,
+      "pixelWidth": 54,
+      "pixelHeight": 60,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        91,
+        97
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "painting-model-palette-39",
+      "label": "Model Palette",
+      "section": "painting",
+      "kind": "control",
+      "file": "controls/painting-model-palette-39.png",
+      "cssWidth": 25.0,
+      "cssHeight": 24.0,
+      "pixelWidth": 75,
+      "pixelHeight": 72,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        112,
+        109
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "property-symbols-object-properties-40",
+      "label": "Object properties",
+      "section": "property-symbols",
+      "kind": "symbol",
+      "file": "controls/property-symbols-object-properties-40.png",
+      "cssWidth": 31.0,
+      "cssHeight": 32.0,
+      "pixelWidth": 93,
+      "pixelHeight": 96,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        130,
+        133
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "property-symbols-scene-properties-41",
+      "label": "Scene properties",
+      "section": "property-symbols",
+      "kind": "symbol",
+      "file": "controls/property-symbols-scene-properties-41.png",
+      "cssWidth": 31.0,
+      "cssHeight": 32.0,
+      "pixelWidth": 93,
+      "pixelHeight": 96,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        130,
+        133
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "editor-properties-scene-properties-model-summary-42",
+      "label": "Scene properties \u00b7 Model Summary",
+      "section": "editor-properties",
+      "kind": "panel",
+      "file": "controls/editor-properties-scene-properties-model-summary-42.png",
+      "cssWidth": 277.0,
+      "cssHeight": 268.0,
+      "pixelWidth": 831,
+      "pixelHeight": 804,
+      "status": "captured",
+      "outlineCropPixels": [
+        7,
+        7,
+        838,
+        811
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "editor-properties-scene-properties-capture-43",
+      "label": "Scene properties \u00b7 Capture",
+      "section": "editor-properties",
+      "kind": "panel",
+      "file": "controls/editor-properties-scene-properties-capture-43.png",
+      "cssWidth": 277.0,
+      "cssHeight": 143.0,
+      "pixelWidth": 831,
+      "pixelHeight": 429,
+      "status": "captured",
+      "outlineCropPixels": [
+        7,
+        7,
+        838,
+        436
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "property-symbols-world-sky-44",
+      "label": "World sky",
+      "section": "property-symbols",
+      "kind": "symbol",
+      "file": "controls/property-symbols-world-sky-44.png",
+      "cssWidth": 31.0,
+      "cssHeight": 32.0,
+      "pixelWidth": 93,
+      "pixelHeight": 96,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        130,
+        133
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "property-symbols-shaders-45",
+      "label": "Shaders",
+      "section": "property-symbols",
+      "kind": "symbol",
+      "file": "controls/property-symbols-shaders-45.png",
+      "cssWidth": 31.0,
+      "cssHeight": 32.0,
+      "pixelWidth": 93,
+      "pixelHeight": 96,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        130,
+        133
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "property-symbols-turrets-46",
+      "label": "Turrets",
+      "section": "property-symbols",
+      "kind": "symbol",
+      "file": "controls/property-symbols-turrets-46.png",
+      "cssWidth": 31.0,
+      "cssHeight": 32.0,
+      "pixelWidth": 93,
+      "pixelHeight": 96,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        130,
+        133
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "turrets-turrets-socket-display-47",
+      "label": "Turrets \u00b7 Socket Display",
+      "section": "turrets",
+      "kind": "panel",
+      "file": "controls/turrets-turrets-socket-display-47.png",
+      "cssWidth": 277.0,
+      "cssHeight": 104.0,
+      "pixelWidth": 831,
+      "pixelHeight": 312,
+      "status": "captured",
+      "outlineCropPixels": [
+        7,
+        7,
+        838,
+        319
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "turrets-turrets-mounting-48",
+      "label": "Turrets \u00b7 Mounting",
+      "section": "turrets",
+      "kind": "panel",
+      "file": "controls/turrets-turrets-mounting-48.png",
+      "cssWidth": 277.0,
+      "cssHeight": 197.0,
+      "pixelWidth": 831,
+      "pixelHeight": 591,
+      "status": "captured",
+      "outlineCropPixels": [
+        7,
+        7,
+        838,
+        598
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "turrets-turrets-socket-details-49",
+      "label": "Turrets \u00b7 Socket Details",
+      "section": "turrets",
+      "kind": "panel",
+      "file": "controls/turrets-turrets-socket-details-49.png",
+      "cssWidth": 277.0,
+      "cssHeight": 112.0,
+      "pixelWidth": 831,
+      "pixelHeight": 336,
+      "status": "captured",
+      "outlineCropPixels": [
+        7,
+        7,
+        838,
+        343
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "property-symbols-components-50",
+      "label": "Components",
+      "section": "property-symbols",
+      "kind": "symbol",
+      "file": "controls/property-symbols-components-50.png",
+      "cssWidth": 31.0,
+      "cssHeight": 32.0,
+      "pixelWidth": 93,
+      "pixelHeight": 96,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        130,
+        133
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "turrets-components-create-sockets-51",
+      "label": "Components \u00b7 Create Sockets",
+      "section": "turrets",
+      "kind": "panel",
+      "file": "controls/turrets-components-create-sockets-51.png",
+      "cssWidth": 277.0,
+      "cssHeight": 218.0,
+      "pixelWidth": 831,
+      "pixelHeight": 654,
+      "status": "captured",
+      "outlineCropPixels": [
+        7,
+        7,
+        838,
+        661
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "turrets-components-component-socket-52",
+      "label": "Components \u00b7 Component Socket",
+      "section": "turrets",
+      "kind": "panel",
+      "file": "controls/turrets-components-component-socket-52.png",
+      "cssWidth": 277.0,
+      "cssHeight": 119.0,
+      "pixelWidth": 831,
+      "pixelHeight": 357,
+      "status": "captured",
+      "outlineCropPixels": [
+        7,
+        7,
+        838,
+        364
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "turrets-components-ship-component-files-53",
+      "label": "Components \u00b7 Ship Component Files",
+      "section": "turrets",
+      "kind": "panel",
+      "file": "controls/turrets-components-ship-component-files-53.png",
+      "cssWidth": 277.0,
+      "cssHeight": 232.0,
+      "pixelWidth": 831,
+      "pixelHeight": 696,
+      "status": "captured",
+      "outlineCropPixels": [
+        7,
+        7,
+        838,
+        703
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "property-symbols-weapon-coverage-54",
+      "label": "Weapon Coverage",
+      "section": "property-symbols",
+      "kind": "symbol",
+      "file": "controls/property-symbols-weapon-coverage-54.png",
+      "cssWidth": 31.0,
+      "cssHeight": 32.0,
+      "pixelWidth": 93,
+      "pixelHeight": 96,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        130,
+        133
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "coverage-weapon-coverage-visualization-55",
+      "label": "Weapon Coverage \u00b7 Visualization",
+      "section": "coverage",
+      "kind": "panel",
+      "file": "controls/coverage-weapon-coverage-visualization-55.png",
+      "cssWidth": 277.0,
+      "cssHeight": 201.0,
+      "pixelWidth": 831,
+      "pixelHeight": 603,
+      "status": "captured",
+      "outlineCropPixels": [
+        7,
+        7,
+        838,
+        610
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "coverage-weapon-coverage-turret-scope-56",
+      "label": "Weapon Coverage \u00b7 Turret Scope",
+      "section": "coverage",
+      "kind": "panel",
+      "file": "controls/coverage-weapon-coverage-turret-scope-56.png",
+      "cssWidth": 277.0,
+      "cssHeight": 119.0,
+      "pixelWidth": 831,
+      "pixelHeight": 357,
+      "status": "captured",
+      "outlineCropPixels": [
+        7,
+        7,
+        838,
+        364
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "coverage-weapon-coverage-analysis-57",
+      "label": "Weapon Coverage \u00b7 Analysis",
+      "section": "coverage",
+      "kind": "panel",
+      "file": "controls/coverage-weapon-coverage-analysis-57.png",
+      "cssWidth": 277.0,
+      "cssHeight": 265.0,
+      "pixelWidth": 831,
+      "pixelHeight": 795,
+      "status": "captured",
+      "outlineCropPixels": [
+        7,
+        7,
+        838,
+        802
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "coverage-weapon-coverage-slice-settings-58",
+      "label": "Weapon Coverage \u00b7 Slice Settings",
+      "section": "coverage",
+      "kind": "panel",
+      "file": "controls/coverage-weapon-coverage-slice-settings-58.png",
+      "cssWidth": 277.0,
+      "cssHeight": 310.0,
+      "pixelWidth": 831,
+      "pixelHeight": 930,
+      "status": "captured",
+      "outlineCropPixels": [
+        7,
+        7,
+        838,
+        937
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "coverage-weapon-coverage-appearance-colors-59",
+      "label": "Weapon Coverage \u00b7 Appearance & Colors",
+      "section": "coverage",
+      "kind": "panel",
+      "file": "controls/coverage-weapon-coverage-appearance-colors-59.png",
+      "cssWidth": 277.0,
+      "cssHeight": 144.0,
+      "pixelWidth": 831,
+      "pixelHeight": 432,
+      "status": "captured",
+      "outlineCropPixels": [
+        7,
+        7,
+        838,
+        439
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "coverage-weapon-coverage-inspection-statistics-60",
+      "label": "Weapon Coverage \u00b7 Inspection & Statistics",
+      "section": "coverage",
+      "kind": "panel",
+      "file": "controls/coverage-weapon-coverage-inspection-statistics-60.png",
+      "cssWidth": 277.0,
+      "cssHeight": 199.0,
+      "pixelWidth": 831,
+      "pixelHeight": 597,
+      "status": "captured",
+      "outlineCropPixels": [
+        7,
+        7,
+        838,
+        604
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "coverage-weapon-coverage-comparison-export-61",
+      "label": "Weapon Coverage \u00b7 Comparison & Export",
+      "section": "coverage",
+      "kind": "panel",
+      "file": "controls/coverage-weapon-coverage-comparison-export-61.png",
+      "cssWidth": 277.0,
+      "cssHeight": 189.0,
+      "pixelWidth": 831,
+      "pixelHeight": 567,
+      "status": "captured",
+      "outlineCropPixels": [
+        7,
+        7,
+        838,
+        574
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "coverage-weapon-coverage-advanced-analysis-62",
+      "label": "Weapon Coverage \u00b7 Advanced Analysis",
+      "section": "coverage",
+      "kind": "panel",
+      "file": "controls/coverage-weapon-coverage-advanced-analysis-62.png",
+      "cssWidth": 277.0,
+      "cssHeight": 925.6666666666666,
+      "pixelWidth": 831,
+      "pixelHeight": 2777,
+      "status": "visible-portion",
+      "outlineCropPixels": [
+        7,
+        7,
+        838,
+        2784
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "property-symbols-workspace-settings-63",
+      "label": "Workspace settings",
+      "section": "property-symbols",
+      "kind": "symbol",
+      "file": "controls/property-symbols-workspace-settings-63.png",
+      "cssWidth": 31.0,
+      "cssHeight": 32.0,
+      "pixelWidth": 93,
+      "pixelHeight": 96,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        130,
+        133
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "workspaces-workspace-settings-window-system-64",
+      "label": "Workspace settings \u00b7 Window system",
+      "section": "workspaces",
+      "kind": "panel",
+      "file": "controls/workspaces-workspace-settings-window-system-64.png",
+      "cssWidth": 277.0,
+      "cssHeight": 184.0,
+      "pixelWidth": 831,
+      "pixelHeight": 552,
+      "status": "captured",
+      "outlineCropPixels": [
+        7,
+        7,
+        838,
+        559
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "colors-editor-type-65",
+      "label": "Editor type",
+      "section": "colors",
+      "kind": "control",
+      "file": "controls/colors-editor-type-65.png",
+      "cssWidth": 36.0,
+      "cssHeight": 23.0,
+      "pixelWidth": 108,
+      "pixelHeight": 69,
+      "status": "captured",
+      "outlineCropPixels": [
+        35,
+        37,
+        143,
+        106
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "colors-area-options-66",
+      "label": "Area options",
+      "section": "colors",
+      "kind": "control",
+      "file": "controls/colors-area-options-66.png",
+      "cssWidth": 25.0,
+      "cssHeight": 23.0,
+      "pixelWidth": 75,
+      "pixelHeight": 69,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        37,
+        111,
+        106
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "assets-editor-type-67",
+      "label": "Editor type",
+      "section": "assets",
+      "kind": "control",
+      "file": "controls/assets-editor-type-67.png",
+      "cssWidth": 36.0,
+      "cssHeight": 23.0,
+      "pixelWidth": 108,
+      "pixelHeight": 69,
+      "status": "captured",
+      "outlineCropPixels": [
+        35,
+        37,
+        143,
+        106
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "assets-show-turrets-in-the-asset-library-68",
+      "label": "Show turrets in the Asset Library",
+      "section": "assets",
+      "kind": "control",
+      "file": "controls/assets-show-turrets-in-the-asset-library-68.png",
+      "cssWidth": 54.0,
+      "cssHeight": 25.0,
+      "pixelWidth": 162,
+      "pixelHeight": 75,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        37,
+        198,
+        112
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "assets-show-components-in-the-asset-library-69",
+      "label": "Show components in the Asset Library",
+      "section": "assets",
+      "kind": "control",
+      "file": "controls/assets-show-components-in-the-asset-library-69.png",
+      "cssWidth": 82.0,
+      "cssHeight": 25.0,
+      "pixelWidth": 246,
+      "pixelHeight": 75,
+      "status": "captured",
+      "outlineCropPixels": [
+        37,
+        37,
+        283,
+        112
+      ],
+      "framing": "yellow outline; no outer margin"
+    },
+    {
+      "id": "assets-area-options-70",
+      "label": "Area options",
+      "section": "assets",
+      "kind": "control",
+      "file": "controls/assets-area-options-70.png",
+      "cssWidth": 25.0,
+      "cssHeight": 23.0,
+      "pixelWidth": 75,
+      "pixelHeight": 69,
+      "status": "captured",
+      "outlineCropPixels": [
+        36,
+        37,
+        111,
+        106
+      ],
+      "framing": "yellow outline; no outer margin"
+    }
+  ],
+  "capturePassCompleted": true,
+  "framing": "yellow outline; no outer margin"
+}

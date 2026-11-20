@@ -1,3 +1,4 @@
+import {mountInfoPerformance} from './info-performance.js';
 import {openStressXmlDialog} from './stress-xml-dialog.js';
 import {diagnosticStart,diagnosticEnd,diagnosticFailure,diagnosticClock,diagnosticPhase,diagnosticModel,diagnosticAllocation,diagnosticAwaitFirstFrame} from './performance-diagnostics.js';
 import {openDiagnostics} from './performance-diagnostics-panel.js';
@@ -162,7 +163,7 @@ function updateLogs() {
   const logs=logEntries();
   document.querySelectorAll('.info-body').forEach(el=>{const node=find(workspace().root,el.closest('[data-area-id]').dataset.areaId),newestFirst=node?.infoNewestFirst===true,problems=node?.infoFilter==='problems';
     const shown=problems?logs.filter(e=>e.level!=='info'):logs,entries=newestFirst?[...shown].reverse():shown;
-    el.innerHTML=entries.length?entries.map(entry=>`<div class="info-row level-${entry.level||'info'}"${entry.detail?` title="${escape(entry.detail)}"`:''}><time>${entry.time.toLocaleTimeString([], {hour12:false})}</time><span class="log-dot"${LOG_LEVEL_LABEL[entry.level]?` aria-label="${escape(t(LOG_LEVEL_LABEL[entry.level]))}"`:''}></span><span class="log-category">${escape(entry.category)}</span><span class="log-message">${escape(entry.message)}</span>${entry.count>1?`<span class="log-repeat">×${entry.count}</span>`:''}</div>`).join(''):`<div class="info-empty">${escape(t(problems?'No errors or warnings.':'No activity to display.'))}</div>`;el.scrollTop=newestFirst?0:el.scrollHeight;});
+    el.innerHTML=entries.length?entries.map(entry=>`<div class="info-row level-${entry.level||'info'}"${entry.detail?` title="${escape(entry.detail)}"`:''}><time>${entry.time.toLocaleTimeString([], {hour12:false})}</time><span class="log-dot"${LOG_LEVEL_LABEL[entry.level]?` aria-label="${escape(t(LOG_LEVEL_LABEL[entry.level]))}"`:''}></span><span class="log-category">${escape(entry.category)}</span><span class="log-message">${escape(entry.message)}${entry.detail?`<details><summary>Details</summary><pre style="white-space:pre-wrap">${escape(entry.detail)}</pre><button data-copy-log="${logs.indexOf(entry)}">Copy details</button></details>`:''}</span>${entry.count>1?`<span class="log-repeat">×${entry.count}</span>`:''}</div>`).join(''):`<div class="info-empty">${escape(t(problems?'No errors or warnings.':'No activity to display.'))}</div>`;el.scrollTop=newestFirst?0:el.scrollHeight;});
   document.querySelectorAll('.info-filter').forEach(b=>{const n=logs.filter(e=>e.level!=='info').length;b.dataset.count=n;b.querySelector('.count').textContent=n?String(n):'';});
   const errors=errorCount(),badge=$('#error-status');if(badge){badge.hidden=!errors;badge.textContent=errors===1?t('1 error'):`${errors} ${t('errors')}`;}
 }
@@ -659,6 +660,7 @@ function renderTopbar(){
       {label:'Reset current workspace',action:resetWorkspace}
     ],
     Help:()=>[
+      {label:'Documentation ↗',action:()=>window.open(new URL('docs/',document.baseURI).href,'_blank','noopener,noreferrer')},
       {label:'Welcome',action:()=>welcome?.open()},
       {label:'Quick start & shortcuts',action:()=>$('#help-dialog').showModal()},
       {label:'Input style…',action:openInputStyle},
@@ -953,11 +955,15 @@ function headerFor(node){
   }else{
     header.insertAdjacentHTML('beforeend',`<span class="header-name">${escape(t(EDITORS[node.editor]))}</span><span class="spacer"></span>`);
     if(node.editor==='info'){
+      for(const [mode,label] of [['all','Activity'],['problems','Problems'],['performance','Performance']]){
+        const tab=button('Show '+label,label,()=>{node.infoFilter=mode;save();render();});
+        tab.classList.toggle('active',(node.infoFilter||'all')===mode);tab.setAttribute('aria-pressed',String((node.infoFilter||'all')===mode));header.append(tab);
+      }
+      if(node.infoFilter!=='performance'){
       const order=button('Reverse activity order',node.infoNewestFirst?'Newest on Top':'Newest on Bottom',()=>{node.infoNewestFirst=!node.infoNewestFirst;order.textContent=node.infoNewestFirst?'Newest on Top':'Newest on Bottom';order.setAttribute('aria-pressed',String(node.infoNewestFirst));updateLogs();save();});
       order.title='Reverse entry order: newest on top or bottom';order.setAttribute('aria-pressed',String(!!node.infoNewestFirst));
-      const filter=button('Show only errors and warnings',`${escape(t('Errors & Warnings'))}<span class="count"></span>`,()=>{node.infoFilter=node.infoFilter==='problems'?'all':'problems';filter.setAttribute('aria-pressed',String(node.infoFilter==='problems'));filter.classList.toggle('active',node.infoFilter==='problems');updateLogs();save();},'info-filter');
-      filter.setAttribute('aria-pressed',String(node.infoFilter==='problems'));filter.classList.toggle('active',node.infoFilter==='problems');filter.title='Show only errors and warnings';
-      header.append(filter,order,button('Copy activity log','Copy',()=>copyLog(node.infoFilter==='problems')),button('Clear activity log','Clear',()=>clearLog()));
+      header.append(order,button('Copy activity log','Copy',()=>copyLog(node.infoFilter==='problems')),button('Clear activity log','Clear',()=>clearLog()));
+      }
     }
   }
   if(node.editor==='assets'){
@@ -988,7 +994,13 @@ function renderArea(node){
   }
   if(node.editor==='color')renderers.push(mountColorEditor(body,node,scene,{save,changed:refreshStructure,brushChanged:()=>{if(scene.paintBrush)rememberPaintColor(scene.paintBrush.colorId);refreshStructure();},select:ids=>selectStructure(ids),focus:ids=>focusStructure(ids),isolate:ids=>visibilityStructure(ids,'isolate'),addRegion:name=>{const region=addRegion(scene,name,[...scene.selectedIds]);refreshStructure();return region;},apply:(...args)=>{const count=paintPaletteColor(scene,...args);refreshStructure();return count;},undo:changePaintHistory}));
   if(node.editor==='assets')renderers.push(mountAttachmentLibrary(body,node,scene,refreshStructure));
-  if(node.editor==='info')body.classList.add('info-body');
+  if(node.editor==='info'){
+    if(node.infoFilter==='performance')renderers.push(mountInfoPerformance(body,scene,()=>renderers.forEach(r=>r.draw?.())));
+    else{
+      body.classList.add('info-body');
+      body.addEventListener('click',event=>{const copy=event.target.closest('[data-copy-log]');if(copy)navigator.clipboard?.writeText(logEntries()[Number(copy.dataset.copyLog)]?.detail||'');});
+    }
+  }
   const paintSettings=body.querySelector('.paint-tool-settings');if(paintSettings)el.append(paintSettings);
   el.append(body);
   if(node.editor!=='preferences')body.querySelectorAll('details').forEach(panel=>{
@@ -1229,9 +1241,14 @@ function renderProperties(body,node){
 }
 
 function siblingOf(node){const p=parentOf(workspace().root,node.id);if(!p)return null;const sibling=p.first.id===node.id?p.second:p.first;return sibling.type==='area'?sibling:null;}
+function editorDocumentation(node){
+ const pages={viewport:'editor-viewport',outliner:'editor-outliner',properties:'editor-properties',info:'editor-info',preferences:'preferences',color:'colors',assets:'assets'};
+ const section=pages[node.editor]||'introduction';window.open(new URL('docs/'+section+'/',document.baseURI).href,'_blank','noopener,noreferrer');
+}
 function areaMenu(event,node){
   hovered=node.id;const sibling=siblingOf(node);const target=event.currentTarget?.getBoundingClientRect();
   menu(event.clientX||target?.left||20,event.clientY||target?.bottom||40,'Area options',[
+    {label:'Documentation ↗',action:()=>editorDocumentation(node)},null,
     {label:'Vertical split',disabled:!!maximized,disabledReason:'Restore the maximized area before splitting the layout.',action:()=>startSplit(node,'x')},
     {label:'Horizontal split',disabled:!!maximized,disabledReason:'Restore the maximized area before splitting the layout.',action:()=>startSplit(node,'y')},
     {label:'Join neighbor · keep this editor',disabled:!sibling||!!maximized,disabledReason:maximized?'Restore the maximized area first.':'This area has no sibling neighbor. Split an area to create a neighbor first.',action:()=>startJoin(node,sibling)},

@@ -57,15 +57,18 @@ test('launcher ports and dock artwork stay on their observed local faces',()=>{
 test('five-unit texture calibration routes each block to its functional mapping',()=>{
   for(const type of [14,15,56]) assert.equal(surfaceKind(getShadingSpec(type).surface,0),33);
   for(const type of [24,25]) assert.equal(surfaceKind(getShadingSpec(type).surface,0),35);
-  for(const type of [50,51,53]) assert.equal(surfaceKind(getShadingSpec(type).surface,0),5);
-  assert.equal(surfaceKind(getShadingSpec(54).surface,0),38);
+  for(const type of [50,53]) assert.equal(surfaceKind(getShadingSpec(type).surface,0),5);
+  for(const type of [51,54]) assert.equal(surfaceKind(getShadingSpec(type).surface,0),38);
   for(const type of [52,55]) assert.equal(surfaceKind(getShadingSpec(type).surface,0),4);
 });
 
-test('windowed hull and cloning pods resolve distinct stock artwork',()=>{
+test('hull windows stay disabled while crew quarters and cloning pods retain artwork',()=>{
   assert.equal(resolveTextureNames(1,0).overlay,undefined);
   assert.equal(resolveTextureNames(121,0).overlay,undefined);
-  for(const type of [2,100,122,123]) assert.equal(resolveTextureNames(type,0).overlay,'plates0_windows');
+  for(const material of [0,1,2,3,4,5,6]){
+    for(const type of [2,122]) assert.equal(resolveTextureNames(type,material).overlay,undefined);
+    for(const type of [100,101,102,103,108,109,112,123,124,125,126,127,128,129]) assert.equal(resolveTextureNames(type,material).overlay,undefined);
+  }
   assert.equal(resolveTextureNames(6,0).overlay,'plates0_manywindows');
   for(const material of [0,1,2,3,4,5,6]){
     const names=resolveTextureNames(58,material);
