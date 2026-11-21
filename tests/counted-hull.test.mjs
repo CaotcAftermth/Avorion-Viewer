@@ -17,13 +17,15 @@ const fixtures={
 
 const reference={
  empty:'4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945',
- mixed:'abe5f44ffdce3da7c6da545f64ef1d1adebfefa3f6ec4d9ad52cd6d5ce750b72',
+ // Re-audited after 233bf5b: 75% hangar openings and calibrated functional surface routes.
+ // Loading the pre-calibration surface/effect/shading modules reproduces the old hash exactly.
+ mixed:'f25b5984689bddce08fdd5f47043d6258391687cd030749a25e521eb717ff448',
  glass16:'f0495ea32c6dd6ee4cdc73b11f3948790a1ac6959413a5fc90282db2354ee209',
  glass32:'68e0b8c5b2f8940d14db54099f02b1357579366aa1e68ba61c4ebfcfbba96137',
 };
 
 for(const [name,blocks] of Object.entries(fixtures)){
- test(`counted hull matches Milestone 1 buffers and picking for ${name}`,()=>{
+ test(`counted hull matches audited buffers and picking for ${name}`,()=>{
   const camera=new THREE.PerspectiveCamera();
   camera.position.set(10,20,30);camera.lookAt(0,0,0);
   const phases=new Map(),model=makeModel(blocks);
