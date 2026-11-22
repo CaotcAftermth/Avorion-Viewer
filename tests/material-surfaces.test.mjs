@@ -56,6 +56,7 @@ test('launcher ports and dock artwork stay on their observed local faces',()=>{
 
 test('five-unit texture calibration routes each block to its functional mapping',()=>{
   for(const type of [14,15,56]) assert.equal(surfaceKind(getShadingSpec(type).surface,0),33);
+  for(const type of [16,19]) assert.equal(surfaceKind(getShadingSpec(type).surface,0),40);
   for(const type of [24,25]) assert.equal(surfaceKind(getShadingSpec(type).surface,0),35);
   for(const type of [50,53]) assert.equal(surfaceKind(getShadingSpec(type).surface,0),5);
   for(const type of [51,54]) assert.equal(surfaceKind(getShadingSpec(type).surface,0),38);

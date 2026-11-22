@@ -27,9 +27,9 @@ export function surfaceKind(surface, side) {
     if (surface === "framework")
         return SURFACE_FRAMEWORK;
     const extra = {
-        solar: 7, glass: 8, hologram: 9, "rich-stone": 10, "super-rich-stone": 11,
+        "glow-stone": 39, solar: 7, glass: 8, hologram: 9, "rich-stone": 10, "super-rich-stone": 11,
         "rich-rift": 12, "super-rich-rift": 13, pods: 14, hangar: 15, reflector: 19,
-        academy: 31, assembly: 32, "five-unit-decal": 33, "rotation-lock": 34, "turret-base": 35,
+        "five-unit-decal-flipped": 40, academy: 31, assembly: 32, "five-unit-decal": 33, "rotation-lock": 34, "turret-base": 35,
         "stripes-a": 20, "stripes-b": 21, "stripes-c": 22, "dark-a": 23, "dark-b": 24, "dark-c": 25, vivid: 29, scaffold: 30,
     };
     // The name faces away from the block's look axis (local -X): Avorion ships

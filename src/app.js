@@ -62,7 +62,7 @@ import { activeTextureAssignment, createTextureDraft, mountTextureAssignments, o
 import { mountBlockInspector } from './block-inspector.js';
 import { blockGallery, isBlockGallery, applyGalleryEdit, BLOCK_GALLERY_NAME } from './block-gallery.js';
 import { openBlockWorkspace } from './block-workspace.js';
-import { textureLibrary, releaseGameModel, socketExposed, gameParams } from './game-renderer.js';
+import { textureLibrary, releaseGameModel, refreshGameTextures, socketExposed, gameParams } from './game-renderer.js';
 import { matchesBinding, modifierActive, bindingFor, shortcutLabel, KEYMAPS } from './keymaps.js';
 import { mountViewCube, selectCubeView, homeCubeView, rotatePoleView } from './view-cube.js';
 import { EDITORS, uid, clamp, area, split, defaults, leaves, find, parentOf, cloneTree, splitArea, joinArea, swapAreas, minimum, ratioBounds, validateState } from './layout.js';
@@ -142,7 +142,7 @@ async function crashRecoveryGate(record){
   return {model:choice!=='clear',textures:choice!=='lite'};
 }
 addLog(`Avorion Viewer ${APP_VERSION} ready. Layout changes are saved in this browser.`,'SYSTEM');addLog('No model loaded. Drop an Avorion .xml or use File > Import Avorion XML.','SCENE');
-const assetPersistence=embedded?{changed(){},start(){},flush(){},stop(){}}:createSessionPersistence({scene,textures:textureLibrary,restored:kind=>{if(kind==='textures'){scene.revision++;/* rebuild: the restored model was built before its textures finished loading */textureStatus=`${textureLibrary.loadedCount} texture maps - restored locally`;if(textureLibrary.loadedCount)notify(`${textureLibrary.loadedCount} saved texture maps restored.`);}if(kind==='model'){prepareProjectFraming();if(!scene.project&&!scene.model?.colorOverrides?.size&&!scene.regions?.length&&!scene.model?.turretMounts?.length&&!scene.model?.componentSetup?.mounts?.length)savedProjectState=projectState();}render();log(`${kind==='model'?'Model':'Textures'} restored from this browser.`,'STORAGE');},onError:error=>{notify('Model/texture persistence unavailable. Current session still works.');reportError(error,'STORAGE');},gate:crashRecoveryGate});
+const assetPersistence=embedded?{changed(){},start(){},flush(){},stop(){}}:createSessionPersistence({scene,textures:textureLibrary,restored:(kind,restoreState={})=>{if(kind==='textures'){scene.revision++;/* rebuild: the restored model was built before its textures finished loading */textureStatus=`${textureLibrary.loadedCount} texture maps - restored locally`;if(textureLibrary.loadedCount)notify(`${textureLibrary.loadedCount} saved texture maps restored.`);}if(kind==='model'){prepareProjectFraming();if(!scene.project&&!scene.model?.colorOverrides?.size&&!scene.regions?.length&&!scene.model?.turretMounts?.length&&!scene.model?.componentSetup?.mounts?.length)savedProjectState=projectState();}if(!restoreState.texturesPending)render();log(`${kind==='model'?'Model':'Textures'} restored from this browser.`,'STORAGE');},onError:error=>{notify('Model/texture persistence unavailable. Current session still works.');reportError(error,'STORAGE');},gate:crashRecoveryGate});
 const workspace = () => state.workspaces.find(w => w.id === state.active);
 const currentArea = () => find(workspace().root, hovered) || leaves(workspace().root)[0];
 const areaElement = id => document.querySelector(`[data-area-id="${id}"]`);
@@ -1378,6 +1378,11 @@ document.addEventListener('keydown',e=>{
   if(match('toolbar')){e.preventDefault();node.toolbar=!node.toolbar;commit();}
   if(match('selectAll')||match('deselectAll')){e.preventDefault();selectStructure(match('selectAll')?liveBlocks(scene).map(b=>b.id):[]);}
 });
+// Migrate the old default once; explicitly chosen fixed resolutions remain available.
+try{if(!localStorage.getItem('avorion-viewer.native-textures.v1')){if(preferences.value.textureResolution===512)preferences.set('textureResolution',0);localStorage.setItem('avorion-viewer.native-textures.v1','1');}}catch{}
+textureLibrary.nativeQuality=preferences.value.textureResolution===0;
+
+textureLibrary.subscribe(event=>{if(event==='quality')void refreshGameTextures(scene).then(()=>{renderers.forEach(renderer=>renderer.draw?.());}).catch(error=>reportError(error,'TEXTURES'));});
 let requestedTextureResolution=preferences.value.textureResolution;
 preferences.subscribe(()=>{
   const resolution=preferences.value.textureResolution;

@@ -1,3 +1,4 @@
+import {textureScaleTable} from '../textures/textureScales.js';
 import {createShipNameImage} from './shipName.js';
 import {CanonicalRendererError,resourceFailure} from '../../../renderer-layout.js';
 import {wedgeTypes,wedgeBoundsWriter,endpointBoundsWriter,isWedgeInstance,hasCanonicalEndpoints,hasDiscreteOrientation,instanceOrientation,encodeOrientationSeams,decodeSeams,placeWedgeVertex,expandWedgeShading,setWedgeCreaseAxes} from './wedgeInstances.js';
@@ -27,7 +28,7 @@ import { thrusterTier } from "./thrusterPorts.js";
 import { buildBlockEffects } from "./blockEffects.js";
 import { collectBlockLights, buildSpillGrid } from "./blockLights.js";
 import { BlockPose } from "./blockPose.js";
-import { createGameMaterial, applyGameParams, setSpillGrid, packMaterialFlags, FLAG_DOUBLE_SIDED, FLAG_TINT, FLAG_EMISSIVE, FLAG_TRANSLUCENT, FLAG_CUTOUT, FLAG_OVERLAY_SECONDARY, } from "./gameShader.js";
+import { configureNativeTextureScales, createGameMaterial, applyGameParams, setSpillGrid, packMaterialFlags, FLAG_DOUBLE_SIDED, FLAG_TINT, FLAG_EMISSIVE, FLAG_TRANSLUCENT, FLAG_CUTOUT, FLAG_OVERLAY_SECONDARY, } from "./gameShader.js";
 function parseColor(av, fallback) {
     if (!av)
         return fallback;
@@ -224,18 +225,23 @@ export function buildTexturedModel(model, profile, params) {
                 auxNames.add(n);
         return { spec, names };
     });
+    const nativeUse=textureLibrary.retainNative([...albedoNames,...normalNames,...auxNames]);
     const textureStart=params.measure&&performance.now();
-    const owned = [];
+    const owned = [()=>nativeUse.release()];
     let spill = null, spillRadius = null;
     const meshes = [];
     try {
-    const albedo = textureLibrary.getArray("albedo", albedoNames);
+    let albedo = textureLibrary.getArray("albedo", albedoNames,undefined,true);
     owned.push(()=>albedo.release());
-    const normal = textureLibrary.getArray("normal", normalNames);
+    let normal = textureLibrary.getArray("normal", normalNames,undefined,true);
     owned.push(()=>normal.release());
-    const aux = textureLibrary.getArray("aux", auxNames, generated);
+    let aux = textureLibrary.getArray("aux", auxNames, generated,true);
     owned.push(()=>aux.release());
     params.measure?.("texture arrays prepared",{durationMs:params.measure?performance.now()-textureStart:0});
+    const usedNames=[...new Set([...albedoNames,...normalNames,...auxNames])];
+    let appliedImages=usedNames.map(n=>textureLibrary.previewImages.get(n)||textureLibrary.images.get(n));
+    let textureScales=textureScaleTable([albedo,normal,aux]),disposed=false,qualityTicket=0;
+    owned.push(()=>textureScales.dispose());
     const layer = (arr, name) => name ? (arr.layerOf.get(name) ?? 0) : 0;
     const batches=(params.prepared||[]).map(entry=>{
       const g=entry.instanced?new THREE.InstancedBufferGeometry():new THREE.BufferGeometry();
@@ -279,7 +285,10 @@ export function buildTexturedModel(model, profile, params) {
             flags |= FLAG_OVERLAY_SECONDARY;
         const layers = [layer(albedo, names.albedo), layer(normal, names.normal), layer(aux, names.mask), layer(aux, names.overlay)];
         const pars = [layer(aux, names.glow), packMaterialFlags(flags, b.materialIndex), spec.reflect ?? 1, 0];
-        const emission = parseColor("ff" + getMaterial(b.materialIndex).color.slice(1), [1, 1, 1, 1]).slice(0, 3);
+        // Glow Stone has pale mineral veins; rich ores retain the vivid material effect color.
+        const effectMaterial = getMaterial(b.materialIndex);
+        const emissionColor = spec.emissionTint === "paint" ? (effectMaterial.paint ?? effectMaterial.color) : effectMaterial.color;
+        const emission = parseColor("ff" + emissionColor.slice(1), [1, 1, 1, 1]).slice(0, 3);
         const blended = spec.translucent && !(spec.surface === "hologram" && color[3] >= 1);
         const args=[color,secondary,layers,pars,spec.surface,layer(aux,names.normalOverlay),emission,[layer(aux,names.materialOverlay),layer(aux,names.materialGlow),[7,13].includes(b.typeIndex)?thrusterTier(b.size.x,b.size.y,b.size.z).size:0],[b.typeIndex===10?0:seams.get(b.id)]];
         if(blended)translucent.push({b,args});
@@ -436,7 +445,7 @@ export function buildTexturedModel(model, profile, params) {
         const canonical=g.userData.canonicalLayout;
         const materialKey=[isT,instanced,doubleSided,canonical].join(':');
         let mat=materialCache.get(materialKey);
-        if(!mat){mat=createGameMaterial(albedo.texture,normal.texture,aux.texture,params,isT);materialCache.set(materialKey,mat);materials.push(mat);owned.push(()=>mat.dispose());}
+        if(!mat){mat=createGameMaterial(albedo.texture,normal.texture,aux.texture,{...params,textureScales,nativeTextureScales:false},isT);materialCache.set(materialKey,mat);materials.push(mat);owned.push(()=>mat.dispose());}
         mat.userData.hardwareCull=!doubleSided;
         if(!doubleSided)mat.side=THREE.FrontSide;
         if(instanced){mat.defines={...mat.defines,BLOCK_INSTANCED:1};}
@@ -525,7 +534,13 @@ export function buildTexturedModel(model, profile, params) {
     owned.length=0;
     return {
         group, materials, ranges,
+        textureStats(){
+            const arrays=[albedo,normal,aux];return {nativeArrayBytes:arrays.reduce((sum,a)=>sum+a.texture.image.data.byteLength+(a.largeTexture?.image.data.byteLength||0),0),singleSizeArrayBytes:arrays.reduce((sum,a)=>sum+Math.max(a.texture.image.width,a.largeTexture?.image.width||0)*Math.max(a.texture.image.height,a.largeTexture?.image.height||0)*(a.texture.userData.scales.length/4)*4,0),drawBatches:meshes.length};
+        },
+        markPreviewPresented(){nativeUse.present();},
+        needsTextureUpdate(){return !disposed&&(materials.some(m=>m.userData.loadingPreview)||usedNames.some((n,i)=>textureLibrary.images.get(n)!==appliedImages[i]));},
         dispose() {
+            disposed=true;nativeUse.release();textureScales.dispose();
             spill?.dispose();
             meshes.forEach((m) => { m.geometry.dispose(); });
             materials.forEach((m) => m.dispose());
@@ -533,6 +548,40 @@ export function buildTexturedModel(model, profile, params) {
             albedo.release();
             normal.release();
             aux.release();
+        },
+        async updateTextures(upload,prepare=async()=>{},{vertexScales=false}={}){
+            const ticket=++qualityTicket, next=[],staged=[],images=usedNames.map(n=>textureLibrary.images.get(n)),textureGeneration=textureLibrary.generation,qualityGeneration=textureLibrary.qualityGeneration;
+            const cancelled=()=>disposed||ticket!==qualityTicket||textureLibrary.generation!==textureGeneration||textureLibrary.qualityGeneration!==qualityGeneration;
+            let scales,committed=false;
+            try{
+                for(const [kind,names,local]of [['albedo',albedoNames],['normal',normalNames],['aux',auxNames,generated]]){
+                    const array=await textureLibrary.getArrayAsync(kind,names,local,cancelled);if(!array)return false;next.push(array);
+                    await upload(array.texture);if(array.largeTexture)await upload(array.largeTexture);if(cancelled())return false;
+                }
+                scales=textureScaleTable(next);
+                for(const material of materials){
+                    const mat=material.clone();mat.onBeforeCompile=material.onBeforeCompile;mat.customProgramCacheKey=material.customProgramCacheKey;mat.defaultAttributeValues=material.defaultAttributeValues;
+                    // Preserve live selection, time, lighting and editor uniforms while staging.
+                    mat.uniforms={...material.uniforms,
+                        uAlbedo:{value:next[0].texture},uNormal:{value:next[1].texture},uAux:{value:next[2].texture},
+                        uTextureScales:{value:scales},uNativeTextureScales:{value:true}};
+                    configureNativeTextureScales(mat,scales,vertexScales);
+                    for(const [i,kind]of ['Albedo','Normal','Aux'].entries()){
+                        const flag='NATIVE_'+kind.toUpperCase()+'_LARGE';delete mat.defines[flag];
+                        mat.uniforms['u'+kind+'Large']={value:next[i].largeTexture||null};
+                        mat.uniforms['u'+kind+'LargeStart']={value:next[i].texture.userData.largeStart};
+                        if(next[i].largeTexture)mat.defines[flag]=1;
+                    }
+                    staged.push(mat);
+                }
+                const staging=new THREE.Group();
+                for(const mesh of meshes){const i=materials.indexOf(mesh.material);if(i>=0){const object=new THREE.Mesh(mesh.geometry,staged[i]);object.frustumCulled=false;staging.add(object);}}
+                await prepare(staging);if(cancelled())return false;
+                for(const mesh of meshes){const i=materials.indexOf(mesh.material);if(i>=0)mesh.material=staged[i];}
+                materials.forEach(m=>m.dispose());materials.splice(0,materials.length,...staged);
+                albedo.release();normal.release();aux.release();textureScales.dispose();
+                [albedo,normal,aux]=next;textureScales=scales;appliedImages=images;committed=true;return true;
+            }finally{if(!committed){next.forEach(a=>a.release());scales?.dispose();staged.forEach(m=>m.dispose());}}
         },
         setSelection(ids) {
             const next=new Set(ids),changed=new Set([...selected].filter(id=>!next.has(id)));for(const id of next)if(!selected.has(id))changed.add(id);

@@ -162,7 +162,15 @@ function blockTypePicker(value, change) {
     picker.open = false;
     picker.firstChild.focus();
   };
-  picker.ontoggle = () => { if (picker.open) search.focus(); };
+  picker.ontoggle = () => {
+    if (!picker.open) return;
+    search.focus({preventScroll:true});
+    const selected = list.querySelector('[aria-current="true"]');
+    if (!selected) return;
+    const entry = selected.getBoundingClientRect(), bounds = list.getBoundingClientRect();
+    // Scroll only the dropdown, keeping the texture-properties pane in place.
+    list.scrollTop += entry.top - bounds.top - (list.clientHeight - entry.height) / 2;
+  };
   picker.open = false;
   filter();
   picker.append(search, list);

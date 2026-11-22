@@ -1,6 +1,8 @@
 // Español interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+  "Native (512 px preview)": "Resolución original (vista previa de 512 px)",
+  "Native displays a 512 px preview then upgrades visible maps to their original dimensions. Fixed resolutions resample maps.": "Muestra primero una vista previa de hasta 512 px y después las texturas visibles con sus dimensiones originales. Las resoluciones fijas redimensionan las texturas.",
   "Hull Renderer": "Renderizador del casco",
   "Canonical rendering reduces hull geometry memory on eligible blocks. The viewport shows the renderer actually used. A legacy URL override takes precedence.": "El renderizado canónico reduce la memoria de geometría de los bloques compatibles. La vista muestra el renderizador activo. La opción Legacy de la URL tiene prioridad.",
   "Default (Legacy)": "Predeterminado (Legacy)",

@@ -3,7 +3,7 @@ import {defaultOrientationProfile} from '../avorion/lib/avorion/orientationProfi
 import {textureLibrary} from '../avorion/lib/textures/textureLibrary.js';
 import {makeModel} from '../block-model.js';
 let textureRevision=0;
-textureLibrary.subscribe(()=>textureRevision++);
+textureLibrary.subscribe(event=>{if(event!=='quality')textureRevision++;});
 const displayUniforms=['uXray','uCull','uBlueprint','uLineScale','uDisplayMode','uMatcap','uAmbientOnly','uAmbientDetail','uWireOverlay','uWireThreshold','uWireOpacity','uExposure','uDebug','uWindowColor','uWindowStrength'];
 export function disposeAttachmentTextures(holder){
  const entry=holder.userData.texturedAttachment;
@@ -40,4 +40,8 @@ export function syncAttachmentTextures(group,scene,view,configureDepth,options){
   for(const child of rendered.group.children)if(child.userData.blockEffects)child.visible=view.display?.shading==='RENDERED'&&!view.display?.blueprint;
  }
  group.userData.prepare=camera=>{for(const holder of group.children)holder.userData.texturedAttachment?.rendered.prepare(camera);};
+}
+
+export function attachmentTextureModels(group){
+ const models=new Set();group?.traverse(object=>{const cached=object.userData.texturedAttachment;if(cached)models.add(cached.rendered);});return [...models];
 }

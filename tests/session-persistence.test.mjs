@@ -42,3 +42,15 @@ test('app-folder texture originals are cached with their source metadata',async(
  const persistence=createSessionPersistence({scene:scene(),textures:library,restored(){},onError:e=>{throw e;},store:{get:async()=>undefined,put:async(k,v)=>writes.set(k,v)}});
  await persistence.start();assert.equal(writes.get('textures')[0].source,'app');assert.equal(writes.get('textures')[0].file,'hull.png');persistence.stop();
 });
+
+test('model notification waits for textures and signals one combined render',async()=>{
+ const current=scene(),initial=current.model,library=textures(),events=[];
+ const saved=scene();saved.model.fileName='Restored ship';
+ library.loadFiles=async()=>{assert.equal(current.model,initial);events.push('pixels');};
+ const store={get:async key=>key==='model'?snapshotModel(saved):[{file:'rock.png',blob:new Blob(['texture'])}],put:async()=>{}};
+ const persistence=createSessionPersistence({scene:current,textures:library,store,restored:(kind,state)=>events.push([kind,state]),onError:e=>{throw e;}});
+ await persistence.start();
+ assert.equal(current.model.fileName,'Restored ship');
+ assert.deepEqual(events,['pixels',['model',{texturesPending:true}],['textures',undefined]]);
+ persistence.stop();
+});

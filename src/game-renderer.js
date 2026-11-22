@@ -7,6 +7,7 @@ import {createSelectionOutline} from './selection-outline.js';
 import {presentation} from './turrets/showcase.js';
 import {WeaponEffectsRenderer} from './turrets/effect-renderer.js';
 import {syncAssetGuides,releaseAssetGuides} from './turrets/asset-guides.js';
+import {attachmentTextureModels} from './turrets/textured-attachments.js';
 import {syncTurrets,pickMountedTurret,pickMountedComponent} from './turrets/render.js';
 import {syncCoverage,pickCoverage,releaseCoverage} from './turrets/coverage-render.js';
 import {coverageOptions} from './turrets/coverage-sampling.js';
@@ -289,7 +290,7 @@ function startAttempt(attempt,defer=false){
   generation=attempt;
   const {scene,model,layout,simple,count,p}=attempt;
   const appearanceAtDispatch=scene.appearanceRevision;
-  const params={...gameParams(p,scene.textureAssignment),simplified:simple,...layout,...(model.imageShipName?{shipName:model.imageShipName}:{})};
+  const params={...gameParams(p,scene.textureAssignment),simplified:simple,loadingPreview:canonicalOptions.get('editor')!=='texture-assignments',...layout,...(model.imageShipName?{shipName:model.imageShipName}:{})};
   const finish=(prepared,method)=>{
     if(!ownsAttempt(attempt)||contextLost||renderer.getContext().isContextLost())return;
     try{
@@ -489,7 +490,7 @@ export function drawGame(ctx,scene,view,width,height,p,dpr,crop=null,output=null
   if(scene.turretStudio&&!studioEffects){studioEffects=new WeaponEffectsRenderer(configureDepth);world.add(studioEffects.group);}
   studioEffects?.update(scene.turretStudio,(!output||output.studioEffects)&&!crop&&scene.visible&&!view.display?.blueprint);
   syncAssetGuides(world,scene,!output&&!crop&&view.display?.showOverlays!==false);
-  const turretGroup=syncTurrets(world,scene,view,configureDepth,{params:gameParams(p),uniforms:rendered?.materials[0]?.uniforms,time:view.imageTime??performance.now()/1000});turretBounds=turretGroup.userData.bounds;
+  const turretGroup=syncTurrets(world,scene,view,configureDepth,{params:{...gameParams(p),loadingPreview:canonicalOptions.get('editor')!=='texture-assignments'},uniforms:rendered?.materials[0]?.uniforms,time:view.imageTime??performance.now()/1000});turretBounds=turretGroup.userData.bounds;
   const coverageGroup=syncCoverage(world,scene,view,configureDepth,!!output||!!crop);
   if(coverageGroup.visible&&coverageGroup.userData.bounds)turretBounds=turretBounds.clone().union(coverageGroup.userData.bounds);
   const camera=cameraFor(view,width,height,p),theme=THEMES[p.theme];turretGroup.userData.prepare?.(camera);
@@ -617,7 +618,13 @@ export function drawGame(ctx,scene,view,width,height,p,dpr,crop=null,output=null
     diagnosticDrawEnd(sample,renderer,world,rendered?.group,turretGroup,{transparentPreparationMs});
   }
   if(output&&generation)exportLayout=layoutKey(generation.layout);
-  if(!output&&!crop&&rendered)diagnosticFirstFrame(scene);
+  if(!output&&!crop&&rendered){
+    diagnosticFirstFrame(scene);
+    if(rendered.nativeReadyPending){rendered.nativeReadyPending=false;performance.mark('avorion-native-textures-ready',{detail:rendered.textureStats()});}
+    const newlyPresented=[rendered,...attachmentTextureModels(turretGroup)].filter(target=>!target.previewSubmitted);
+    for(const target of newlyPresented){target.previewSubmitted=true;if(target===rendered)performance.mark('avorion-preview-ready',{detail:{fileName:source?.fileName,blocks:source?.blocks?.length,lightweight:target.materials.some(m=>m.userData.loadingPreview)}});}
+    if(newlyPresented.length)requestAnimationFrame(()=>requestAnimationFrame(()=>{for(const target of newlyPresented)target.markPreviewPresented();}));
+  }
   return true;
 }
 // Analysis is a diagram: draw its surface first and the ship over it, keeping
@@ -725,4 +732,24 @@ export function pickTurret(scene,view,width,height,x,y,p){
 export function pickWeaponCoverage(scene,view,width,height,x,y,p){
  const camera=cameraFor(view,width,height,p);raycaster.setFromCamera(new THREE.Vector2(x/width*2-1,1-y/height*2),camera);
  return pickCoverage(raycaster,scene);
+}
+
+// Upload replacements while preview materials remain bound, then swap uniforms.
+export async function refreshGameTextures(scene){
+ if(!rendered||source!==scene.model)return;
+ const main=rendered,started=diagnosticClock();let changed=false;
+ for(const target of [main,...attachmentTextureModels(world)]){
+   if(rendered!==main)return;if(!target.needsTextureUpdate())continue;
+   const updated=await target.updateTextures(async texture=>{
+     if(texture.userData.nativeUploaded)return;
+     for(let layer=0;layer<texture.image.depth;layer++){
+       if(rendered!==main)return;texture.addLayerUpdate(layer);texture.needsUpdate=true;renderer.initTexture(texture);await new Promise(r=>setTimeout(r,0));
+     }
+     texture.userData.nativeUploaded=true;
+   },async staging=>{
+     const preparation=new THREE.Scene();preparation.add(staging);await renderer.compileAsync(preparation,perspective);
+   },{vertexScales:renderer.capabilities.maxVaryings>=24&&renderer.capabilities.vertexTextures});
+   changed=updated||changed;
+ }
+ if(changed&&rendered===main){main.nativeReadyPending=true;diagnosticPhase('native textures uploaded',undefined,started);}
 }

@@ -1,6 +1,8 @@
 // Polski interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+  "Native (512 px preview)": "Rozdzielczość oryginalna (podgląd 512 px)",
+  "Native displays a 512 px preview then upgrades visible maps to their original dimensions. Fixed resolutions resample maps.": "Najpierw wyświetla podgląd do 512 px, a następnie widoczne tekstury w oryginalnych wymiarach. Stałe rozdzielczości skalują tekstury.",
   "Hull Renderer": "Renderer kadłuba",
   "Canonical rendering reduces hull geometry memory on eligible blocks. The viewport shows the renderer actually used. A legacy URL override takes precedence.": "Renderowanie kanoniczne zmniejsza użycie pamięci geometrii zgodnych bloków. Widok pokazuje aktywny renderer. Opcja Legacy w adresie URL ma pierwszeństwo.",
   "Default (Legacy)": "Domyślny (Legacy)",

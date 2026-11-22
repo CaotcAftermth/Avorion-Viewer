@@ -146,7 +146,7 @@ PREFERENCE_SECTIONS.push({id:'shaders',label:'Shaders',scope:'render',panels:[
 ]});
 PREFERENCE_SECTIONS.find(s=>s.id==='shaders').panels.push(
   {label:'Game Surface',fields:[
-    {key:'textureResolution',label:'Texture Resolution',type:'select',numeric:true,default:DEFAULT_TEXTURE_RESOLUTION,options:TEXTURE_RESOLUTIONS.map(size=>[size,`${size} px`]),description:'Resolution per texture map. Higher resolutions preserve more source detail and use more memory.'},
+    {key:'textureResolution',label:'Texture Resolution',type:'select',numeric:true,default:DEFAULT_TEXTURE_RESOLUTION,options:TEXTURE_RESOLUTIONS.map(size=>[size,size===0?'Native (512 px preview)':`${size} px`]),description:'Native displays a 512 px preview then upgrades visible maps to their original dimensions. Fixed resolutions resample maps.'},
     {key:'shaderTileScale',label:'Texture Scale',type:'number',min:.01,max:1,step:.01,default:.1,suffix:'/u',description:'World-space plating tiles per native coordinate unit; 0.1 gives one tile per ten units.'},
     {key:'shaderNormal',label:'Normal Strength',type:'number',min:0,max:2,step:.05,default:1,suffix:'×',description:'Tangent normal-map strength. Browser-decoded RGB is used without channel swapping.'},
     {key:'shaderMinReflection',label:'Facing Reflection',type:'number',min:0,max:1,step:.01,default:.05,description:'Sky reflection when facing the surface.'},

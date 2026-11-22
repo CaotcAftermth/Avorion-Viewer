@@ -1,0 +1,22 @@
+import {chromium} from 'file:///C:/Users/joshu/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import {readFile,mkdir,writeFile} from 'node:fs/promises';
+const before=await readFile('test-results/stone-emission/pre-rift-glow.json','utf8').then(JSON.parse).catch(e=>{if(e.code==='ENOENT')return null;throw e;});
+import http from 'node:http';
+import {viewerHandler} from '../scripts/serve.mjs';
+const textureRoot=process.env.AVORION_TEXTURE_DIR||'C:/Program Files (x86)/Steam/steamapps/common/Avorion/data/textures/blocks';
+const textures=await Promise.all(['rock.png','melted-rock.png'].map(async name=>({name,data:(await readFile(textureRoot+'/'+name)).toString('base64')})));
+const handler=viewerHandler('.');const server=http.createServer((req,res)=>{if(req.headers.origin===`http://127.0.0.1:${server.address().port}`)req.headers.origin='http://127.0.0.1:5173';req.headers.host='127.0.0.1:5173';handler(req,res);});await new Promise(r=>server.listen(0,'127.0.0.1',r));
+const browser=await chromium.launch({headless:true,channel:'msedge',args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});await mkdir('test-results/stone-emission',{recursive:true});
+try{
+const rows=[];
+for(const old of before?[true,false]:[false]){const page=await browser.newPage();if(old)for(const [path,source]of Object.entries(before))await page.route('**/'+path,route=>route.fulfill({contentType:'text/javascript',body:source}));
+await page.goto(`http://127.0.0.1:${server.address().port}/`);
+const images=await page.evaluate(async textures=>{
+ const {makeBlock,makeModel}=await import('/src/block-model.js'),{drawGame,textureLibrary,releaseGameModel}=await import('/src/game-renderer.js'),{FACTORY_PREFERENCES}=await import('/src/preferences.js'),{area}=await import('/src/layout.js'),{ensureViewportOptions}=await import('/src/viewport-options.js');
+ textureLibrary.clear();await textureLibrary.loadFiles(textures.map(t=>new File([Uint8Array.from(atob(t.data),c=>c.charCodeAt(0))],t.name,{type:'image/png'})));
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=360;const ctx=canvas.getContext('2d');const scene={loaded:true,visible:true,selected:false,selectedIds:new Set(),hiddenIds:new Set(),revision:0};const view={...area().view,yaw:.45,pitch:.3,zoom:.055,projection:'orthographic',grid:false,target:[0,0,0],panX:0,panY:0};Object.assign(ensureViewportOptions(view),{shading:'RENDERED',background:'VIEWPORT',backgroundColor:'#131a20',showOverlays:false,objectOutline:false,dof:false,shadows:false,ambientOnly:false});
+ const prefs={...FACTORY_PREFERENCES,shaderAmbient:.12,shaderLight:.3,shaderSkyAmbient:.05,shaderSpecular:0,shaderMinReflection:0,shaderMaxReflection:0,shaderGlow:1,shaderBloom:1,shaderAO:0,shaderSpill:0,shaderExposure:0};const result=[];
+ for(const typeIndex of [520,550,560]){scene.model=makeModel([makeBlock({typeIndex,materialIndex:0,size:{x:60,y:60,z:60},position:{x:0,y:0,z:0},color:'ff777777'})]);scene.revision++;drawGame(ctx,scene,view,360,360,prefs,1);result.push(canvas.toDataURL());}releaseGameModel();return result;
+},textures);rows.push({name:old?'Before':'After',images});await page.close();}
+const sheet=await browser.newPage({viewport:{width:1120,height:850}});await sheet.setContent('<html><body style="margin:0;padding:18px;background:#131a20;color:#e1e8ed;font:16px system-ui"><div id="sheet"></div></body></html>');await sheet.evaluate(rows=>{const host=document.querySelector('#sheet');for(const row of rows){const heading=document.createElement('h2');heading.textContent=row.name;heading.style='font-size:16px;margin:8px 0';host.append(heading);const grid=document.createElement('div');grid.style='display:flex;gap:8px';for(let i=0;i<3;i++){const figure=document.createElement('figure');figure.style='margin:0';const image=document.createElement('img');image.src=row.images[i];image.width=350;const cap=document.createElement('figcaption');cap.textContent=['Super Rich Stone','Super Rich Rift Stone','Glow Stone'][i];cap.style='font-size:13px';figure.append(image,cap);grid.append(figure);}host.append(grid);}},rows);await sheet.locator('img').evaluateAll(images=>Promise.all(images.map(img=>img.decode())));await sheet.screenshot({path:'test-results/stone-emission/before-after.png',fullPage:true});console.log('Saved real-rock-texture before/after comparison with bloom enabled; game textures remain local and uncommitted.');
+}finally{await browser.close();await new Promise(r=>server.close(r));}

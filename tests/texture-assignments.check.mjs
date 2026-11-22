@@ -33,6 +33,27 @@ try {
   const emission=frame.getByLabel('Window emission',{exact:true});
   await emission.fill('2');
   await emission.press('Tab');
+  // Picking a distant variant must not reopen the list at its beginning.
+  await picker.click();
+  await frame.getByRole('searchbox',{name:'Search block types'}).fill('Super Rich Rift');
+  await frame.locator('.texture-block-list button:not(.texture-block-arrow)').filter({hasText:/\(551\)$/}).click();
+  const selectedVisible=async()=>{
+    await frame.locator('.texture-block-list [aria-current=true]').waitFor();
+    await page.waitForTimeout(40);
+    return frame.locator('.texture-block-list').evaluate(list=>{
+      const selected=list.querySelector('[aria-current=true]'),a=selected.getBoundingClientRect(),b=list.getBoundingClientRect();
+      return {visible:a.top>=b.top&&a.bottom<=b.bottom,scroll:list.scrollTop,text:selected.textContent,entry:[a.top,a.bottom],bounds:[b.top,b.bottom],height:list.clientHeight};
+    });
+  };
+  await picker.click();
+  let selected=await selectedVisible();assert.match(selected.text,/\(551\)$/);assert.ok(selected.visible,JSON.stringify(selected));assert.ok(selected.scroll>0);
+  await frame.getByRole('searchbox',{name:'Search block types'}).press('Escape');
+  await picker.click();selected=await selectedVisible();assert.ok(selected.visible,JSON.stringify(selected));assert.ok(selected.scroll>0);
+  await frame.getByRole('searchbox',{name:'Search block types'}).press('Escape');
+  // Material changes rebuild the picker; the selected variant must stay visible.
+  await frame.getByLabel('Material',{exact:true}).selectOption('0');
+  await picker.click();selected=await selectedVisible();assert.ok(selected.visible,JSON.stringify(selected));assert.match(selected.text,/\(551\)$/);
+  await frame.getByRole('searchbox',{name:'Search block types'}).press('Escape');
   await picker.click();
   const blockList=frame.locator('.texture-block-list');
   const variants=blockList.getByRole('button',{name:'Variants for Blank Hull (1)',exact:true});
@@ -115,7 +136,7 @@ try {
   ]);
   // Execute the production mapping helper with a repeating 4-step texture.
   const shaderSource=await readFile('src/avorion/lib/geometry/gameShader.js','utf8');
-  const uvHelpers=shaderSource.slice(shaderSource.indexOf('vec4 sampleBlockUV('),shaderSource.indexOf('vec4 sampleShipName('));
+  const uvHelpers=shaderSource.slice(shaderSource.indexOf('uniform sampler2D uTextureScales;',shaderSource.indexOf('const FRAG =')),shaderSource.indexOf('vec4 sampleShipName('));
   const tileSamples=await page.evaluate(helpers=>{
     const canvas=document.createElement('canvas');
     canvas.width=100; canvas.height=1;
@@ -137,6 +158,7 @@ try {
       uniform float width;
       uniform int mode;
       uniform float surface;
+      const int MAP_ALBEDO=0,MAP_NORMAL=1;
       int uTextureScaling[1];
       vec4 vSurface;
       const float uTileScale=.1;
@@ -155,11 +177,12 @@ try {
     gl.linkProgram(program);
     if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
     gl.useProgram(program);
+    gl.uniform1i(gl.getUniformLocation(program,'uTextureScales'),1);
     gl.bindTexture(gl.TEXTURE_2D_ARRAY,gl.createTexture());
     gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
     gl.texImage3D(gl.TEXTURE_2D_ARRAY,0,gl.R8,4,1,2,0,gl.RED,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,0,32,96,160,224]));
-    return [[10,0,0],[20,0,0],[20,1,0],[2,0,31],[2,1,31],[5,0,33],[5,0,35],[5,0,4],[5,0,5],[.5,0,6],[.75,0,6],[.75,1,6]].map(([width,mode,surface])=>{
+    return [[10,0,0],[20,0,0],[20,1,0],[2,0,31],[2,1,31],[5,0,33],[5,0,35],[5,0,4],[5,0,5],[.5,0,6],[.75,0,6],[.75,1,6],[2,0,32],[2,1,32]].map(([width,mode,surface])=>{
       gl.uniform1f(gl.getUniformLocation(program,'width'),width);
       gl.uniform1i(gl.getUniformLocation(program,'mode'),mode);
       gl.uniform1f(gl.getUniformLocation(program,'surface'),surface);
@@ -171,10 +194,12 @@ try {
       });
     });
   },uvHelpers);
-  assert.deepEqual(tileSamples,[[32,96,96,160,160,224],[160,32,96,160,160,32],[32,96,96,160,160,224],[96,32,32,224,224,160],[32,96,96,160,160,224],
-    [224,160,160,96,96,32],[224,160,160,96,96,32],
-    [32,96,96,160,160,224],[32,96,96,160,160,224],
-    [32,96,96,160,160,224],[32,96,160,224,224,32],[32,96,96,160,160,224]]);
+  // Existing defaults are corner-centered; only Assembly's native mapping shifts.
+  assert.deepEqual(tileSamples,[[160,224,224,32,32,96],[32,160,224,32,32,160],[32,96,96,160,160,224],[96,32,32,224,224,160],[32,96,96,160,160,224],
+    [96,32,32,224,224,160],[96,32,32,224,224,160],
+    [160,224,224,32,32,96],[160,224,224,32,32,96],
+    [32,96,96,160,160,224],[32,160,224,32,32,160],[32,96,96,160,160,224],
+    [224,160,160,96,96,32],[32,96,96,160,160,224]]);
   const parentHasTexture=await page.evaluate(async()=>{
     const {textureLibrary}=await import('/src/avorion/lib/textures/textureLibrary.js');
     return textureLibrary.has('preview-map');
@@ -183,6 +208,14 @@ try {
   await dialog.getByRole('button',{name:'Close',exact:true}).click();
   await page.getByRole('button',{name:'Help',exact:true}).click();
   await page.getByRole('menuitem',{name:'Texture Assignments…'}).click();
+  await picker.waitFor({timeout:10000}).catch(async error=>{
+    const state=await frame.locator('body').evaluate(async()=>{const {textureLibrary:t}=await import('/src/avorion/lib/textures/textureLibrary.js');return {pending:t.pending,loaded:t.loadedCount,blobs:t.blobs.size,scanning:t.scanning};});
+    console.log('Reopen diagnostic',state,await dialog.locator('[role=status]').textContent(),errors);
+    error.message+=' Reopen status: '+await dialog.locator('[role=status]').textContent()+' textures: '+JSON.stringify(state)+' errors: '+JSON.stringify(errors);throw error;
+  });
+  await picker.click();selected=await selectedVisible();assert.ok(selected.visible,JSON.stringify(selected));assert.match(selected.text,/\(2\)$/);
+  await frame.getByRole('searchbox',{name:'Search block types'}).press('Escape');
+  await frame.getByRole('button',{name:'Inspect Albedo',exact:true}).click();
   await albedo.waitFor();
   assert.equal(await albedo.inputValue(),'file:preview-map');
   await frame.getByRole('button',{name:'Reset this block and material'}).click();

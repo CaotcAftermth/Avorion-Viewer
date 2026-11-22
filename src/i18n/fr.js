@@ -1,6 +1,8 @@
 // Français interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+  "Native (512 px preview)": "Résolution d’origine (aperçu 512 px)",
+  "Native displays a 512 px preview then upgrades visible maps to their original dimensions. Fixed resolutions resample maps.": "Affiche un aperçu de 512 px maximum, puis charge les textures visibles dans leurs dimensions d’origine. Les résolutions fixes redimensionnent les textures.",
   "Hull Renderer": "Moteur de rendu de la coque",
   "Canonical rendering reduces hull geometry memory on eligible blocks. The viewport shows the renderer actually used. A legacy URL override takes precedence.": "Le rendu canonique réduit la mémoire géométrique des blocs compatibles. La vue indique le moteur actif. L’option Legacy de l’URL est prioritaire.",
   "Default (Legacy)": "Par défaut (Legacy)",

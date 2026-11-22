@@ -1,6 +1,8 @@
 // Deutsch interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+  "Native (512 px preview)": "Originalauflösung (512-px-Vorschau)",
+  "Native displays a 512 px preview then upgrades visible maps to their original dimensions. Fixed resolutions resample maps.": "Zeigt zunächst eine Vorschau mit bis zu 512 px und lädt sichtbare Texturen dann in Originalgröße. Feste Auflösungen skalieren Texturen.",
   "Hull Renderer": "Rumpf-Renderer",
   "Canonical rendering reduces hull geometry memory on eligible blocks. The viewport shows the renderer actually used. A legacy URL override takes precedence.": "Der kanonische Renderer spart Geometriespeicher bei geeigneten Blöcken. Der aktive Renderer steht im Ansichtsfenster. Die Legacy-URL-Option hat Vorrang.",
   "Default (Legacy)": "Standard (Legacy)",

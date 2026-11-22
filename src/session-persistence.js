@@ -1,3 +1,4 @@
+import {resolveTextureNames} from './avorion/lib/textures/shadingMap.js';
 import {validateSetup} from './components/core.js';
 import {makeModel,parseAvorionXml,placeImportedModel} from './block-model.js';
 import {exportPaintedXml} from './color-workshop.js';
@@ -133,15 +134,23 @@ export function createSessionPersistence({scene,textures,restored,onError,gate,s
     }
     // A held-back texture set stays saved: start from it so the empty library is not written over it.
     if(!plan.textures&&textureResult.status==='fulfilled'&&Array.isArray(textureResult.value))lastTextures=[];
+    let pendingModel,texturesRestored=false;
     if(modelResult.status==='fulfilled'){
-      if(plan.model&&modelResult.value!==undefined&&scene.model===initialModel){try{Object.assign(scene,restoreModel(modelResult.value));lastScene=recoveryState();scene.revision++;restored('model');}catch(error){report(error);}}
+      if(plan.model&&modelResult.value!==undefined&&scene.model===initialModel){try{pendingModel=restoreModel(modelResult.value);}catch(error){report(error);}}
     }else report(modelResult.reason);
-    ready=true;textures.subscribe(saveTextures);flush();
+    // Restore texture pixels before exposing the model, avoiding an untextured build.
     if(textureResult.status==='fulfilled'){
       if(plan.textures&&Array.isArray(textureResult.value)&&textures.generation===initialGeneration&&!picked().length){
-        try{await textures.loadFiles(textureResult.value.map(f=>new File([f.blob],f.file,{type:f.blob.type})),{retainUndecoded:true,sources:new Map(textureResult.value.map(f=>[f.file,f.source||'folder']))});restored('textures');}catch(error){report(error);}
+        try{await textures.loadFiles(textureResult.value.map(f=>new File([f.blob],f.file,{type:f.blob.type})),{retainUndecoded:true,sources:new Map(textureResult.value.map(f=>[f.file,f.source||'folder'])),previewNames:textures.nativeQuality&&pendingModel?.model?new Set(pendingModel.model.blocks.flatMap(b=>Object.values(resolveTextureNames(b.typeIndex,b.materialIndex)))):null});texturesRestored=true;}catch(error){report(error);}
       }
     }else report(textureResult.reason);
+    if(stopped)return;
+    if(pendingModel&&scene.model===initialModel){
+      Object.assign(scene,pendingModel);lastScene=recoveryState();scene.revision++;
+      restored('model',{texturesPending:texturesRestored});
+    }
+    if(texturesRestored)restored('textures');
+    ready=true;textures.subscribe(saveTextures);
     // Observe clear/unload and all import entry points through the shared library.
     if(stopped)return;
     saveTextures();flush();

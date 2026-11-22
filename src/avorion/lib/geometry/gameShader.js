@@ -1,3 +1,4 @@
+import {LOADING_PREVIEW_FRAGMENT} from './loadingPreview.js';
 // ---------------------------------------------------------------------------
 // Game shader: a WebGL2 port of Avorion's data/shaders/blocks/block.vert +
 // armor.frag / armormask.frag / colorableoverlay.frag lighting model.
@@ -32,6 +33,9 @@ export { DEFAULT_GAME_SHADER };
 // Six low bits remain draw/picking flags. Higher bits hold material index + 1.
 // Code zero is the fallback for unknown materials and untagged preview geometry.
 export const MATERIAL_FLAG_STRIDE = 64;
+// Viewer-calibrated gains, not recovered native util0.a values. Order follows ore surfaces 10–13, then Glow Stone.
+// Super Rich Stone and Rift Stone retain HDR deposit cores for bloom; the tightened deposit mask keeps host rock dark.
+export const STONE_EMISSION_DEFAULTS = Object.freeze([.5, .75, .5, .75, .5]);
 export function packMaterialFlags(flags, materialIndex) {
     const knownMaterial = Number.isInteger(materialIndex) && materialIndex >= 0 && materialIndex < materialShadingDefaults.length;
     return flags + (knownMaterial ? materialIndex + 1 : 0) * MATERIAL_FLAG_STRIDE;
@@ -44,6 +48,17 @@ export const FLAG_TRANSLUCENT = 4;
 export const FLAG_CUTOUT = 8;
 export const FLAG_OVERLAY_SECONDARY = 16;
 const VERT = /* glsl */ `
+#ifdef NATIVE_SCALE_VERTEX
+uniform sampler2D uTextureScales;
+flat out vec4 vNativeScale0;
+flat out vec4 vNativeScale1;
+flat out vec4 vNativeScale2;
+flat out vec4 vNativeScale3;
+flat out vec4 vNativeScale4;
+flat out vec4 vNativeScale5;
+flat out vec4 vNativeScale6;
+flat out vec4 vNativeScale7;
+#endif
 #ifdef BLOCK_CANONICAL_ENDPOINTS
 attribute vec4 aOffset;
 attribute vec4 aScale;
@@ -115,6 +130,16 @@ float wedgeCrease(float code, vec3 span) {
 }
 #endif
 void main() {
+#ifdef NATIVE_SCALE_VERTEX
+vNativeScale0=texelFetch(uTextureScales,ivec2(int(aLayers.x+.5),0),0);
+vNativeScale1=texelFetch(uTextureScales,ivec2(int(aLayers.y+.5),1),0);
+vNativeScale2=texelFetch(uTextureScales,ivec2(int(aLayers.z+.5),2),0);
+vNativeScale3=texelFetch(uTextureScales,ivec2(int(aLayers.w+.5),2),0);
+vNativeScale4=texelFetch(uTextureScales,ivec2(int(aSurface.w+.5),2),0);
+vNativeScale5=texelFetch(uTextureScales,ivec2(int(aParams.x+.5),2),0);
+vNativeScale6=texelFetch(uTextureScales,ivec2(int(aMaterialLayers.x+.5),2),0);
+vNativeScale7=texelFetch(uTextureScales,ivec2(int(aMaterialLayers.y+.5),2),0);
+#endif
   vBary=vec3(equal(vec3(floor(aEdges.w+.5)),vec3(0.,1.,2.)));vEdges=aEdges.xyz;
   vec3 blockPosition=position;
   vec3 texturePosition=aSide.xyz;
@@ -196,6 +221,15 @@ out vec4 outColor;
 uniform sampler2DArray uAlbedo;
 uniform sampler2DArray uNormal;
 uniform sampler2DArray uAux;
+#ifdef NATIVE_ALBEDO_LARGE
+uniform sampler2DArray uAlbedoLarge;uniform float uAlbedoLargeStart;
+#endif
+#ifdef NATIVE_NORMAL_LARGE
+uniform sampler2DArray uNormalLarge;uniform float uNormalLargeStart;
+#endif
+#ifdef NATIVE_AUX_LARGE
+uniform sampler2DArray uAuxLarge;uniform float uAuxLargeStart;
+#endif
 uniform float uTileScale;
 uniform float uExposure;
 uniform float uBlueprint,uLineScale;
@@ -218,6 +252,7 @@ uniform float uNormalStrength;
 uniform float uSharpness;
 uniform float uSecondaryFactor;
 uniform float uGlowStrength;
+uniform float uStoneEmission[5];
 uniform float uHologramGlow;
 uniform float uFogStrength;
 uniform vec3 uSelectColor;
@@ -264,44 +299,77 @@ vec3 shadowCoord;
 vec3 shadowDx;
 vec3 shadowDy;
 
-vec4 sampleBlockUV(sampler2DArray tex, float layer, int mode, float tileFactor) {
+uniform sampler2D uTextureScales;
+uniform bool uNativeTextureScales;
+#ifdef NATIVE_SCALE_VERTEX
+flat in vec4 vNativeScale0;
+flat in vec4 vNativeScale1;
+flat in vec4 vNativeScale2;
+flat in vec4 vNativeScale3;
+flat in vec4 vNativeScale4;
+flat in vec4 vNativeScale5;
+flat in vec4 vNativeScale6;
+flat in vec4 vNativeScale7;
+#endif
+// NATIVE_SCALE_LOOKUP
+vec4 sampleTextureArray(sampler2DArray tex,vec3 point,vec2 dx,vec2 dy,int slot){
+#ifndef NATIVE_TEXTURE_SCALES
+ return textureGrad(tex,point,dx,dy);
+#else
+ int row=slot==MAP_ALBEDO?0:slot==MAP_NORMAL?1:2;
+ vec4 scale=nativeTextureScale(row,point.z,slot);
+ vec2 uv=fract(point.xy)*scale.xy+scale.zw;
+#ifdef NATIVE_ALBEDO_LARGE
+ if(row==0&&point.z>=uAlbedoLargeStart)return textureGrad(uAlbedoLarge,vec3(uv,point.z-uAlbedoLargeStart+1.),dx*scale.xy,dy*scale.xy);
+#endif
+#ifdef NATIVE_NORMAL_LARGE
+ if(row==1&&point.z>=uNormalLargeStart)return textureGrad(uNormalLarge,vec3(uv,point.z-uNormalLargeStart+1.),dx*scale.xy,dy*scale.xy);
+#endif
+#ifdef NATIVE_AUX_LARGE
+ if(row==2&&point.z>=uAuxLargeStart)return textureGrad(uAuxLarge,vec3(uv,point.z-uAuxLargeStart+1.),dx*scale.xy,dy*scale.xy);
+#endif
+ return textureGrad(tex,vec3(uv,point.z),dx*scale.xy,dy*scale.xy);
+#endif
+}
+
+vec4 sampleBlockUV(sampler2DArray tex, float layer, int mode, float tileFactor, int slot) {
   if (layer < 0.5) return textureLod(tex, vec3(0.0), 0.0);
   vec2 scale = mode == 2 ? vSurface.xy * (uTileScale * tileFactor) : vec2(1.0);
   vec2 uv = mode == 2 ? vFaceUV * scale : clamp(vFaceUV, vec2(0.001), vec2(0.999));
-  return textureGrad(tex, vec3(uv, layer), faceDx * scale, faceDy * scale);
+  return sampleTextureArray(tex, vec3(uv, layer), faceDx * scale, faceDy * scale, slot);
 }
 
 vec4 sampleBlockUV(sampler2DArray tex, float layer, int mode) {
-  return sampleBlockUV(tex, layer, mode, 1.0);
+  return sampleBlockUV(tex, layer, mode, 1.0, 0);
 }
 
 vec4 sampleFrameworkMask(sampler2DArray tex, float layer, int slot) {
   int mode = uTextureScaling[slot];
-  if (mode != 0) return sampleBlockUV(tex, layer, mode);
+  if (mode != 0) return sampleBlockUV(tex, layer, mode, 1.0, slot);
   if (layer < 0.5) return textureLod(tex, vec3(0.0), 0.0);
   // Fit whole, equally sized sections from the face base. At stock scale,
   // counts increase at 0.75, 1.25, 1.75, ... native units on each axis.
   vec2 sections = max(vec2(1.0), floor(vSurface.xy * (uTileScale * 20.0) + 0.5));
-  return textureGrad(tex, vec3(vFaceUV * sections, layer), faceDx * sections, faceDy * sections);
+  return sampleTextureArray(tex, vec3(vFaceUV * sections, layer), faceDx * sections, faceDy * sections, slot);
 }
 
 vec4 sampleFace(sampler2DArray tex, float layer, float scale, int slot) {
-  if (uTextureScaling[slot] != 0) return sampleBlockUV(tex, layer, uTextureScaling[slot]);
+  if (uTextureScaling[slot] != 0) return sampleBlockUV(tex, layer, uTextureScaling[slot], 1.0, slot);
   vec4 result = textureLod(tex, vec3(0.0), 0.0);
   // Keep a face decal inside its layer instead of wrapping into the next tile.
   vec2 uv = scale == 1.0 ? clamp(vFaceUV, vec2(0.001), vec2(0.999)) : vFaceUV * scale;
-  if (layer >= 0.5) result = textureGrad(tex, vec3(uv, layer), faceDx * scale, faceDy * scale);
+  if (layer >= 0.5) result = sampleTextureArray(tex, vec3(uv, layer), faceDx * scale, faceDy * scale, slot);
   return result;
 }
 
 // Keep a tile corner at the face center as its physical dimensions change.
 // A negative factor keeps the native inverted UV orientation for functional decals.
 vec4 sampleCenteredFace(sampler2DArray tex, float layer, float factor, float center, int slot) {
-  if (uTextureScaling[slot] != 0) return sampleBlockUV(tex, layer, uTextureScaling[slot]);
+  if (uTextureScaling[slot] != 0) return sampleBlockUV(tex, layer, uTextureScaling[slot], 1.0, slot);
   if (layer < 0.5) return textureLod(tex, vec3(0.0), 0.0);
   vec2 scale = vSurface.xy * (uTileScale * factor);
   vec2 uv = center + (vFaceUV - 0.5) * scale;
-  return textureGrad(tex, vec3(uv, layer), faceDx * scale, faceDy * scale);
+  return sampleTextureArray(tex, vec3(uv, layer), faceDx * scale, faceDy * scale, slot);
 }
 
 vec4 sampleCenteredFace(sampler2DArray tex, float layer, float factor, int slot) {
@@ -310,13 +378,18 @@ vec4 sampleCenteredFace(sampler2DArray tex, float layer, float factor, int slot)
 
 // Dock artwork uses an inverted face fit.
 vec4 sampleFunctional(sampler2DArray tex, float layer, float surface, int slot) {
-  if (uTextureScaling[slot] != 0) return sampleBlockUV(tex, layer, uTextureScaling[slot]);
+  if (uTextureScaling[slot] != 0) return sampleBlockUV(tex, layer, uTextureScaling[slot], 1.0, slot);
   if (layer < 0.5) return textureLod(tex, vec3(0.0), 0.0);
-  if (surface == 28.0 || surface >= 36.0) {
+  if (surface == 28.0 || (surface >= 36.0 && surface <= 37.0)) {
     // The frontal opening occupies about one third of each face axis.
     vec2 scale = surface == 37.0 ? vec2(-2.34, -.78) : vec2(-1.0);
     vec2 uv = clamp(0.5 + (vFaceUV - 0.5) * scale, vec2(0.001), vec2(0.999));
-    return textureGrad(tex, vec3(uv, layer), faceDx * scale, faceDy * scale);
+    return sampleTextureArray(tex, vec3(uv, layer), faceDx * scale, faceDy * scale, slot);
+  }
+  if (surface == 40.0) {
+    // Mirror horizontally while keeping five-unit tiling and the corner anchor.
+    vec2 scale = vSurface.xy * (uTileScale * 2.0) * vec2(1.0, -1.0);
+    return sampleTextureArray(tex,vec3((vFaceUV - 0.5) * scale,layer),faceDx*scale,faceDy*scale, slot);
   }
   // Relative to the normal plating repeat rate. Rotation lock and turret base
   // contain multiple motifs per source tile.
@@ -325,7 +398,8 @@ vec4 sampleFunctional(sampler2DArray tex, float layer, float surface, int slot) 
   if (surface == 32.0) factor = 6.0;
   if (surface == 34.0) factor = 10.0;
   if (surface == 33.0 || surface == 35.0) factor = 2.0;
-  return sampleCenteredFace(tex, layer, -factor, 0.0, slot);
+  // Assembly centers its artwork, rather than a tile corner, on the face.
+  return sampleCenteredFace(tex, layer, -factor, surface == 32.0 ? 0.5 : 0.0, slot);
 }
 
 vec4 sampleGeneratorDetail(sampler2DArray tex, float layer, float surface, int slot) {
@@ -334,7 +408,7 @@ vec4 sampleGeneratorDetail(sampler2DArray tex, float layer, float surface, int s
 }
 
 vec4 sampleShipName(float layer) {
-  if (uTextureScaling[MAP_OVERLAY] != 0) return sampleBlockUV(uAux, layer, uTextureScaling[MAP_OVERLAY]);
+  if (uTextureScaling[MAP_OVERLAY] != 0) return sampleBlockUV(uAux, layer, uTextureScaling[MAP_OVERLAY], 1.0, MAP_OVERLAY);
   if (layer < 0.5) return vec4(0.0);
   // Fit the 4:1 name region uniformly. Only face width and height matter.
   float aspect = vSurface.x / max(vSurface.y, .0001);
@@ -342,11 +416,11 @@ vec4 sampleShipName(float layer) {
   vec2 uv = 0.5 + (vFaceUV - 0.5) * scale;
   if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) return vec4(0.0);
   vec2 dx = faceDx * scale, dy = faceDy * scale;
-  float glyph = textureGrad(uAux, vec3(uv, layer), dx, dy).r;
+  float glyph = sampleTextureArray(uAux, vec3(uv, layer), dx, dy, MAP_OVERLAY).r;
   float outline = 0.0;
   for (int y = -1; y <= 1; ++y)
     for (int x = -1; x <= 1; ++x)
-      outline += textureGrad(uAux, vec3(uv + vec2(float(x) * .004, float(y) * .016), layer), dx, dy).r;
+      outline += sampleTextureArray(uAux, vec3(uv + vec2(float(x) * .004, float(y) * .016), layer), dx, dy, MAP_OVERLAY).r;
   return vec4(vec3(glyph), max(glyph, min(outline, 1.0)));
 }
 
@@ -365,11 +439,11 @@ float thrusterCoverage(vec2 point, float portSize) {
   return 1.0 - smoothstep(portSize * 0.5 - aa, portSize * 0.5 + aa, max(abs(point.x), abs(point.y)));
 }
 vec4 sampleThruster(float layer, vec2 point, float portSize, int slot) {
-  if (uTextureScaling[slot] != 0) return sampleBlockUV(uAux, layer, uTextureScaling[slot]);
+  if (uTextureScaling[slot] != 0) return sampleBlockUV(uAux, layer, uTextureScaling[slot], 1.0, slot);
   if (layer < 0.5) return vec4(0.0);
   // Native port artwork wraps across the four texture corners.
   float scale = portSize * 3.2;
-  return textureGrad(uAux, vec3(fract(point / scale), layer), faceDx * vSurface.xy / scale, faceDy * vSurface.xy / scale);
+  return sampleTextureArray(uAux, vec3(fract(point / scale), layer), faceDx * vSurface.xy / scale, faceDy * vSurface.xy / scale, MAP_OVERLAY);
 }
 
 vec3 triWeights(vec3 n) {
@@ -378,12 +452,12 @@ vec3 triWeights(vec3 n) {
 }
 
 vec4 sampleTriScaled(sampler2DArray tex, float layer, vec3 p, vec3 w, float scale, int slot) {
-  if (uTextureScaling[slot] != 0) return sampleBlockUV(tex, layer, uTextureScaling[slot]);
+  if (uTextureScaling[slot] != 0) return sampleBlockUV(tex, layer, uTextureScaling[slot], 1.0, slot);
   vec4 result = textureLod(tex, vec3(0.0, 0.0, 0.0), 0.0); // fallback layer, uniform
   if (layer >= 0.5) {
-    vec4 x = textureGrad(tex, vec3(p.zy * scale, layer), dpdx.zy * scale, dpdy.zy * scale);
-    vec4 y = textureGrad(tex, vec3(p.xz * scale, layer), dpdx.xz * scale, dpdy.xz * scale);
-    vec4 z = textureGrad(tex, vec3(p.xy * scale, layer), dpdx.xy * scale, dpdy.xy * scale);
+    vec4 x = sampleTextureArray(tex, vec3(p.zy * scale, layer), dpdx.zy * scale, dpdy.zy * scale, slot);
+    vec4 y = sampleTextureArray(tex, vec3(p.xz * scale, layer), dpdx.xz * scale, dpdy.xz * scale, slot);
+    vec4 z = sampleTextureArray(tex, vec3(p.xy * scale, layer), dpdx.xy * scale, dpdy.xy * scale, slot);
     result = x * w.x + y * w.y + z * w.z;
   }
   return result;
@@ -396,9 +470,9 @@ vec3 sampleNormalTri(float layer, vec3 p, vec3 w, vec3 n, float scale) {
   if (layer < 0.5) return n;
   // Browser image decoding already converts BMP's BGR storage to RGB.
   // Swapping again turns a flat (128,128,255) normal into a tangent.
-  vec3 tx = textureGrad(uNormal, vec3(p.zy*scale, layer), dpdx.zy*scale, dpdy.zy*scale).rgb * 2.0 - 1.0;
-  vec3 ty = textureGrad(uNormal, vec3(p.xz*scale, layer), dpdx.xz*scale, dpdy.xz*scale).rgb * 2.0 - 1.0;
-  vec3 tz = textureGrad(uNormal, vec3(p.xy*scale, layer), dpdx.xy*scale, dpdy.xy*scale).rgb * 2.0 - 1.0;
+  vec3 tx = sampleTextureArray(uNormal, vec3(p.zy*scale, layer), dpdx.zy*scale, dpdy.zy*scale, MAP_NORMAL).rgb * 2.0 - 1.0;
+  vec3 ty = sampleTextureArray(uNormal, vec3(p.xz*scale, layer), dpdx.xz*scale, dpdy.xz*scale, MAP_NORMAL).rgb * 2.0 - 1.0;
+  vec3 tz = sampleTextureArray(uNormal, vec3(p.xy*scale, layer), dpdx.xy*scale, dpdy.xy*scale, MAP_NORMAL).rgb * 2.0 - 1.0;
   // UDN blend: perturb the geometric normal in each projection plane.
   // Projection UVs do not flip on negative faces; their tangent derivatives
   // must not flip either. Only the geometric normal changes sign.
@@ -454,9 +528,9 @@ void main() {
   if (uCull>.5 && !gl_FrontFacing && !hasFlag(flags, 32.0)) discard;
   float surface = vSurface.z;
   bool generator = surface == 4.0 || surface == 5.0 || surface == 38.0;
-  bool ore = surface >= 10.0 && surface <= 13.0;
+  bool ore = (surface >= 10.0 && surface <= 13.0) || surface == 39.0;
   bool stripes = surface >= 20.0 && surface <= 25.0;
-  bool decal = surface == 3.0 || surface == 28.0 || (surface >= 31.0 && surface <= 37.0);
+  bool decal = surface == 40.0 || surface == 3.0 || surface == 28.0 || (surface >= 31.0 && surface <= 37.0);
   float portSize = max(vMaterialLayers.z, 0.1);
   vec2 portPoint = thrusterPortPoint(vFaceUV, vSurface.xy, portSize);
   float portCoverage = surface == 2.0 ? thrusterCoverage(portPoint, portSize) : 0.0;
@@ -473,7 +547,9 @@ void main() {
   if (surface == 27.0) base = sampleFace(uAlbedo, vLayers.x, 2.0, MAP_ALBEDO);
   if (solar > 0.5) base = sampleTriScaled(uAlbedo, vLayers.x, p, w, 1.5, MAP_ALBEDO);
   if (ore) {
-    float detail = 1.0 - clamp(length(vWorldPos - cameraPosition) / 40.0, 0.5, 1.0);
+    // Camera-distance blending moves the deposits themselves. Keep their two-scale
+    // pattern fixed; textureGrad and mipmaps already filter it as the view changes.
+    const float detail = 0.5;
     base = mix(sampleTriScaled(uAlbedo, vLayers.x, p, w, 0.25, MAP_ALBEDO), sampleTriScaled(uAlbedo, vLayers.x, p, w, 1.25, MAP_ALBEDO), detail);
   }
   if (surface != 6.0 && hasFlag(flags, 8.0) && base.a < 0.5) discard;
@@ -544,9 +620,15 @@ void main() {
     if (surface == 17.0) overlay = sampleFace(uAux, vLayers.w, 1.0, MAP_OVERLAY);
     if (stripes && vLayers.w > 0.5) {
       float variant = mod(surface - 20.0, 3.0);
-      // Preserve world, inverted-world and face-centered stripe variants.
-      overlay = variant == 2.0 ? sampleCenteredFace(uAux,vLayers.w,1.0, MAP_OVERLAY)
-        : sampleTriScaled(uAux,vLayers.w,p,w,variant == 1.0 ? -1.0 : 1.0, MAP_OVERLAY);
+      // One complete stripe tile spans five native units at stock tile scale (.1).
+      // All stripe families anchor a tile corner at each face center.
+      if (variant == 0.0 && uTextureScaling[MAP_OVERLAY] == 0) {
+        // A stripes rise toward the right on the reference face. Reflect only
+        // the horizontal coordinate, retaining the tile corner at face center.
+        vec2 scale = vSurface.xy * (uTileScale * 2.0) * vec2(-1.0, 1.0);
+        vec2 uv = (vFaceUV - 0.5) * scale;
+        overlay = sampleTextureArray(uAux,vec3(uv,vLayers.w),faceDx*scale,faceDy*scale, MAP_OVERLAY);
+      } else overlay = sampleCenteredFace(uAux,vLayers.w,variant == 1.0 ? -2.0 : 2.0,0.0,MAP_OVERLAY);
       paintLocation = mix(paintLocation, secondaryMask, overlay.a);
       vec3 stripeColor = surface >= 23.0 ? vec3(0.12) : vec3(1.0);
       overlay.rgb *= mix(stripeColor, vSecondary.rgb, vSecondary.a);
@@ -580,7 +662,7 @@ void main() {
   }
 
   vec3 N = sampleNormalTri(vLayers.y, p, w, textureNormal, mix(1.0,1.5,solar));
-  if(ore){float detail=1.0-clamp(length(vWorldPos-cameraPosition)/40.0,0.5,1.0);
+  if(ore){const float detail=.5; // Match the fixed albedo/deposit pattern.
     N=normalize(mix(sampleNormalTri(vLayers.y,p,w,textureNormal,.25),sampleNormalTri(vLayers.y,p,w,textureNormal,1.25),detail));}
   // Rotate the rest-space texture normal into the posed surface frame.
   vec3 restT=dFdx(vTexturePosition), posedT=worldDx;
@@ -593,7 +675,7 @@ void main() {
   if (surface == 4.0 && vLayers.y > 0.5) N = faceNormal(sampleCenteredFace(uNormal, vLayers.y, 1.5, MAP_NORMAL).rgb * 2.0 - 1.0, n);
   if (surface == 27.0 && vLayers.y > 0.5) N = faceNormal(sampleFace(uNormal, vLayers.y, 2.0, MAP_NORMAL).rgb * 2.0 - 1.0, n);
   if (uTextureScaling[MAP_NORMAL] != 0 && vLayers.y > 0.5)
-    N = faceNormal(sampleBlockUV(uNormal, vLayers.y, uTextureScaling[MAP_NORMAL]).rgb * 2.0 - 1.0, n);
+    N = faceNormal(sampleBlockUV(uNormal, vLayers.y, uTextureScaling[MAP_NORMAL], 1.0, MAP_NORMAL).rgb * 2.0 - 1.0, n);
   if ((decal || generator) && vSurface.w > 0.5) {
     vec4 detail = decal ? sampleFunctional(uAux, vSurface.w, surface, MAP_NORMALOVERLAY)
       : sampleGeneratorDetail(uAux, vSurface.w, surface, MAP_NORMALOVERLAY);
@@ -636,17 +718,27 @@ void main() {
   if (surface == 8.0) spec *= 3.0;
   if (hasFlag(flags, 2.0) || ore) spec = 0.0;
   outc += spec * uLightColor * shadow;
+  float materialGlow = uMaterialGlow[materialCode] * uGlowStrength;
   if (ore) {
-    float rich = surface == 11.0 || surface == 13.0 ? 1.0 : 0.5;
-    float bias = rich > 0.5 ? -0.15 : 0.0;
-    float lightness = 1.0 - min(1.0, length(base.rgb + bias) * 1.65);
-    float highlight = pow(clamp(dot(-uLightDir, R), 0.0, 1.0), surface >= 12.0 ? 450.0 : 250.0);
-    outc += vEmission * rich * (4.0 * lightness + highlight * base.a);
+    bool superRich = surface == 11.0 || surface == 13.0;
+    bool riftOre = surface == 12.0 || surface == 13.0 || surface == 39.0;
+    int family = surface == 39.0 ? 4 : int(surface - 10.0);
+    // Native richstone/richriftstone derive deposits from inverse rock brightness.
+    // Tighten low-level emission so dark host rock does not acquire a broad HDR wash.
+    float bias = superRich || surface == 39.0 ? -0.15 : 0.15;
+    float deposit = clamp(1.0 - length(base.rgb + bias) * 1.65, 0.0, 1.0);
+    float emissionMask = deposit * deposit;
+    if (superRich) emissionMask = pow(deposit, 8.0); // Reserve HDR gain for the brightest deposits.
+    else if (surface == 39.0) emissionMask *= emissionMask; // Pale veins need less bloom coverage than saturated ore.
+    else emissionMask = deposit; // Native rich ores: sparse cores from intact rock RGB, with the narrower rich-ore bias.
+    outc += vEmission * (4.0 * uStoneEmission[family] * emissionMask * materialGlow);
+    // Sunlight reflection is not emission: it follows the light, shadow and specular controls.
+    float highlight = pow(clamp(dot(-uLightDir, R), 0.0, 1.0), riftOre ? 450.0 : 250.0);
+    outc += vEmission * (superRich ? 1.0 : 0.5) * highlight * base.a * uLightColor * shadow * uSpecular;
     outc += pow(fres, 5.0) * sky(eyeDir) * mix(base.a, 1.0, 0.5);
   }
 
   vec3 effectColor = mix(vEmission, vSecondary.rgb, vSecondary.a);
-  float materialGlow = uMaterialGlow[materialCode] * uGlowStrength;
   if (generator) {
     vec4 highlight = sampleGeneratorDetail(uAux, vLayers.w, surface, MAP_OVERLAY);
     vec3 energy = (effectColor + 0.6) * (highlight.rgb + 0.3) * materialGlow;
@@ -739,6 +831,15 @@ void main() {
   float line=max(edge.x,max(edge.y,edge.z));
   if(uDisplayMode==2.0){if(line<.1)discard;outc=vec3(.65);alpha=line;}
   else if(uWireOverlay>.5)outc=mix(outc,vec3(.025),line*uWireOpacity);
+  if(surface == 9.0 && uDisplayMode == 0.0 && uAmbientOnly < .5 && uDebug < .5) {
+    // A soft emissive band feeds HDR energy into bloom beyond the silhouette. The crease
+    // metadata excludes triangulation diagonals on boxes and sloped faces.
+    vec3 rimEdges=(vec3(1.0)-smoothstep(vec3(0.0),widths*5.0,vBary))*step(vec3(.0001),vEdges);
+    float rim=max(rimEdges.x,max(rimEdges.y,rimEdges.z));
+    float strength=max(0.0,uHologramGlow*uGlowStrength);
+    outc+=col*rim*4.0*strength;
+    // Preserve surface transparency; the exterior halo comes from bloom.
+  }
   if(uXray>=0.0)alpha*=uXray;
   // Paint preview uses the real surface and its depth/cutout rules. The second
   // state bit is transient; it never changes selection or either paint color.
@@ -780,14 +881,25 @@ export function materialShadingFor(materialIndex, params) {
         glow: overrides?.glow ?? material.glow,
     };
 }
+export function configureNativeTextureScales(material,table,vertexScales=false){
+ const lookup=vertexScales?Array.from({length:8},(_,i)=>i<7?'if(slot=='+i+')return vNativeScale'+i+';':'return vNativeScale7;').join('\n'):'return texelFetch(uTextureScales,ivec2(int(layer+.5),row),0);';
+ material.fragmentShader=FRAG.replace('// NATIVE_SCALE_LOOKUP','vec4 nativeTextureScale(int row,float layer,int slot){\n'+lookup+'\n}');
+ material.userData.loadingPreview=false;material.vertexShader=VERT;material.defines={...material.defines,NATIVE_TEXTURE_SCALES:1};delete material.defines.NATIVE_SCALE_VERTEX;
+ if(vertexScales)material.defines.NATIVE_SCALE_VERTEX=1;
+ material.needsUpdate=true;
+}
 export function createGameMaterial(albedo, normal, aux, params, transparent = false) {
     const m = new THREE.ShaderMaterial({
+        defines:{},
         glslVersion: THREE.GLSL3,
         vertexShader: VERT,
-        fragmentShader: FRAG,
+        fragmentShader: params.loadingPreview?LOADING_PREVIEW_FRAGMENT:FRAG,
         uniforms: {
             uAmbientOnly:{value:0},uAmbientDetail:{value:0},uDisplayMode:{value:0},uMatcap:{value:0},uCull:{value:1},uXray:{value:-1},
             uWireOverlay:{value:0},uWireThreshold:{value:1},uWireOpacity:{value:1},uMaskPass:{value:0},
+            uTextureScales:{value:params.textureScales||null},
+
+            uNativeTextureScales:{value:!!params.nativeTextureScales},
             uAlbedo: { value: albedo },
             uNormal: { value: normal },
             uAux: { value: aux },
@@ -807,7 +919,7 @@ export function createGameMaterial(albedo, normal, aux, params, transparent = fa
             uMaterialGlow: { value: [1, ...materialShadingDefaults.map(material => material.glow)] },
             uSpecular: { value: 0 },
             uNormalStrength: { value: 1 }, uSharpness: { value: 8 },
-            uSecondaryFactor: { value: 0.6 }, uGlowStrength: { value: 1 }, uHologramGlow: { value: 1.5 }, uFogStrength: { value: 0 },
+            uSecondaryFactor: { value: 0.6 }, uGlowStrength: { value: 1 }, uStoneEmission: { value: [...STONE_EMISSION_DEFAULTS] }, uHologramGlow: { value: 1.5 }, uFogStrength: { value: 0 },
             uShadeSelected: { value: 1 },
             uSelectColor: { value: new THREE.Color().setStyle("#4fd8eb", THREE.LinearSRGBColorSpace) },
             uMirrorOrigin: { value: new THREE.Vector3() },
@@ -829,7 +941,8 @@ export function createGameMaterial(albedo, normal, aux, params, transparent = fa
     // Raw test/preview geometries without functional-face data remain plain hull.
     m.defaultAttributeValues = { ...m.defaultAttributeValues,
         aFaceUV: [0.5, 0.5], aSurface: [1, 1, 0, 0], aEmission: [1, 1, 1, 0], aMaterialLayers: [0, 0, 0] };
-    applyGameParams(m, params);
+    m.userData.loadingPreview=!!params.loadingPreview;applyGameParams(m, params);
+    if(params.nativeTextureScales)configureNativeTextureScales(m,params.textureScales);
     return m;
 }
 export function applyGameParams(m, p) {

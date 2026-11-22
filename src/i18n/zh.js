@@ -1,6 +1,8 @@
 // 中文（简体） interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+  "Native (512 px preview)": "原始分辨率（512 px预览）",
+  "Native displays a 512 px preview then upgrades visible maps to their original dimensions. Fixed resolutions resample maps.": "先显示最大512 px的预览，再将可见纹理更新为原始尺寸。固定分辨率会缩放纹理。",
   "Hull Renderer": "船体渲染器",
   "Canonical rendering reduces hull geometry memory on eligible blocks. The viewport shows the renderer actually used. A legacy URL override takes precedence.": "规范化渲染可减少受支持方块的几何内存占用。视口显示实际使用的渲染器。网址中的旧版选项优先。",
   "Default (Legacy)": "默认（旧版）",

@@ -1,6 +1,8 @@
 // 日本語 interface strings, keyed by the English source text.
 // Missing keys fall back to English. Placeholders {0} and inline <code>/<br> markup must be kept.
 export default {
+  "Native (512 px preview)": "元の解像度（512 pxプレビュー）",
+  "Native displays a 512 px preview then upgrades visible maps to their original dimensions. Fixed resolutions resample maps.": "最大512 pxのプレビューを表示した後、表示中のテクスチャを元の寸法に更新します。固定解像度ではテクスチャを拡大・縮小します。",
   "Hull Renderer": "船体レンダラー",
   "Canonical rendering reduces hull geometry memory on eligible blocks. The viewport shows the renderer actually used. A legacy URL override takes precedence.": "対応ブロックでは正準レンダリングがジオメトリのメモリ使用量を削減します。使用中のレンダラーはビューポートに表示されます。URL のレガシー指定が優先されます。",
   "Default (Legacy)": "既定（レガシー）",
