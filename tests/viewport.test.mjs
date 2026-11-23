@@ -1,5 +1,5 @@
 import {demoProject} from '../src/turrets/core.js';
-import {blockSockets} from '../src/turrets/sockets.js';
+import {blockSockets,drawSockets} from '../src/turrets/sockets.js';
 import {placeTurret} from '../src/turrets/mounts.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -65,18 +65,28 @@ test('viewport pointer lifecycle, modifiers, cancellation, and cursor removal', 
     }finally{h.renderer.dispose();}
   });
 
-  await t.test('coverage does not hide explicitly requested armored-base sockets',()=>{
-    const h=setup({...FACTORY_PREFERENCES},{model:makeModel([makeBlock({typeIndex:24})]),showFireCoverage:true,turretSockets:{show:true,through:true,scope:'all'}});
-    try{h.node.view.interactionMode='object';h.node.view.tool='sockets';h.flush();assert.ok(h.calls.some(c=>c.name==='arc'),'armored socket markers remain visible while coverage is enabled');}
+  await t.test('coverage does not bypass socket exposure checks',()=>{
+    const h=setup({...FACTORY_PREFERENCES},{model:makeModel([makeBlock({typeIndex:24,size:{x:4,y:4,z:4}})]),showFireCoverage:true,turretSockets:{show:true,through:true,scope:'all'}});
+    try{h.node.view.interactionMode='object';h.node.view.tool='sockets';h.flush();assert.equal(h.calls.filter(c=>c.name==='arc').length,0,'without a visible surface hit, coverage and through mode cannot expose sockets');}
     finally{h.renderer.dispose();}
   });
-  await t.test('thin turret bodies retain sockets and undersized faces remain inspectable',()=>{
-    for(const thickness of [0,.4,.5]){
-      const h=setup({...FACTORY_PREFERENCES},{model:makeModel([makeBlock({typeIndex:24,size:{x:2,y:thickness,z:2}})]),turretSockets:{show:true,through:true,scope:'all'}});
-      try{h.node.view.showThinBlocks=false;h.node.view.interactionMode='object';h.node.view.tool='sockets';h.flush();assert.equal(h.calls.filter(c=>c.name==='arc').length,6);}
-      finally{h.renderer.dispose();}
-    }
+  await t.test('socket overlays show only exposed, valid, unoccupied sockets',()=>{
+    const block=makeBlock({id:'socket-base',typeIndex:24,size:{x:4,y:4,z:4}});
+    const h=setup({...FACTORY_PREFERENCES},{model:makeModel([block]),turretSockets:{show:true,through:true,scope:'all'}});
+    try{
+      h.node.view.interactionMode='object';h.node.view.tool='sockets';
+      const ctx=new Proxy({save(){},restore(){}},{get:(target,key)=>target[key]||(()=>{})});
+      const draw=visible=>drawSockets(ctx,h.scene,h.node.view,800,600,'#fff',visible);
+      const open=draw(()=>true);assert.ok(open.length>0,'valid exposed sockets are available');
+      assert.equal(draw(()=>false).length,0,'through mode cannot expose obscured sockets');
+      const asset=demoProject().assets[0];asset.sourceSize=1;placeTurret(h.scene,asset,open[0],.5);
+      assert.ok(!draw(()=>true).some(s=>s.id===open[0].id),'occupied sockets are not drawn or hit-testable');
+    }finally{h.renderer.dispose();}
+    const small=setup({...FACTORY_PREFERENCES},{model:makeModel([makeBlock({typeIndex:24,size:{x:.1,y:.1,z:.1}})]),turretSockets:{show:true,through:true,scope:'all'}});
+    try{small.node.view.interactionMode='object';small.node.view.tool='sockets';small.flush();assert.equal(small.calls.filter(c=>c.name==='arc').length,0,'undersized sockets are hidden');}
+    finally{small.renderer.dispose();}
   });
+
   await t.test('Socket box selection selects multiple turrets and Ctrl subtracts them',()=>{
     const blocks=[makeBlock({id:'a',typeIndex:24,position:{x:-1,y:0,z:0}}),makeBlock({id:'b',typeIndex:24,position:{x:1,y:0,z:0}})];
     const scene={loaded:true,visible:true,model:makeModel(blocks),hiddenIds:new Set()},asset=demoProject().assets[0];asset.sourceSize=1;
