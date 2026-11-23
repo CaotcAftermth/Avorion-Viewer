@@ -31,7 +31,7 @@ In Trackpad mode on a touchscreen, tap to select, drag one finger to orbit, drag
 | Focus mode | Ctrl+Alt+Space |
 | Restore / cancel operation | Escape |
 | Toggle viewport toolbar / sidebar | T / N |
-| Input style | Help > Input style (also available beside model and texture loading in the No ship loaded screen) or Preferences > Input: Blender, Laptop (Alt+left-drag, number-row views) or Trackpad (two-finger scroll pans, pinch zooms, Shift+scroll orbits) |
+| Input style | Help > Input style (also available beside model and texture loading in the No ship loaded screen) or Preferences > Input: Blender, Laptop (Alt+left-drag, number-row views) or Trackpad (two-finger scroll pans, pinch zooms) |
 | Orbit / pan | Middle mouse / Shift+middle mouse, or the left toolbar tools |
 | Snap orbit to an axis | Hold Alt when releasing an orbit drag |
 | Stepped orbit | Numpad 2 / 4 / 6 / 8 (15°) |

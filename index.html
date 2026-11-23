@@ -15,7 +15,7 @@
 <body>
   <div id="app">
     <header id="topbar" aria-label="Application menu">
-      <a class="brand" href="./" title="Avorion Viewer" aria-label="Avorion Viewer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 22 19H2Z"/><path d="m12 8 5 8H7Z"/></svg></a>
+      <button type="button" class="brand" title="Open Welcome" aria-label="Open Welcome"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 22 19H2Z"/><path d="m12 8 5 8H7Z"/></svg></button>
       <nav id="main-menu" aria-label="Main menu"></nav>
       <div class="workspace-tabs" id="workspaces" role="tablist" aria-label="Workspaces"></div>
       <span class="project-title">Untitled <span class="muted">· Local session</span></span>
@@ -30,9 +30,9 @@
   <div id="toast" role="status" hidden></div>
   <div id="drop-overlay" hidden><div><b>Drop to open</b><span>Model Project, Workspace Profile, Avorion XML, or textures</span></div></div>
   <dialog id="help-dialog">
-    <p><a href="docs/" target="_blank" rel="noopener noreferrer">Documentation — editors, features &amp; window system ↗</a></p>
+    <p><a href="docs/" target="_blank" rel="noopener noreferrer">Documentation: editors, features &amp; window system ↗</a></p>
     <div class="dialog-heading"><span class="eyebrow">QUICK START</span><button class="icon-button" data-close aria-label="Close help">×</button></div>
-    <h1 data-i18n-html>Open a ship.<br>Look it over.</h1>
+    <h1>Quick Start Guide</h1>
     <ol class="quick-start">
       <li><b>Open</b><span data-i18n-html>Drop an Avorion ship <code>.xml</code> onto the window, or use File &gt; Import Avorion XML.</span></li>
       <li><b>Textures</b><span>Drop the game's block texture folder, or use File &gt; Load local texture folder. They are kept in this browser.</span></li>

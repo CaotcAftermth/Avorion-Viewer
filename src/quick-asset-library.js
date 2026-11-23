@@ -1,6 +1,6 @@
 import {turretLibrary,loadTurretLibrary} from './turrets/library.js';
 import {componentLibrary,loadComponentLibrary} from './components/library.js';
-import {mountAttachmentLibrary,ASSET_KINDS} from './attachment-library.js';
+import {mountAttachmentLibrary,ASSET_KINDS,assetSearch} from './attachment-library.js';
 import {matchesBinding} from './keymaps.js';
 
 // A non-blocking dialog keeps the viewport available as a native drag target.
@@ -14,7 +14,16 @@ export function openQuickAssetLibrary({scene,preferences,kind='turrets',changed,
  const tabs=document.createElement('div');tabs.className='asset-kind-switch';tabs.setAttribute('role','group');tabs.setAttribute('aria-label','Asset type');header.append(tabs);
  const dismiss=document.createElement('button');dismiss.type='button';dismiss.textContent='×';dismiss.setAttribute('aria-label','Close Quick Asset Library');dismiss.title='Close (Esc)';header.append(dismiss);
  const body=document.createElement('div');body.className='quick-asset-library-body';host.append(header,body);document.body.append(host);
+ // Route mouse-wheel movement along the asset row; preserve pinch zoom and form controls.
+ host.addEventListener('wheel',event=>{
+  if(event.ctrlKey||event.target.closest('input,textarea,select')||body.scrollWidth<=body.clientWidth)return;
+  const delta=Math.abs(event.deltaX)>Math.abs(event.deltaY)?event.deltaX:event.deltaY;
+  if(!delta)return;
+  event.preventDefault();
+  body.scrollLeft+=delta*(event.deltaMode===1?16:event.deltaMode===2?body.clientWidth:1);
+ },{passive:false,signal:events.signal});
  const node={id:'quick-assets',assetKind:kind},library=mountAttachmentLibrary(body,node,scene,changed);
+ header.insertBefore(assetSearch('',query=>library.search(query)),dismiss);
  for(const [value,label] of ASSET_KINDS){
   const button=document.createElement('button');button.type='button';button.textContent=label;
   button.setAttribute('aria-pressed',String(value===node.assetKind));button.classList.toggle('active',value===node.assetKind);

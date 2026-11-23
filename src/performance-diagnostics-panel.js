@@ -43,7 +43,7 @@ export function openDiagnostics(scene,viewportCount){
     const data=report(),active=data.activeOperations||[];
     download.disabled=reset.disabled=!data.enabled;
     query('overview').textContent=data.enabled?
-      `${scene.model?.fileName||'No model'} · ${data.model.blocks.toLocaleString()} blocks · revision ${data.model.revision??'—'} · ${data.activeViewports} viewports · ${active.map(op=>op.kind+' '+op.format).join(', ')||'Idle'} · ${(data.elapsedMs/1000).toFixed(1)} s · ${Object.entries(data.counts).map(([key,value])=>key+' '+value).join(' · ')||'0 completed operations'}`:'Disabled';
+      `${scene.model?.fileName||'No model'} · ${data.model.blocks.toLocaleString()} blocks · revision ${data.model.revision??' - '} · ${data.activeViewports} viewports · ${active.map(op=>op.kind+' '+op.format).join(', ')||'Idle'} · ${(data.elapsedMs/1000).toFixed(1)} s · ${Object.entries(data.counts).map(([key,value])=>key+' '+value).join(' · ')||'0 completed operations'}`:'Disabled';
     const memory=data.memory?.trackedBytesByCategory||{},peak=data.memory?.peakTrackedBytesByCategory||{};
     const wasm=data.events?.findLast(event=>event.wasmCapacityBytes!=null)?.wasmCapacityBytes;
     query('memory').textContent=data.enabled?[

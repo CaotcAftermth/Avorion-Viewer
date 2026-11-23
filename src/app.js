@@ -26,7 +26,7 @@ import {mountTurretOutliner} from './turrets/editors.js';
 import {mountHistory,beginPropertyEdit,endPropertyEdit} from './turrets/mounts.js';
 import {enhanceNumericFields,numericEditing,cancelNumericEdit} from './numeric-field.js';
 import {mountCoverageControls} from './turrets/coverage-ui.js';
-import {mountAttachmentLibrary,ASSET_KINDS} from './attachment-library.js';
+import {mountAttachmentLibrary,ASSET_KINDS,assetSearch} from './attachment-library.js';
 import {restoreComponentSetup} from './components/storage.js';
 import {mountComponentProperties} from './components/properties.js';
 import {mountComponentOutliner} from './components/outliner.js';
@@ -126,7 +126,8 @@ let trackpadEnabled=preferences.value.trackpadNavigation;
 let hovered = null, maximized = null, focusMode = false, operation = null, renderers = [], toastTimer, saveTimer;
 const scene = { loaded: false, visible: true, selected: false, selectedId:null, selectedIds:new Set(), hiddenIds:new Set(), preview:false, revision:0, model:null, thinBlockThreshold:preferences.value.thinBlockThreshold };
 let savedProjectState=null,workspaceProfileName='';
-const welcome=embedded?null:createWelcome({preferences,wireInputStyles,openModel:importXml,openProject:()=>openSavePicker(),openTextures:loadTextures,feedback:showFeedback,trackpadFallback});
+const welcome=embedded?null:createWelcome({preferences,wireInputStyles,openModel:importXml,openProject:()=>openSavePicker(),openTextures:loadTextures,feedback:showFeedback,openSettings:openPreferences,trackpadFallback});
+if(welcome)document.querySelector('#topbar .brand').addEventListener('click',event=>{event.preventDefault();welcome.open();});
 let textureStatus='Neutral texture fallback · Load a local texture folder from File';
 installGlobalErrorCapture(window);
 // Crash recovery: an unclean exit with a model on screen holds the saved model back on the next launch.
@@ -804,6 +805,11 @@ function resetWorkspace(){const template=defaults().workspaces.find(w=>w.id===wo
 function toggleMaximize(id,focus=false){if(maximized===id&&focusMode===focus){maximized=null;focusMode=false;}else{maximized=id;focusMode=focus;}render();}
 $('#restore-button').onclick=()=>{maximized=null;focusMode=false;render();};
 $('#help-button').onclick=()=>$('#help-dialog').showModal();
+// Native dialog backdrop clicks target the dialog; padding inside it stays open.
+$('#help-dialog').addEventListener('click',event=>{
+  const dialog=event.currentTarget,bounds=dialog.getBoundingClientRect();
+  if(event.target===dialog&&(event.clientX<bounds.left||event.clientX>bounds.right||event.clientY<bounds.top||event.clientY>bounds.bottom))dialog.close();
+});
 let statusTarget=null;
 function refreshStatusHint(){
  if(operation)return;
@@ -973,7 +979,7 @@ function headerFor(node){
       const choice=button(`Show ${label.toLowerCase()} in the Asset Library`,escape(t(label)),()=>{node.assetKind=kind;for(const b of kinds.children){b.classList.toggle('active',b.dataset.kind===kind);b.setAttribute('aria-pressed',String(b.dataset.kind===kind));}renderers.find(r=>r.assetAreaId===node.id)?.show(kind);save();});
       choice.dataset.kind=kind;choice.classList.toggle('active',kind===current);choice.setAttribute('aria-pressed',String(kind===current));kinds.append(choice);
     }
-    header.append(kinds);
+    header.append(kinds,assetSearch(node.assetQuery,query=>{node.assetQuery=query;renderers.find(r=>r.assetAreaId===node.id)?.search(query);save();}));
   }
   const options=button('Area options','⋮',e=>areaMenu(e,node),'icon-button area-options');header.append(options);
   header.addEventListener('contextmenu',e=>{e.preventDefault();areaMenu(e,node);});
@@ -1072,6 +1078,7 @@ function renderViewport(body,node){
     handle.addEventListener('pointerdown',e=>{if(e.button!==0)return;e.preventDefault();const original=node.sidebarWidth;gesture(e,move=>resize(body.getBoundingClientRect().right-move.clientX),save,()=>resize(original));});
     handle.addEventListener('keydown',e=>{const direction=resizeDirection(e);if(direction){e.preventDefault();e.stopPropagation();resize(node.sidebarWidth-direction*(modifierActive('largeResize',e,preferences.value)?40:10));save();}});
     body.append(sidebar);
+    body.addEventListener('pointerdown',event=>{if(!node.sidebar||sidebar.contains(event.target))return;node.sidebar=false;commit();},{capture:true});
   }
 }
 function frameArea(node){navigate(node,{action:'frame'});}

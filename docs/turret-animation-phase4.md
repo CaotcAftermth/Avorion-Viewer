@@ -1,4 +1,4 @@
-# Showcase, calibration and export — development history
+# Showcase, calibration and export  -  development history
 
 > Historical milestone report. For current behavior, see [Turret Studio](TURRET_STUDIO.md).
 

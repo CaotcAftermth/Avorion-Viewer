@@ -39,7 +39,7 @@ export function mountTurretProperties(host,scene,changed,canAttach=()=>false){
    for(const [name,value] of rows)propertyDataRow(section,name,value);
    details.append(section);
   };
-  group('Block',[['ID',socket.blockId],['Index',nativeItemIndex(block)??'—'],['Type/Index',block?`${block.type} · ${block.typeIndex}`:'—']]);
+  group('Block',[['ID',socket.blockId],['Index',nativeItemIndex(block)??' - '],['Type/Index',block?`${block.type} · ${block.typeIndex}`:' - ']]);
   const inUse=mounts(scene).some(m=>m.socketId===socket.id);
   group('Socket',[['ID',socket.id],['Socket Face',socket.faceId+1],['Status',inUse?'Occupied':socket.fitSize==null?'Unavailable':'Available'],['Normal',socket.normal.map(n=>n.toFixed(2)).join(', ')]]);
  }

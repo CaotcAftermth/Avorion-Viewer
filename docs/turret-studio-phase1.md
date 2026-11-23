@@ -1,4 +1,4 @@
-# Tracking and firing scheduler — development history
+# Tracking and firing scheduler  -  development history
 
 > Historical milestone report. For current behavior, see [Turret Studio](TURRET_STUDIO.md).
 

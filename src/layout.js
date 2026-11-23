@@ -33,7 +33,8 @@ export function defaults() {
     viewportArea(view(0.5463, 0.2481, 0.05509, 2.206, 6.841, 'orthographic', { showThinBlocks: false, orthographicDistance: 181.54, interactionMode: 'paint', paint: { tool: 'brush', scope: 'all', radius: 0, lensZoom: 2, lensSize: 200, symmetry: { x: false, y: false, z: false }, origin: { x: 0, y: 0, z: 0 }, fillRule: 'color', lensQuality: 'detail', planeVisible: { x: true, y: true, z: true } }, display: { axisX: false, axisY: false, axisZ: false, showText: false, showStats: false, wireOverlay: true, background: 'THEME', ambientOnly: true, ambientStrength: 2, ambientDetail: 0.7 } })),
     editorArea('color', { colorEditor: { tab: 'wheel', mode: 'Analogous' } }));
   const armament = split('x', 0.77,
-    split('y', 0.7,
+    // One card row, its name, and the library header; users can resize afterward.
+    split('y', clamp(1-200/Math.max(400,(globalThis.innerHeight||900)-64),0.55,0.9),
       viewportArea(view(0.8067, 0.4501, 0.05679, 2.953, 13.856, 'perspective', { orthographicDistance: 176.09, interactionMode: 'object', tool: 'sockets', display: { shading: 'RENDERED', background: 'THEME', objectOutline: false } })),
       editorArea('assets', { assetKind: 'turrets', panels: { 'assets:object:Components': true, 'assets:object:Ship component sockets': true } })),
     split('y', 0.36, editorArea('outliner', { shipGrouping: 'type' }), editorArea('properties', propertyPanels('turrets', armamentProperties))));

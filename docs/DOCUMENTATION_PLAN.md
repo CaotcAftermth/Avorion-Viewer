@@ -224,6 +224,6 @@ The first implementation task should be Phase 1 followed by the three-page verti
 
 The implementation now lives in `C:/Users/joshu/OneDrive/Documents/GitHub/Avorion-Viewer`, version 0.12.0. Earlier findings about the separate 0.11.0 workspace are historical. This checkout uses Ctrl+Shift+Space for Focus Mode and disables Trackpad; its documentation has been adjusted accordingly. XR/AR instructions from the other workspace are excluded from published navigation. The window-system screenshot is labeled as an earlier-build reference pending recapture.
 
-## Manual format decision — November 19, 2026
+## Manual format decision  -  November 19, 2026
 
 The user selected the Blender Manual hierarchy and the upstream Furo format. The implementation now uses real Sphinx + Furo with MyST Markdown, replacing the earlier custom Node HTML shell. The canonical tree is `docs/site/manual.json`: Introduction; User Interface and its window-system chapters; Editors with nested tools and features; Model Project; Workspace Profile; Export; Textures; Reference. Images use captioned figures with full-resolution targets, GIFs have static posters and explicit playback, and small local interactive illustrations progressively enhance the prose. Python is a build dependency, not a published-site runtime. The CI workflows install pinned documentation dependencies. Existing release-verification requirements still apply.

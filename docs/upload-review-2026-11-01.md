@@ -1,4 +1,4 @@
-# Upload review — 2026-11-01
+# Upload review  -  2026-11-01
 
 Reviewed the public main-branch snapshot at 12a97f9eb06bd57c980549b44fb0849661abfef7. All uploaded implementation/test files matched the local workspace after line-ending normalization. The GitHub README and repository-only license/attributes were preserved.
 

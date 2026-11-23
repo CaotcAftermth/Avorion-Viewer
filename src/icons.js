@@ -1,6 +1,15 @@
 import {cursorIcon} from './viewport-cursors.js';
 const cursorTools={select:'select',socket:'sockets',orbit:'orbit',pan:'pan-open',frame:'frame',paintBrush:'brush',eyedropper:'eyedropper',replaceColor:'replace',fillPaint:'fill',restorePaint:'restore'};
 const paths = {
+  regions:'<rect x="1.5" y="1.5" width="5" height="5" rx=".6" fill="currentColor" fill-opacity=".35"/><rect x="9.5" y="1.5" width="5" height="5" rx=".6" opacity=".45"/><rect x="1.5" y="9.5" width="5" height="5" rx=".6" fill="currentColor" fill-opacity=".35"/><rect x="9.5" y="9.5" width="5" height="5" rx=".6" fill="currentColor" fill-opacity=".35"/><path d="M4 6.5v3M6.5 12h3"/>',
+
+  boxOutline:'<path d="m8 1 6 3.5v7L8 15l-6-3.5v-7ZM2 4.5 8 8l6-3.5M8 8v7"/>',
+  brushOutline:'<path d="m6 10 5.8-8.2a1.4 1.4 0 0 1 2.2 1.7L8 11M6 10c-3-1-2 3-4.5 4 3.5 1 6 .2 6.5-3"/>',
+  crosshair:'<circle cx="8" cy="8" r="5"/><circle cx="8" cy="8" r="1.3"/><path d="M8 1v3M8 12v3M1 8h3M12 8h3"/>',
+  folder:'<path d="M1 4V2.5h5L8 5h7v8.5H1V4Z"/>',
+  bookOpen:'<path d="M8 3C5.5 1.5 3 1.5 1.5 2.5v11C3 12.5 5.5 12.5 8 14c2.5-1.5 5-1.5 6.5-.5v-11C13 1.5 10.5 1.5 8 3Zm0 0v11"/>',
+  settings:'<path d="m6.5 1-.3 2-1.5.9-1.9-.7-1.5 2.6 1.6 1.2v2L1.3 10.2l1.5 2.6 1.9-.7 1.5.9.3 2h3l.3-2 1.5-.9 1.9.7 1.5-2.6L13.1 9V7l1.6-1.2-1.5-2.6-1.9.7-1.5-.9-.3-2Z"/><circle cx="8" cy="8" r="2.4"/>',
+  exportModel:'<path d="M2 9v5h12V9M8 11V1M4 5l4-4 4 4"/>',
  coverage:'<circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="3"/><path d="M8 1v14M1 8h14"/>',
   // User-supplied turret silhouette from SVG Repo; normalized to the shared 16px icon grid.
   socket:'<circle cx="6" cy="8" r="4"/><circle cx="6" cy="8" r="1" fill="currentColor"/><path d="M10 8h5"/>',

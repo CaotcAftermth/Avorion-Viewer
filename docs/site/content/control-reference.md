@@ -4,7 +4,7 @@ The 70 focused captures are shown in the relevant editor chapters, under their c
 
 ## 3D Viewport
 
-[Open the 3D Viewport reference images](../editor-viewport/) — 21 captures.
+[Open the 3D Viewport reference images](../editor-viewport/)  -  21 captures.
 
 - Select
 - Select Sockets
@@ -30,7 +30,7 @@ The 70 focused captures are shown in the relevant editor chapters, under their c
 
 ## Topbar
 
-[Open the Topbar reference images](../topbar/) — 4 captures.
+[Open the Topbar reference images](../topbar/)  -  4 captures.
 
 - File
 - Edit
@@ -39,7 +39,7 @@ The 70 focused captures are shown in the relevant editor chapters, under their c
 
 ## Painting
 
-[Open the Painting reference images](../painting/) — 14 captures.
+[Open the Painting reference images](../painting/)  -  14 captures.
 
 - Select
 - Brush
@@ -58,7 +58,7 @@ The 70 focused captures are shown in the relevant editor chapters, under their c
 
 ## Properties
 
-[Open the Properties reference images](../editor-properties/) — 10 captures.
+[Open the Properties reference images](../editor-properties/)  -  10 captures.
 
 - Object properties
 - Scene properties
@@ -73,7 +73,7 @@ The 70 focused captures are shown in the relevant editor chapters, under their c
 
 ## Turrets & Components
 
-[Open the Turrets & Components reference images](../turrets/) — 6 captures.
+[Open the Turrets & Components reference images](../turrets/)  -  6 captures.
 
 - Turrets · Socket Display
 - Turrets · Mounting
@@ -84,7 +84,7 @@ The 70 focused captures are shown in the relevant editor chapters, under their c
 
 ## Weapon Coverage
 
-[Open the Weapon Coverage reference images](../coverage/) — 8 captures.
+[Open the Weapon Coverage reference images](../coverage/)  -  8 captures.
 
 - Weapon Coverage · Visualization
 - Weapon Coverage · Turret Scope
@@ -97,20 +97,20 @@ The 70 focused captures are shown in the relevant editor chapters, under their c
 
 ## Workspaces
 
-[Open the Workspaces reference images](../workspaces/) — 1 captures.
+[Open the Workspaces reference images](../workspaces/)  -  1 captures.
 
 - Workspace settings · Window system
 
 ## Color Editor
 
-[Open the Color Editor reference images](../colors/) — 2 captures.
+[Open the Color Editor reference images](../colors/)  -  2 captures.
 
 - Editor type
 - Area options
 
 ## Asset Library
 
-[Open the Asset Library reference images](../assets/) — 4 captures.
+[Open the Asset Library reference images](../assets/)  -  4 captures.
 
 - Editor type
 - Show turrets in the Asset Library

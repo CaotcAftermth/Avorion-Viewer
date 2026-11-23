@@ -782,3 +782,24 @@ dialog.texture-quick-preview{width:fit-content;max-width:calc(100vw - 24px);max-
 .texture-color-mask-legend>span{display:inline-flex;align-items:center;gap:4px}
 .texture-color-mask-legend>span::before{content:"";width:9px;height:9px;border-radius:2px;background:#f00}
 .texture-color-mask-legend>[data-channel=secondary]::before{background:#00f}
+
+/* Shared asset-kind pill, in editor and spacebar library headers. */
+[data-editor=assets]>.area-header,.quick-asset-library>header{position:relative;}
+[data-editor=assets]>.area-header .asset-kind-switch,.quick-asset-library .asset-kind-switch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:190px;gap:2px;margin:0;padding:3px;border:1px solid var(--border,#4a4f54);border-radius:999px;background:var(--bg);flex-shrink:0;}
+[data-editor=assets]>.area-header .asset-kind-switch{position:absolute;left:50%;transform:translateX(-50%);}
+[data-editor=assets]>.area-header .asset-kind-switch button,.quick-asset-library .asset-kind-switch button{display:flex;justify-content:center;align-items:center;min-width:0;padding:3px 9px;border:0;border-radius:999px;background:transparent;color:var(--muted);box-shadow:none;font-size:12px;}
+[data-editor=assets]>.area-header .asset-kind-switch button:hover,.quick-asset-library .asset-kind-switch button:hover{color:var(--text);background:#ffffff0b;}
+[data-editor=assets]>.area-header .asset-kind-switch button.active,.quick-asset-library .asset-kind-switch button.active{background:var(--accent);color:var(--bg);box-shadow:0 1px 3px #0003;}
+.quick-asset-library .asset-kind-switch{margin-inline:auto;}
+[data-editor=assets]>.area-header .header-name{max-width:calc(50% - 165px);overflow:hidden;text-overflow:ellipsis;}
+
+.asset-library-search{width:280px;min-width:60px;height:25px;font-size:12px;}
+[data-editor=assets]>.area-header .asset-library-search{width:clamp(60px,28%,280px);max-width:calc(50% - 130px);margin-left:auto;}
+.quick-asset-library>header{flex-wrap:wrap;}
+.quick-asset-library .asset-library-search{flex:0 1 280px;}
+
+/* Keep library header controls compact with breathing room at the edges. */
+[data-editor=assets]>.area-header,.quick-asset-library>header{min-height:34px;padding-top:4px;padding-bottom:4px;}
+[data-editor=assets]>.area-header .asset-kind-switch,.quick-asset-library .asset-kind-switch{padding:2px;}
+[data-editor=assets]>.area-header .asset-kind-switch button,.quick-asset-library .asset-kind-switch button{padding-top:1px;padding-bottom:1px;line-height:18px;}
+[data-editor=assets]>.area-header .asset-library-search,.quick-asset-library .asset-library-search{height:24px;padding-top:2px;padding-bottom:2px;}

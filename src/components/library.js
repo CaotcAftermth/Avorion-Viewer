@@ -40,24 +40,18 @@ export function filteredComponents(){
 }
 
 // Same cards as the turret library: gray tile with a preview, editable name, hover ×, and a + tile to import.
-export function mountComponentLibrary(host,changed){
+export function mountComponentLibrary(host,changed,{externalSearch=false}={}){
  host.classList.add('turret-library','component-library');let error='',busy=false,disposed=false;
  const draw=(selectionOnly=false)=>{
   if(disposed)return;
   if(selectionOnly){for(const tile of host.querySelectorAll('[data-asset-id]'))tile.setAttribute('aria-pressed',String(tile.dataset.assetId===componentLibrary.selectedId));return;}
   const scrollTop=host.scrollTop,scrollLeft=host.scrollLeft,focused=document.activeElement?.dataset?.componentTool;host.replaceChildren();
-  // Search, folder filter and pack import/export.
+  // Standalone search; the Asset Library supplies its own header search.
   const tools=document.createElement('div');tools.className='component-library-tools';host.append(tools);
   const search=document.createElement('input');search.type='search';search.placeholder='Search components';search.setAttribute('aria-label','Search components');search.value=componentLibrary.query;search.dataset.componentTool='search';search.oninput=()=>{componentLibrary.query=search.value;draw();};
-  const exportPack=document.createElement('button');exportPack.type='button';exportPack.textContent='Export pack';exportPack.title='Save the components shown here as a pack file';exportPack.disabled=!componentLibrary.assets.length;
-  exportPack.onclick=()=>diagnosticDownload('component pack',undefined,()=>{const list=filteredComponents(),blob=new Blob([componentPackFile(list)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='avorion-components.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return blob;});
-  const importPack=document.createElement('button');importPack.type='button';importPack.textContent='Import pack';importPack.title='Add components from a pack file';
-  const packInput=document.createElement('input');packInput.type='file';packInput.accept='.json';packInput.hidden=true;importPack.onclick=()=>packInput.click();
-  packInput.onchange=async()=>{const file=packInput.files[0];if(!file)return;busy=true;error='';draw();try{const {added,skipped}=await importComponentPack(await file.text());error=`Imported ${added} component${added===1?'':'s'}${skipped?`, skipped ${skipped} already in the library`:''}.`;changed();}catch(e){error=e.message;}finally{busy=false;draw();}};
   componentLibrary.folder='';
-  exportPack.textContent='Export Shown Components (.json)';importPack.textContent='Import Component Pack (.json)';
-  const files=document.createElement('details');files.className='component-library-files';const title=document.createElement('summary');title.textContent='Library Files';files.append(title,exportPack,importPack,packInput);
-  tools.append(search,files);if(focused==='search'){search.focus();search.setSelectionRange(search.value.length,search.value.length);}
+  if(!externalSearch)tools.append(search);else tools.remove();
+  if(!externalSearch&&focused==='search'){search.focus();search.setSelectionRange(search.value.length,search.value.length);}
   const shown=filteredComponents(),groups=new Map();for(const asset of shown){const key=asset.folder||'';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(asset);}
   const keys=[...groups.keys()].sort((a,b)=>a===''?1:b===''?-1:a.localeCompare(b)),grouped=keys.length>1||keys[0]&&keys[0]!=='';
   let grid;const newGrid=label=>{if(label!==undefined){const heading=document.createElement('h3');heading.className='component-folder-heading';heading.textContent=label;host.append(heading);}grid=document.createElement('div');grid.className='turret-asset-grid';host.append(grid);};
@@ -104,5 +98,5 @@ export function mountComponentLibrary(host,changed){
   const status=document.createElement('p');status.className='panel-note';status.setAttribute('role','status');status.textContent=error||componentLibrary.error||(busy?'Importing component…':'Component assets · Saved in this browser');host.append(status);host.scrollTop=scrollTop;host.scrollLeft=scrollLeft;
  };
  listeners.add(draw);draw();loadComponentLibrary().catch(e=>{error=e.message;draw();});
- return {dispose(){disposed=true;listeners.delete(draw);}};
+ return {search(query){componentLibrary.query=query;draw();},dispose(){disposed=true;listeners.delete(draw);}};
 }

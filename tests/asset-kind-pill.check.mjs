@@ -1,0 +1,31 @@
+import {chromium} from 'file:///C:/Users/joshu/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import http from 'node:http';
+import assert from 'node:assert/strict';
+import {viewerHandler} from '../scripts/serve.mjs';
+const handler=viewerHandler(process.cwd());const server=http.createServer((req,res)=>{req.headers.host='127.0.0.1:5173';if(req.headers.origin)req.headers.origin='http://127.0.0.1:5173';handler(req,res);});await new Promise(r=>server.listen(0,'127.0.0.1',r));
+const browser=await chromium.launch({headless:true,channel:'msedge'});
+try{
+const page=await browser.newPage({viewport:{width:900,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.route('**/color-harness',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><html><body></body></html>'}));
+await page.goto(`http://127.0.0.1:${server.address().port}/color-harness`);
+await page.setContent('<link rel="stylesheet" href="/src/styles.css"><section data-editor="assets" style="width:800px"><header class="area-header"><button class="editor-switch">◇</button><span class="header-name">Asset Library</span><span class="spacer"></span><span class="asset-kind-switch"><button class="active">Turrets</button><button>Components</button></span><button>⋮</button></header></section>');
+await page.locator('.asset-kind-switch').waitFor();
+await page.waitForTimeout(200);
+const header=await page.locator('.area-header').boundingBox(),pill=await page.locator('.asset-kind-switch').boundingBox();assert.ok(Math.abs((header.x+header.width/2)-(pill.x+pill.width/2))<1);
+assert.equal(await page.locator('.asset-kind-switch').evaluate(el=>getComputedStyle(el).borderRadius),'999px');
+await page.evaluate(async()=>{const {openQuickAssetLibrary}=await import('/src/quick-asset-library.js');window.quick=openQuickAssetLibrary({scene:{},preferences:()=>({}),changed(){},closed(){}});});
+const quick=page.locator('.quick-asset-library');await quick.waitFor();
+assert.equal(await quick.locator('.asset-kind-switch').evaluate(el=>getComputedStyle(el).borderRadius),'999px');
+await quick.getByRole('button',{name:'Components',exact:true}).click();assert.equal(await quick.getByRole('button',{name:'Components',exact:true}).getAttribute('aria-pressed'),'true');
+assert.equal(await quick.locator('.component-library-files').count(),0);
+const search=quick.getByRole('searchbox',{name:'Search assets'});await search.fill('test query');
+assert.equal(await quick.getByRole('searchbox').count(),1);
+assert.equal(await page.evaluate(async()=>{const {componentLibrary}=await import('/src/components/library.js');return componentLibrary.query;}),'test query');
+await quick.getByRole('button',{name:'Turrets',exact:true}).click();assert.equal(await search.inputValue(),'test query');
+await quick.getByRole('button',{name:'Components',exact:true}).click();assert.equal(await search.inputValue(),'test query');
+const body=quick.locator('.quick-asset-library-body');
+await body.evaluate(el=>{const wide=document.createElement('div');wide.style.width='3000px';wide.style.height='20px';el.append(wide);el.scrollLeft=0;});
+await body.dispatchEvent('wheel',{deltaY:120,deltaMode:0,bubbles:true,cancelable:true});assert.ok(await body.evaluate(el=>el.scrollLeft)>0);
+const before=await body.evaluate(el=>el.scrollLeft);await body.dispatchEvent('wheel',{deltaY:-80,deltaMode:0,bubbles:true,cancelable:true});assert.ok(await body.evaluate(el=>el.scrollLeft)<before);
+await page.screenshot({path:'test-results/asset-kind-pills.png'});assert.deepEqual(errors,[]);console.log('Passed: centered editor pill, matching quick-library pill, component switching, no browser errors.');
+}finally{await browser.close();server.close();}

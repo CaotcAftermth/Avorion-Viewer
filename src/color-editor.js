@@ -1,4 +1,4 @@
-import {loadPalette,HARMONIES,wheelCells,WHEEL_BANDS,nearestNeutral} from './color-palette.js';
+import {loadPalette,HARMONIES,wheelCells,WHEEL_BANDS,nearestNeutral,rgbColor,hueColor} from './color-palette.js';
 
 import {paintAvailability,readPalettes,savePalette,activePalette,activatePalette,editPalette,addRegion,renameRegion,deleteRegion,editRegion,growRegion,recolorRegion,undoRegionChange,regionUndoLabel} from './color-workshop.js';
 import {setRegionDisplay,regionDisplayMode,activeRegion,REGION_COLORS} from './region-display.js';
@@ -61,7 +61,7 @@ export function mountColorEditor(host,area,scene,actions){
 
   function chosen(b){return b.variants.find(c=>c.variant===state.variants[b.id])||b;}
 
-  function suggestions(){return harmony(palette,base(),state.mode);}
+  function suggestions(){return state.allColors&&base().wheel?HARMONIES[state.mode].map(offset=>({base:hueColor((base().h+offset+360)%360,base().l),target:(base().h+offset+360)%360})):harmony(palette,base(),state.mode);}
 
   function pick(color,primary=true){
 
@@ -113,11 +113,12 @@ export function mountColorEditor(host,area,scene,actions){
 
     slider.value=state.neutralLevel??128;slider.setAttribute('aria-label','Neutral shade');
 
-    const preview=()=>{const c=nearestNeutral(palette,Number(slider.value));label.textContent=c.name+' · '+c.hex;slider.setAttribute('aria-valuetext',c.name+' '+c.hex);};
+    const neutral=level=>state.allColors?rgbColor([level,level,level]):nearestNeutral(palette,level);
+    const preview=()=>{const c=neutral(Number(slider.value));label.textContent=c.name+' · '+c.hex;slider.setAttribute('aria-valuetext',c.name+' '+c.hex);};
 
-    slider.oninput=preview;slider.onchange=()=>{state.neutralLevel=Number(slider.value);pick(nearestNeutral(palette,state.neutralLevel));};preview();
+    slider.oninput=preview;slider.onchange=()=>{state.neutralLevel=Number(slider.value);pick(neutral(state.neutralLevel));};preview();
 
-    row.title='Black to white target; snaps to the nearest grayscale Avorion base color in OKLab. Release to choose the paint color.';
+    row.title=state.allColors?'Choose any grayscale value from black to white.':'Black to white target; snaps to the nearest grayscale Avorion base color in OKLab. Release to choose the paint color.';
 
     row.append(slider,label);parent.append(row);
 
@@ -152,22 +153,38 @@ export function mountColorEditor(host,area,scene,actions){
     const buttons=node('div','harmony-modes');buttons.setAttribute('role','group');buttons.setAttribute('aria-label','Color Harmony');
 
     for(const mode of Object.keys(HARMONIES)){const b=button('',()=>changeHarmony(mode));b.title=`${mode} · ${HARMONIES[mode].map(angle=>`${angle}°`).join(' / ')} from the base hue`;b.setAttribute('aria-label',mode+' harmony');b.setAttribute('aria-pressed',String(state.mode===mode));b.append(harmonySymbol(mode));buttons.append(b);}parent.append(buttons);
+    const scope=node('div','color-set-pill');scope.setAttribute('role','group');scope.setAttribute('aria-label','Wheel color set');
+    for(const [all,label] of [[false,'Avorion colors'],[true,'All colors']]){const b=button(label,()=>{state.allColors=all;save();render();});b.setAttribute('aria-pressed',String(!!state.allColors===all));scope.append(b);}parent.append(scope);
 
-    const svg=svgNode('svg',{viewBox:'0 0 400 400','aria-label':'Avorion Family Fan: twelve hue families, dark to light outward'});svg.classList.add('base-color-wheel');
+    const svg=svgNode('svg',{viewBox:'0 0 400 400','aria-label':state.allColors?'All colors wheel: hue around, dark to light outward':'Avorion Family Fan: twelve hue families, dark to light outward'});svg.classList.add('base-color-wheel');
 
     const point=(r,deg)=>[200+r*Math.sin(deg*Math.PI/180),200-r*Math.cos(deg*Math.PI/180)],cells=wheelCells(palette),paths=[];
 
+    if(state.allColors){
+      cells.length=0;
+      for(let sector=0;sector<360;sector++)for(let band=0;band<4;band++)cells.push({color:hueColor(sector,.2+band*.2),hue:sector,band,sector,start:sector,end:sector+1,family:'RGB'});
+    }
+    const gradients=svgNode('defs');svg.append(gradients);
+    if(state.allColors)for(let hue=0;hue<360;hue++){
+      const gradient=svgNode('radialGradient',{id:`rgb-${area.id}-${hue}`,gradientUnits:'userSpaceOnUse',cx:200,cy:200,r:190});
+      for(const [offset,light] of [[0,.05],[88/190,.05],[139/190,.5],[1,.95]])gradient.append(svgNode('stop',{offset,'stop-color':hueColor(hue,light).hex}));
+      gradients.append(gradient);
+    }
     for(const cell of cells){
 
       const {color,band,start,end,sector}=cell,inner=88+band*25.5,outer=inner+25.5,p1=point(outer,start),p2=point(outer,end),p3=point(inner,end),p4=point(inner,start);
 
-      const path=svgNode('path',{d:`M${p1}A${outer} ${outer} 0 0 1 ${p2}L${p3}A${inner} ${inner} 0 0 0 ${p4}Z`,fill:color.hex,role:'button',tabindex:'-1','aria-label':`${color.name} base color · hue ${cell.hue}° · ${['dark','mid-dark','mid-light','light'][band]} band`});
+      const path=svgNode('path',{d:`M${p1}A${outer} ${outer} 0 0 1 ${p2}L${p3}A${inner} ${inner} 0 0 0 ${p4}Z`,fill:state.allColors?`url(#rgb-${area.id}-${sector})`:color.hex,role:'button',tabindex:'-1','aria-label':`${color.name} base color · hue ${cell.hue}° · ${['dark','mid-dark','mid-light','light'][band]} band`});
 
       path.dataset.base=color.id;path.dataset.band=band;path.dataset.sector=sector;path.dataset.family=cell.family;path.setAttribute('aria-pressed',String(color.id===state.baseId));
 
       const title=svgNode('title');title.textContent=`${color.name} · ${color.hex} · Base color`;path.append(title);
 
-      path.onclick=()=>pick(chosen(color));paths.push(path);svg.append(path);
+      path.onclick=event=>{
+        if(!state.allColors){pick(chosen(color));return;}
+        const rect=svg.getBoundingClientRect(),x=(event.clientX-rect.left)*400/rect.width-200,y=(event.clientY-rect.top)*400/rect.height-200;
+        pick(hueColor((Math.atan2(x,-y)*180/Math.PI+360)%360,.05+.9*Math.max(0,Math.min(1,(Math.hypot(x,y)-88)/102))));
+      };paths.push(path);svg.append(path);
 
     }
 
@@ -199,7 +216,7 @@ export function mountColorEditor(host,area,scene,actions){
 
     parent.append(wrap);const caption=node('div','color-wheel-caption');caption.append(node('strong','',base().wheel?state.mode:base().name),node('span','',base().wheel?HARMONIES[state.mode].map(x=>`${x}°`).join(' / '):'Neutral · list color'));parent.append(caption);
 
-    const legend=node('div','color-wheel-legend');legend.append(node('span','','Base colors · dark → light outward'));legend.title='Twelve hue families separated by gutters. Each fan samples existing base colors in four tonal bands; sparse ranges repeat colors. No variants or generated RGB values. Every color remains available in List.';
+    const legend=node('div','color-wheel-legend');legend.append(node('span','',state.allColors?'All colors · dark → light outward':'Base colors · dark → light outward'));legend.title='Twelve hue families separated by gutters. Each fan samples existing base colors in four tonal bands; sparse ranges repeat colors. No variants or generated RGB values. Every color remains available in List.';
 
     const link=node('label','color-link'),checkbox=node('input');checkbox.type='checkbox';checkbox.checked=!!state.link;checkbox.onchange=()=>{state.link=checkbox.checked;if(state.link)pick(chosen(base()));else{save();render();}};link.append(checkbox,node('span','','Link Variants'));link.title='Follow the primary variant where available. Other families retain their current choice.';legend.append(link);parent.append(legend);
 
@@ -246,7 +263,7 @@ export function mountColorEditor(host,area,scene,actions){
 
       for(const color of members){const b=button('',()=>pick(color),'color-list-row');b.setAttribute('aria-label',color.name+' · '+color.hex);b.title=`${color.name} · RGB ${color.rgb.join(' ')} · ${color.hex} · ${color.source||`source row ${color.row}`}`;b.setAttribute('aria-pressed',String(state.activeId===color.id));
 
-        const name=node('span','color-list-name');name.append(swatch(color),node('span','',color.name));b.append(name,node('span','',color.rgb.join(' ')),node('span','',color.hex),node('span','',color.row===null?'—':String(color.row)));d.append(b);}
+        const name=node('span','color-list-name');name.append(swatch(color),node('span','',color.name));b.append(name,node('span','',color.rgb.join(' ')),node('span','',color.hex),node('span','',color.row===null?' - ':String(color.row)));d.append(b);}
 
     }
 
@@ -417,9 +434,9 @@ export function mountColorEditor(host,area,scene,actions){
 
     if(disposed||!palette)return;const scrolls=['color-editor-main','color-wheel-pane','color-list-pane'].map(cls=>[cls,host.querySelector('.'+cls)?.scrollTop||0]);host.replaceChildren();browserHost=null;
 
-    const tabs=node('div','color-editor-tabs');for(const [id,text] of [['wheel','Wheel'],['list','List'],['palettes','Palettes'],['regions','Regions']]){const b=button(text,()=>{state.tab=id;save();render();});b.setAttribute('aria-pressed',String(state.tab===id));tabs.append(b);}host.append(tabs);
+    const tabs=node('div','color-editor-tabs');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-orientation','vertical');tabs.setAttribute('aria-label','Color editor');for(const [id,text] of [['wheel','Wheel'],['list','List'],['palettes','Palettes'],['regions','Regions']]){const b=button('',()=>{state.tab=id;save();render();});b.innerHTML=icon({wheel:'color',list:'outliner',palettes:'grid',regions:'regions'}[id]);b.title=text;b.setAttribute('aria-label',text);b.setAttribute('role','tab');b.id=`color-tab-${area.id}-${id}`;b.setAttribute('aria-selected',String(state.tab===id));b.setAttribute('aria-controls',`color-panel-${area.id}`);b.tabIndex=state.tab===id?0:-1;b.onkeydown=event=>{const ids=['wheel','list','palettes','regions'],index=ids.indexOf(id),next=event.key==='ArrowDown'?(index+1)%4:event.key==='ArrowUp'?(index+3)%4:event.key==='Home'?0:event.key==='End'?3:null;if(next===null)return;event.preventDefault();state.tab=ids[next];save();render();host.querySelector('[role=tab][aria-selected=true]').focus();};tabs.append(b);}host.append(tabs);
 
-    const main=node('div','color-editor-main');host.append(main);
+    const main=node('div','color-editor-main');main.id=`color-panel-${area.id}`;main.setAttribute('role','tabpanel');main.setAttribute('aria-labelledby',`color-tab-${area.id}-${state.tab}`);host.append(main);
 
     if(state.tab==='wheel'){const content=node('div','color-wheel-pane');main.append(content);wheel(content);}
 
@@ -428,7 +445,7 @@ export function mountColorEditor(host,area,scene,actions){
     scene.paintHarmony=[chosen(base()).id,...suggestions().map(s=>chosen(s.base).id)];
     scene.paintBrush??={colorId:state.activeId,channel:state.channel,strength:state.strength};liveModel=scene.model;liveRegions=scene.regions;liveSelection=scene.selectedIds;
 
-    const applyMenu=button('Apply…',()=>popover(applyMenu,'Apply Color',el=>{footer=node('div','color-apply-controls');el.append(footer);updateFooter();}));applyMenu.className='color-apply-menu';tabs.append(applyMenu);
+    if(state.tab==='regions'){const applyMenu=button('Apply…',()=>popover(applyMenu,'Apply Color',el=>{footer=node('div','color-apply-controls');el.append(footer);updateFooter();}));applyMenu.className='color-apply-menu';main.prepend(applyMenu);}
 
     updateFooter();for(const [cls,top] of scrolls){const el=host.querySelector('.'+cls);if(el)el.scrollTop=top;}
 
@@ -436,7 +453,7 @@ export function mountColorEditor(host,area,scene,actions){
 
   host.append(node('p','color-note','Loading local Avorion palette…'));
 
-  loadPalette().then(data=>{if(disposed)return;palette=data;if(!palette.bases.some(c=>c.id===state.baseId))state.baseId=palette.wheel[0].id;if(!palette.byId.has(state.activeId))state.activeId=chosen(base()).id;state.draft=state.draft.filter(id=>palette.byId.has(id)).slice(0,32);if(!palette.categories.includes(state.category))state.category='';readSharedBrush();render();}).catch(error=>{if(!disposed){host.replaceChildren(node('p','color-note',error.message));}});
+  loadPalette().then(data=>{if(disposed)return;palette=data;if(!palette.byId.has(state.baseId))state.baseId=palette.wheel[0].id;if(!palette.byId.has(state.activeId))state.activeId=chosen(base()).id;state.draft=state.draft.filter(id=>palette.byId.has(id)).slice(0,32);if(!palette.categories.includes(state.category))state.category='';readSharedBrush();render();}).catch(error=>{if(!disposed){host.replaceChildren(node('p','color-note',error.message));}});
 
   return {colorAreaId:area.id,choosePaintColor(id){const c=palette?.byId.get(id);if(c)pick(c,!scene.paintHarmony?.includes(c.id));},sync(){
 

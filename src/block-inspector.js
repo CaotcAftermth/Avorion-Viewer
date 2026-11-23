@@ -48,10 +48,10 @@ function mountNativeData(panel,b,scene,reveal){
   const linkRow=(label,build)=>{const row=document.createElement('div');row.className='field-row native-hierarchy';const caption=document.createElement('span');caption.textContent=label;const links=document.createElement('div');links.className='native-links';build(links);row.append(caption,links);panel.append(row);};
   sub('Item · <item>');
   const itemIndex=item?.getAttribute('index');
-  field('index',itemIndex??'—',{title:item?'Native block index. Other items refer to it with parent="…".':'This block is not wrapped in an <item> element.'});
+  field('index',itemIndex??' - ',{title:item?'Native block index. Other items refer to it with parent="…".':'This block is not wrapped in an <item> element.'});
   const parentAttr=item?.getAttribute('parent');
   if(b.parentId&&live.has(b.parentId))linkRow('parent',links=>link(byId.get(b.parentId),links));
-  else field('parent',parentAttr==null?'—':parentAttr==='-1'?'-1 · root block':`${parentAttr} · not loaded`,{title:parentAttr==='-1'?'Root of the ship: no parent.':parentAttr==null?'':'The parent item is not a rendered block (turret design or missing index).'});
+  else field('parent',parentAttr==null?' - ':parentAttr==='-1'?'-1 · root block':`${parentAttr} · not loaded`,{title:parentAttr==='-1'?'Root of the ship: no parent.':parentAttr==null?'':'The parent item is not a rendered block (turret design or missing index).'});
   const children=blockChildIds(scene,[b.id]);
   if(!children.length)field('children','None',{title:'No items name this block as their parent.'});
   else linkRow(`children · ${children.length}`,links=>{
@@ -67,7 +67,7 @@ function mountNativeData(panel,b,scene,reveal){
   for(const name of ['look','up'])field(name,el.hasAttribute(name)?`${raw(name)} · ${AXES[Number(raw(name))]??'invalid'}`:`absent · default ${b[name]} (${AXES[b[name]]})`,{title:name==='look'?'Axis the block faces: 0 −X, 1 +X, 2 −Y, 3 +Y, 4 −Z, 5 +Z.':'Axis the block’s top points to: 0 −X, 1 +X, 2 −Y, 3 +Y, 4 −Z, 5 +Z.'});
   for(const [title,axes] of BOUNDS){
     sub(title);const vector=document.createElement('div');vector.className='property-vector';panel.append(vector);
-    for(const [cur,legacy] of axes){const name=el.hasAttribute(cur)||!el.hasAttribute(legacy)?cur:legacy;field(name,raw(name)??'—',{parent:vector,title:'Native XML coordinate, before viewer placement.'});}
+    for(const [cur,legacy] of axes){const name=el.hasAttribute(cur)||!el.hasAttribute(legacy)?cur:legacy;field(name,raw(name)??' - ',{parent:vector,title:'Native XML coordinate, before viewer placement.'});}
   }
   sub('Color');
   if(el.hasAttribute('color'))field('color',raw('color').toUpperCase(),{title:'AARRGGBB · alpha, red, green, blue',swatch:raw('color')});else field('color','absent · default FF808080');

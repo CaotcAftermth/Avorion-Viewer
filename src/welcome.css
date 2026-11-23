@@ -1,34 +1,67 @@
-/* Welcome and the bundled beginner guide. */
-#welcome-dialog{width:650px;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);box-sizing:border-box;padding:28px;overflow:auto}
+/* The welcome scene uses the same palette as the editors, without a WebGL scene. */
+#welcome-dialog{width:1180px;height:850px;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);padding:0;border:1px solid color-mix(in srgb,var(--accent) 22%,var(--panel));border-radius:14px;overflow:hidden;background:var(--bg);color:var(--text);isolation:isolate}
+#welcome-dialog[open]{display:grid;place-items:center}
 #welcome-dialog [hidden]{display:none!important}
-#welcome-dialog .dialog-heading{margin-bottom:18px}
-#welcome-dialog .eyebrow{letter-spacing:.12em}
-#welcome-dialog [data-version]{letter-spacing:normal;color:#aaa;margin-left:8px}
-.welcome-beta{display:inline-block;border:1px solid #82704b;border-radius:4px;padding:4px 7px;color:#e8cc91;font-size:10px;text-transform:uppercase;letter-spacing:.12em}
-#welcome-dialog h1{font-size:29px;line-height:1.18;margin:14px 0 10px;font-weight:500;letter-spacing:-.025em}
-#welcome-dialog h2{font-size:14px;font-weight:600;margin:0 0 7px}
-.welcome-intro{font-size:13px;line-height:1.6;color:#c6c6c6;max-width:470px}
-.welcome-load{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
-.welcome-load button{padding:10px 14px}
-.welcome-note{font-size:11px;line-height:1.5;color:#aaa}
-.welcome-input{border-top:1px solid #494949;margin-top:21px;padding-top:20px}
-#welcome-dialog .input-style-options{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:10px}
-#welcome-dialog .input-style-options button{padding:10px}
-.input-style-options button:disabled{opacity:.45;cursor:not-allowed;background:#292929;border-color:#444}
-.welcome-controls{font-size:11px;line-height:1.6;min-height:1.6em;color:#d1d1d1;margin-bottom:4px}
-.welcome-fallback{font-size:12px;color:#e8cc91;line-height:1.5}
-.welcome-guide-card{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:17px;border:1px solid #555;border-radius:7px;margin:20px 0;background:#30343a}
-.welcome-guide-card p{font-size:12px;margin:0;color:#bbb}
-.welcome-guide-card button{white-space:nowrap}
-.welcome-footer{border-top:1px solid #494949;padding-top:12px;display:grid;gap:12px}
-.welcome-footer>div{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:12px;color:#bbb}
-.coffee-button{display:inline-flex;gap:8px;align-items:center;background:#ffdd00;color:#161616!important;padding:10px 13px;border-radius:5px;font-weight:600;text-decoration:none;white-space:nowrap;font-size:12px}
-.coffee-button:hover{background:#ffe749}.coffee-button:focus-visible{outline:2px solid white;outline-offset:3px}
-#welcome-dialog.reading-guide{width:850px}
-.welcome-guide-content{user-select:text;font-size:14px;line-height:1.7;color:#ddd}
-#welcome-dialog .welcome-guide-content h2{font-size:21px;margin:30px 0 10px;color:#fff}
-.welcome-guide-content h3{font-size:16px;margin:23px 0 8px;color:#eee}
-.welcome-guide-content p{font-size:inherit;line-height:inherit}.welcome-guide-content a{color:#a8cff4}
-.welcome-guide-content table{border-collapse:collapse;width:100%;font-size:12px;margin:16px 0}.welcome-guide-content th,.welcome-guide-content td{padding:9px;border:1px solid #555;text-align:left;vertical-align:top}.welcome-guide-content th{background:#373b42}
+#welcome-dialog::backdrop{background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:blur(6px)}
+.welcome-scene{position:absolute;inset:0;overflow:hidden;pointer-events:none;background:radial-gradient(ellipse at 85% 65%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 50%),radial-gradient(ellipse at 15% 15%,color-mix(in srgb,var(--accent) 15%,transparent),transparent 45%),var(--bg);z-index:-1}
+.welcome-scene::before{content:"";position:absolute;inset:-20%;background:var(--accent);mask:url('./assets/sky/bg9.png') center/cover;mask-mode:luminance;opacity:.17;transform:rotate(-25deg)}
+.welcome-orbit{position:absolute;width:880px;height:880px;border:1px solid color-mix(in srgb,var(--accent) 38%,transparent);border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-25deg);box-shadow:0 0 0 25px color-mix(in srgb,var(--accent) 3%,transparent),0 0 0 90px color-mix(in srgb,var(--accent) 3%,transparent)}
+.welcome-orbit::before,.welcome-orbit::after{content:"";position:absolute;width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 18px var(--accent);left:8%;top:22%}.welcome-orbit::after{left:auto;top:auto;right:8%;bottom:22%}
+.welcome-planet{position:absolute;width:540px;height:540px;left:-240px;bottom:-290px;border-radius:50%;background:radial-gradient(circle at 65% 0%,color-mix(in srgb,var(--accent) 25%,var(--panel)),var(--bg) 66%);border-top:2px solid color-mix(in srgb,var(--accent) 75%,transparent);box-shadow:0 -10px 40px color-mix(in srgb,var(--accent) 23%,transparent),inset 0 12px 25px color-mix(in srgb,var(--accent) 16%,transparent)}
+.welcome-stars{position:absolute;inset:0;opacity:.5;background-image:radial-gradient(circle,var(--text) .8px,transparent 1.3px),radial-gradient(circle,var(--accent) 1px,transparent 1.5px);background-size:137px 113px,233px 197px;background-position:19px 23px,81px 57px;mask-image:linear-gradient(90deg,#000,transparent 40%,transparent 60%,#000)}
+.welcome-shell{position:relative;box-sizing:border-box;width:min(620px,calc(100% - 48px));max-height:calc(100% - 64px);overflow:auto;padding:30px 42px 22px;border:1px solid color-mix(in srgb,var(--accent) 45%,var(--panel));border-radius:20px;background:linear-gradient(150deg,color-mix(in srgb,var(--accent) 6%,var(--panel)),color-mix(in srgb,var(--bg) 94%,transparent));box-shadow:0 22px 80px #0005,0 0 32px color-mix(in srgb,var(--accent) 9%,transparent),inset 0 -1px color-mix(in srgb,var(--accent) 45%,transparent);text-align:center;scrollbar-width:thin}
+#welcome-dialog .dialog-heading{position:absolute;right:12px;top:12px;z-index:1}
+#welcome-dialog .dialog-heading .icon-button{width:28px;height:28px;font-size:20px;color:var(--muted)}
+.welcome-emblem{width:62px;height:62px;margin:0 auto 15px;display:grid;place-items:center;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:13px;filter:drop-shadow(0 0 9px color-mix(in srgb,var(--accent) 28%,transparent))}
+.welcome-emblem svg{width:45px;height:45px}
+.welcome-brand{font-size:32px;font-weight:750;letter-spacing:.025em;line-height:1.15;white-space:nowrap}.welcome-brand>span{color:var(--accent)}
+.welcome-release{display:flex;justify-content:center;align-items:center;gap:14px;margin:13px 0 22px;color:var(--muted);font-size:12px}
+.welcome-release::before,.welcome-release::after{content:"";width:55px;height:1px;background:color-mix(in srgb,var(--text) 15%,transparent)}
+.welcome-beta{border:1px solid color-mix(in srgb,var(--accent) 65%,transparent);border-radius:4px;padding:4px 8px;color:var(--accent);font-size:10px;text-transform:uppercase;letter-spacing:.1em}
+#welcome-dialog h1{font-size:35px;line-height:1.2;margin:0 0 10px;font-weight:650;letter-spacing:-.025em;color:var(--text)}
+#welcome-dialog h2{color:var(--text)}
+#welcome-dialog .welcome-intro{font-size:14px;line-height:1.6;color:var(--muted);margin:0 auto;max-width:410px}
+.welcome-features{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));list-style:none;padding:0;margin:26px 0 28px}
+.welcome-features li{display:flex;flex-direction:column;align-items:center;gap:10px;padding:0 12px;font-size:12px;line-height:1.45;color:var(--muted);border-right:1px solid color-mix(in srgb,var(--text) 12%,transparent)}
+.welcome-features li:last-child{border:0}.welcome-features svg{width:26px;height:26px;color:var(--text)}
+#welcome-dialog .welcome-enter{width:100%;display:flex;align-items:center;justify-content:center;gap:13px;min-height:58px;border-radius:10px;border:1px solid color-mix(in srgb,var(--accent) 75%,var(--text));background:linear-gradient(120deg,color-mix(in srgb,var(--accent) 82%,var(--panel)),color-mix(in srgb,var(--accent) 64%,var(--bg)));color:var(--text);box-shadow:0 4px 24px color-mix(in srgb,var(--accent) 16%,transparent),inset 0 1px #ffffff20;font-size:21px;font-weight:600}
+.welcome-enter>svg{width:25px;height:25px}.welcome-enter>svg:last-child{margin-left:auto;width:20px}.welcome-enter>svg:first-child{margin-left:auto}
+#welcome-dialog .welcome-enter:hover{filter:brightness(1.12)}
+.welcome-load{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;margin:10px 0 18px}.welcome-load button{font-size:11px;padding:6px 8px;color:var(--muted)}
+.welcome-links{display:flex;align-items:center;justify-content:center;gap:18px;margin:0 0 20px}.welcome-links button{display:flex;align-items:center;gap:9px;font-size:13px;padding:7px 4px}.welcome-links button+button{border-left:1px solid color-mix(in srgb,var(--text) 18%,transparent);padding-left:22px;border-radius:0}.welcome-links svg{width:21px;height:21px;color:var(--muted)}
+.welcome-input{border-top:1px solid color-mix(in srgb,var(--text) 12%,transparent);text-align:left;padding-top:11px;margin-top:8px}.welcome-input>summary{font-size:11px;color:var(--muted);cursor:pointer;width:fit-content;margin:auto;padding:4px 9px}.welcome-input-body{padding-top:8px}
+#welcome-dialog .input-style-options{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:6px}#welcome-dialog .input-style-options button{padding:10px 5px}.input-style-options button:disabled{opacity:.45;cursor:not-allowed}
+#welcome-dialog .welcome-controls,#welcome-dialog .welcome-note{font-size:11px;line-height:1.6;color:var(--muted);text-align:center}
+#welcome-dialog .welcome-fallback{font-size:12px;line-height:1.6;color:var(--accent)}
+.welcome-footer{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:10px;margin-top:13px;color:var(--muted)}.welcome-footer button,.welcome-footer a{font-size:10px;color:var(--muted);text-decoration:none;padding:4px}.welcome-footer a:hover,.welcome-footer button:hover{color:var(--accent)}
+#welcome-dialog button:focus-visible,#welcome-dialog a:focus-visible,#welcome-dialog summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+#welcome-dialog.reading-guide .welcome-shell{width:min(850px,calc(100% - 48px));text-align:left;padding:34px}
+.welcome-guide-content{user-select:text;font-size:14px;line-height:1.7;color:var(--text)}
+#welcome-dialog .welcome-guide-content h2{font-size:21px;margin:30px 0 10px}.welcome-guide-content h3{font-size:16px;margin:23px 0 8px}
+.welcome-guide-content p{font-size:inherit;line-height:inherit;color:var(--muted)}.welcome-guide-content a{color:var(--accent)}
+.welcome-guide-content table{border-collapse:collapse;width:100%;font-size:12px;margin:16px 0}.welcome-guide-content th,.welcome-guide-content td{padding:9px;border:1px solid color-mix(in srgb,var(--text) 20%,transparent);text-align:left;vertical-align:top}.welcome-guide-content th{background:var(--panel)}
 .welcome-guide-content ul,.welcome-guide-content ol{padding-left:24px}.welcome-guide-content li{margin:7px 0}
-@media(max-width:520px){#welcome-dialog{padding:18px}#welcome-dialog h1{font-size:24px}.welcome-footer>div{align-items:flex-start;flex-direction:column}.welcome-guide-card{padding:12px}.welcome-load{flex-direction:column}#welcome-dialog .input-style-options button{padding:8px 5px}#welcome-dialog .input-style-options span{font-size:10px}}
+@media(max-width:600px){#welcome-dialog{max-width:calc(100vw - 12px);max-height:calc(100dvh - 12px)}.welcome-shell{width:calc(100% - 22px);max-height:calc(100% - 24px);padding:28px 20px 18px;border-radius:14px}.welcome-brand{font-size:clamp(21px,6.2vw,30px)}#welcome-dialog h1{font-size:29px}.welcome-emblem{width:50px;height:50px}.welcome-emblem svg{width:36px;height:36px}.welcome-features{margin:22px 0}.welcome-features li{padding:0 5px;font-size:10px}.welcome-features svg{width:23px;height:23px}.welcome-release{gap:8px}.welcome-release::before,.welcome-release::after{width:26px}.welcome-links{gap:10px}.welcome-links button{font-size:12px}.welcome-links button+button{padding-left:14px}.welcome-load{gap:0}.welcome-load button{font-size:10px}.welcome-planet{opacity:.5}#welcome-dialog.reading-guide .welcome-shell{width:calc(100% - 22px);padding:28px 18px}.welcome-guide-content{font-size:12px}.welcome-guide-content table{font-size:10px}.welcome-guide-content th,.welcome-guide-content td{padding:5px}}
+
+/* The welcome brand uses the same asset as the browser tab. */
+.welcome-emblem{border:0;filter:none}.welcome-emblem img{display:block;width:62px;height:62px}.welcome-features svg,.welcome-links svg,.welcome-enter>svg{stroke-width:1.3}
+@media(max-width:600px){.welcome-emblem img{width:50px;height:50px}}
+
+/* Keep the first-use walkthrough compact and easy to scan. */
+#welcome-dialog.reading-guide h1{font-size:28px}
+.welcome-guide-content{font-size:13px;line-height:1.6}
+#welcome-dialog .welcome-guide-content h2{font-size:17px;margin:18px 0 8px}
+.welcome-guide-content p{margin:8px 0}.welcome-guide-content li{margin:4px 0}
+
+/* The welcome stage fills the window; the card retains a readable measure. */
+#welcome-dialog{inset:0;margin:0;width:100vw;height:100dvh;max-width:none;max-height:none;border:0;border-radius:0}
+.welcome-scene{background:radial-gradient(ellipse at 15% 30%,#152b41,transparent 65%),#080e18}
+.welcome-scene::before{background:#527ba2;opacity:.18}
+.welcome-nebula{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.78}
+.welcome-scene.has-sky::before,.welcome-scene.has-sky .welcome-stars{opacity:0}
+.welcome-scene::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 20%,#03071070 100%)}
+.welcome-orbit{border-color:color-mix(in srgb,var(--accent) 30%,transparent);box-shadow:0 0 0 25px #c3d7e908,0 0 0 90px #c3d7e905}
+.welcome-planet{background:radial-gradient(circle at 65% 0%,#254055,#080e18 66%);border-top-color:#789ebd;box-shadow:0 -10px 40px #688eaf38,inset 0 12px 25px #688eaf25}
+.welcome-shell{background:linear-gradient(150deg,var(--panel),color-mix(in srgb,var(--bg) 96%,transparent))}
+.welcome-emblem svg{width:62px;height:62px;stroke-width:1.7}
+@media(max-width:600px){#welcome-dialog{inset:0;margin:0;width:100vw;height:100dvh;max-width:none;max-height:none;border-radius:0}.welcome-emblem svg{width:50px;height:50px}}

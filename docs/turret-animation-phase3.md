@@ -1,4 +1,4 @@
-# Weapon-family effects and resources — development history
+# Weapon-family effects and resources  -  development history
 
 > Historical milestone report. For current behavior, see [Turret Studio](TURRET_STUDIO.md).
 

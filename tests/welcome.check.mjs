@@ -14,23 +14,52 @@ try {
  page.on('pageerror',e=>errors.push(e.message));
  await page.goto(base);
  const splash=page.locator('#welcome-dialog');await splash.waitFor({state:'visible'});
+ await page.mouse.click(4,450);assert.ok(await splash.isVisible());
+ assert.equal(await splash.locator('.welcome-emblem svg').innerHTML(),await page.locator('#topbar .brand svg').innerHTML());
+ const bounds=await splash.boundingBox();assert.equal(bounds.width,1280);assert.equal(bounds.height,900);
+ await splash.locator('.welcome-scene.has-sky').waitFor({timeout:30000});
  assert.ok((await splash.innerText()).includes('v'+APP_VERSION));assert.match(await splash.innerText(),/Beta release/i);
- assert.ok(await splash.locator('[data-style="trackpad"]').isDisabled());
+ await mkdir('test-results',{recursive:true});await page.screenshot({path:'test-results/welcome-redesign-home.png'});
+ await splash.locator('[data-settings]').click();await page.locator('#preferences-dialog').waitFor({state:'visible'});
+ await page.locator('#preferences-dialog').getByRole('searchbox',{name:'Search preferences'}).fill('Apply a theme to every editor and viewport.');
+ for(const theme of ['graphite','contrast','blender']){
+  await page.locator('#preferences-dialog').getByRole('searchbox',{name:'Search preferences'}).fill('Apply a theme to every editor and viewport.');
+  await page.locator('#preferences-dialog').getByLabel('Preset',{exact:true}).selectOption(theme);
+  await page.locator('#preferences-dialog .preferences-window-title .icon-button').click();assert.ok(await splash.isVisible());
+  await page.screenshot({path:'test-results/welcome-'+theme+'.png'});
+  if(theme!=='blender')await splash.locator('[data-settings]').click();
+ }
+
+ await splash.locator('[data-enter]').click();assert.ok(await splash.isHidden());
+ await page.locator('#help-button').click();
+ const helpModal=page.locator('#help-dialog');
+ assert.equal(await helpModal.locator('h1').innerText(),'Quick Start Guide');
+ assert.ok(!(await helpModal.innerText()).includes('\u2014'));
+ await helpModal.locator('h1').click();assert.ok(await helpModal.isVisible());
+ await page.mouse.click(4,450);await helpModal.waitFor({state:'hidden'});
+ await page.getByRole('button',{name:'Open Welcome',exact:true}).click();
+ await splash.locator('.welcome-input summary').click();
+ assert.ok(await splash.locator('[data-style="trackpad"]').isEnabled());
  await splash.locator('[data-style="laptop"]').click();assert.match(await splash.locator('.welcome-controls').innerText(),/Alt/);
  assert.equal(await splash.locator('.coffee-button').getAttribute('href'),'https://www.buymeacoffee.com/CaotcAftermth');
  await mkdir('test-results',{recursive:true});await page.screenshot({path:'test-results/welcome-desktop.png'});
- await splash.locator('[data-guide]').click();await splash.locator('article table').first().waitFor();assert.match(await splash.locator('article').innerText(),/Spherical Heatmap/);assert.match(await splash.locator('article').innerText(),/3MF/);
- await splash.locator('[data-back]').click();assert.equal(await splash.locator('[data-style="laptop"]').getAttribute('aria-pressed'),'true');
+ await splash.locator('[data-guide]').click();await splash.locator('article h2').first().waitFor();
+ assert.equal(await splash.locator('article h2').count(),4);assert.equal(await splash.locator('article table').count(),0);
+ const quickStart=await splash.locator('article').innerText();assert.ok(quickStart.split(/\s+/).length<300);assert.match(quickStart,/Save preserved XML/);assert.match(quickStart,/Ctrl\+S saves the workspace layout, not the ship XML/);
+ assert.equal(await splash.locator('article a').getAttribute('href'),'./docs/');await page.screenshot({path:'test-results/quick-start-simplified.png'});
+ await splash.locator('article h2').first().click();assert.ok(await splash.locator('[data-welcome-guide]').isVisible());
+ await page.mouse.click(4,450);assert.ok(await splash.isVisible());assert.ok(await splash.locator('[data-welcome-guide]').isHidden());
+ await splash.locator('[data-guide]').click();await splash.locator('[data-back]').click();assert.equal(await splash.locator('[data-style="laptop"]').getAttribute('aria-pressed'),'true');
  await splash.locator('[data-feedback]').click();await page.locator('#feedback-dialog').waitFor({state:'visible'});await page.locator('#feedback-dialog [data-close]').first().click();assert.ok(await splash.isVisible());
  const picker=page.waitForEvent('filechooser');await splash.locator('[data-textures]').click();await mkdir('test-results/empty-textures',{recursive:true});await (await picker).setFiles(process.cwd()+'/test-results/empty-textures');assert.ok(await splash.isVisible());
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'test-results/welcome-mobile.png'});
- assert.ok(await splash.evaluate(el=>el.scrollWidth<=el.clientWidth+1));
+ assert.ok(await splash.evaluate(el=>el.scrollWidth<=el.clientWidth+1));assert.ok(await splash.locator('.welcome-shell').evaluate(el=>el.scrollWidth<=el.clientWidth+1));
  await page.keyboard.press('Escape');assert.ok(await splash.isHidden());
  await page.setViewportSize({width:1280,height:900});await page.getByRole('button',{name:'Help',exact:true}).click();await page.getByRole('menuitem',{name:'Welcome',exact:true}).click();assert.ok(await splash.isVisible());
  const xml='<ship><plan><item index="0" parent="-1"><block lx="0" ly="0" lz="0" ux="2" uy="4" uz="8" index="122" material="0" look="1" up="3" color="ff336699" secondaryColor="00000000"/></item></plan></ship>';
  const file=page.waitForEvent('filechooser');await splash.locator('[data-open]').click();await (await file).setFiles({name:'welcome-test.xml',mimeType:'text/xml',buffer:Buffer.from(xml)});
  await splash.waitFor({state:'hidden'});await page.waitForTimeout(700);await page.reload();await page.locator('.ship-root .ship-name').filter({hasText:'welcome-test'}).waitFor();assert.ok(await splash.isHidden());
- const fresh=await browser.newContext();const fallback=await fresh.newPage();await fallback.addInitScript(()=>localStorage.setItem('avorion-viewer.preferences.v1',JSON.stringify({version:1,inputStyle:'trackpad',trackpadNavigation:true})));await fallback.goto(base);await fallback.locator('#welcome-dialog').waitFor({state:'visible'});assert.ok(await fallback.locator('.welcome-fallback').isVisible());assert.equal(await fallback.locator('#welcome-dialog [data-style="laptop"]').getAttribute('aria-pressed'),'true');
+ const fresh=await browser.newContext();const fallback=await fresh.newPage();await fallback.addInitScript(()=>localStorage.setItem('avorion-viewer.preferences.v1',JSON.stringify({version:1,inputStyle:'trackpad',trackpadNavigation:true})));await fallback.goto(base);await fallback.locator('#welcome-dialog').waitFor({state:'visible'});assert.ok(await fallback.locator('.welcome-fallback').isHidden());assert.equal(await fallback.locator('#welcome-dialog [data-style="trackpad"]').getAttribute('aria-pressed'),'true');
  const embedded=await context.newPage();await embedded.goto(base+'/?editor=block');await embedded.waitForTimeout(500);assert.equal(await embedded.locator('#welcome-dialog').count(),0);
  assert.deepEqual(errors,[]);console.log('Welcome browser checks passed: startup, inputs, guide, feedback, pickers, import, restore, fallback, embedded editor, responsive layout.');
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}

@@ -1,4 +1,4 @@
-# Initial weapon effects — development history
+# Initial weapon effects  -  development history
 
 > Historical milestone report. For current behavior, see [Turret Studio](TURRET_STUDIO.md).
 

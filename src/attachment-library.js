@@ -5,7 +5,11 @@ export const ASSET_KINDS=[['turrets','Turrets'],['components','Components']];
 // the body shows one asset grid at a time.
 export function mountAttachmentLibrary(host,node,scene,changed){
  let controller;
- function show(kind){controller?.dispose();host.replaceChildren();host.classList.remove('turret-library');node.assetKind=kind;controller=kind==='components'?mountComponentLibrary(host,changed):mountTurretLibrary(host,changed);}
+ function show(kind){controller?.dispose();host.replaceChildren();host.classList.remove('turret-library');node.assetKind=kind;controller=kind==='components'?mountComponentLibrary(host,changed,{externalSearch:true}):mountTurretLibrary(host,changed);controller.search(node.assetQuery||'');}
  show(node.assetKind==='components'?'components':'turrets');
- return {assetAreaId:node.id,show,sync:()=>controller?.sync?.(),dispose:()=>controller?.dispose()};
+ return {assetAreaId:node.id,show,search(query){node.assetQuery=query;controller.search(query);},sync:()=>controller?.sync?.(),dispose:()=>controller?.dispose()};
+}
+
+export function assetSearch(value,change){
+ const input=document.createElement('input');input.type='search';input.className='asset-library-search';input.placeholder='Search assets';input.setAttribute('aria-label','Search assets');input.value=value||'';input.oninput=()=>change(input.value);return input;
 }

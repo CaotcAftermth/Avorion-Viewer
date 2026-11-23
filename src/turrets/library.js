@@ -31,11 +31,11 @@ export function openTurretProject(asset,changed=()=>{}){
   });
 }
 export function mountTurretLibrary(host,changed){
-  host.classList.add('turret-library');let error='',busy=false,disposed=false;
+  host.classList.add('turret-library');let error='',busy=false,disposed=false,query='';
   const draw=(selectionOnly=false)=>{
     if(selectionOnly){for(const tile of host.querySelectorAll('[data-asset-id]'))tile.setAttribute('aria-pressed',String(tile.dataset.assetId===turretLibrary.selectedId));return;}
     if(disposed)return;const scrollTop=host.scrollTop,scrollLeft=host.scrollLeft;host.replaceChildren();const grid=document.createElement('div');grid.className='turret-asset-grid';host.append(grid);
-    for(const asset of turretLibrary.assets){
+    for(const asset of turretLibrary.assets.filter(asset=>query.toLowerCase().trim().split(/\s+/).filter(Boolean).every(term=>[asset.name,asset.folder,...(asset.tags||[])].some(value=>String(value||'').toLowerCase().includes(term))))){
       const card=document.createElement('div');card.className='turret-asset-card';
       const tile=document.createElement('button');tile.className='turret-asset-tile';tile.dataset.assetId=asset.id;tile.setAttribute('aria-label',asset.name);tile.setAttribute('aria-pressed',String(asset.id===turretLibrary.selectedId));tile.draggable=true;
       tile.ondragstart=e=>{if(!dragImage.complete||!dragImage.naturalWidth){e.preventDefault();return;}turretLibrary.dragged=asset;e.dataTransfer.setData('application/x-avorion-turret',asset.id);e.dataTransfer.effectAllowed='copy';e.dataTransfer.setDragImage(dragImage,dragImage.naturalWidth/2,dragImage.naturalHeight/2);window.dispatchEvent(new Event('turret-drag-start'));};
@@ -75,7 +75,7 @@ export function mountTurretLibrary(host,changed){
     const status=document.createElement('p');status.className='panel-note';status.setAttribute('role','status');status.textContent=error||(busy?'Importing turret…':'Turret assets · Saved in this browser');host.append(status);host.scrollTop=scrollTop;host.scrollLeft=scrollLeft;
   };
   listeners.add(draw);draw();loadTurretLibrary().catch(e=>{error=e.message;draw();});
-  return {dispose(){disposed=true;listeners.delete(draw);}};
+  return {search(value){query=value;draw();},dispose(){disposed=true;listeners.delete(draw);}};
 }
 
 export async function updateTurretAsset(draft){await loadTurretLibrary();const next=revisedAsset(draft,turretLibrary.assets.find(a=>a.id===draft.id));await records(next);turretLibrary.assets=turretLibrary.assets.map(a=>a.id===next.id?next:a);emit();return next;}

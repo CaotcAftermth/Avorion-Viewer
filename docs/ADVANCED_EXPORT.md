@@ -1,4 +1,4 @@
-# Advanced Export — milestones 1–4
+# Advanced Export  -  milestones 1–4
 
 Open **File > Advanced Export** after loading a ship or block preview. Start with a goal: **Blender / game asset** (GLB, editable grouped mesh, real scale), **3D print** (3MF printable shell, 100 mm longest dimension, sealed cavities filled) or **Quick share** (GLB of the visible blocks, real scale). A goal fills the form; changing any value switches to **Custom**. File format, geometry output, scope and size stay visible. Placement, colors, repair, transparency, thin-block filtering, cavity fill, solid tolerance and memory budget sit under **Advanced**, and rows that do not apply to the current format or mode are hidden.
 

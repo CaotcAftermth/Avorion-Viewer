@@ -192,7 +192,7 @@ export function addMaterialColors(palette){
 
 let pending;
 
-export function loadPalette(){return pending??=fetch(new URL('./data/avorion-rgb.txt',import.meta.url)).then(r=>{if(!r.ok)throw Error('Local Avorion palette could not be loaded.');return r.text();}).then(parsePalette).then(addMaterialColors).catch(error=>{pending=null;throw error;});}
+export function loadPalette(){return pending??=fetch(new URL('./data/avorion-rgb.txt',import.meta.url)).then(r=>{if(!r.ok)throw Error('Local Avorion palette could not be loaded.');return r.text();}).then(parsePalette).then(addMaterialColors).then(p=>({...p,byId:new PaintColorMap(p.byId)})).catch(error=>{pending=null;throw error;});}
 
 
 
@@ -214,3 +214,18 @@ export function nearestNeutral(palette,level){
 
 
 export function isGrayscale(color){return color.rgb[0]===color.rgb[1]&&color.rgb[1]===color.rgb[2];}
+
+// RGB identifiers remain usable by brushes and saved palettes after a reload.
+export function rgbColor(rgb){
+ const hex='#'+rgb.map(v=>Math.round(Math.max(0,Math.min(255,v))).toString(16).padStart(2,'0')).join('').toUpperCase();
+ const id=hex,color={id,name:hex,baseName:id,variant:'Base',hex,rgb:rgb.map(Math.round),...hsl(rgb),ok:perceptual(rgb),wheel:rgb.some(v=>v!==rgb[0])};
+ color.variants=[color];return color;
+}
+export function hueColor(h,l=.5){
+ const a=Math.min(l,1-l),f=n=>{const k=(n+h/30)%12;return 255*(l-a*Math.max(-1,Math.min(k-3,9-k,1)));};
+ return rgbColor([f(0),f(8),f(4)]);
+}
+class PaintColorMap extends Map{
+ get(id){return super.get(id)||(/^#[0-9a-f]{6}$/i.test(id||'')?rgbColor([1,3,5].map(i=>parseInt(id.slice(i,i+2),16))):undefined);}
+ has(id){return !!this.get(id);}
+}

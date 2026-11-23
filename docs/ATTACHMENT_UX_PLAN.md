@@ -91,7 +91,7 @@ Expose Saving, Saved locally, and Save failed states. Failures retain a recovera
 
 ## Delivery sequence
 
-### Phase 1 — Baseline and state contracts
+### Phase 1  -  Baseline and state contracts
 
 - Record current import, placement, selection, undo, persistence, simulation, baking, and export behavior using representative fixtures.
 - Inventory existing state fields and make a selection/interaction ownership map.
@@ -101,7 +101,7 @@ Expose Saving, Saved locally, and Save failed states. Failures retain a recovera
 
 Acceptance: baseline passes, existing saved data loads, and the transition rules above are represented in a small state contract before UI changes begin.
 
-### Phase 2 — Contextual Properties and selection
+### Phase 2  -  Contextual Properties and selection
 
 - Reorganize both Properties editors around the shared hierarchy.
 - Connect viewport and Outliner selection to one active context and a designated unpinned inspector.
@@ -110,7 +110,7 @@ Acceptance: baseline passes, existing saved data loads, and the transition rules
 
 Acceptance: selecting any instance or socket exposes the correct controls; stale fields from another selection disappear; pinned/multiple inspectors behave predictably; keyboard focus survives routine updates.
 
-### Phase 3 — Socket editing and asset attachment tools
+### Phase 3  -  Socket editing and asset attachment tools
 
 - Standardize marker shape, visibility, hover information, scope filters, and selected state.
 - Extend existing component face picking and manipulation tools to the shared interaction controller, then apply them to turret attachment frames.
@@ -119,7 +119,7 @@ Acceptance: selecting any instance or socket exposes the correct controls; stale
 
 Acceptance: top, bottom, side, and angled faces align correctly; centering/reloading does not move saved sockets; users can identify occupied and invalid sockets without color; no socket tool intercepts painting or ordinary navigation.
 
-### Phase 4 — Placement, replacement, and mounted transforms
+### Phase 4  -  Placement, replacement, and mounted transforms
 
 - Implement stable target snapping, ghost previews, the placement strip, and cancellation rules.
 - Preserve fast empty-socket drag/drop and add keyboard-accessible Place.
@@ -129,7 +129,7 @@ Acceptance: top, bottom, side, and angled faces align correctly; centering/reloa
 
 Acceptance: target choice remains stable on dense ships; invalid placement explains its reason; cancel leaves no mutations; one gesture is one undo step; dropping or confirming selects the new instance; replacement undo restores the exact previous occupant.
 
-### Phase 5 — Library revision and workspace lifecycle
+### Phase 5  -  Library revision and workspace lifecycle
 
 - Add source identity/revision tracking while preserving legacy assets and independent mounted copies.
 - Add Edit library asset, Save as new asset, Update from library, and explicit replacement previews.
@@ -138,7 +138,7 @@ Acceptance: target choice remains stable on dense ships; invalid placement expla
 
 Acceptance: changing a library asset leaves existing mounts unchanged until requested; missing/deleted source assets do not break mounts; updates preserve compatible instance edits; cancellation does not leak draft changes.
 
-### Phase 6 — Unified history and persistence feedback
+### Phase 6  -  Unified history and persistence feedback
 
 - Route undo/redo through active context, preserving existing paint history and domain-specific histories.
 - Standardize transaction boundaries for placement, socket edits, symmetry batches, replacement, and library updates.
@@ -148,7 +148,7 @@ Acceptance: changing a library asset leaves existing mounts unchanged until requ
 
 Acceptance: reload restores final committed state; rapid edits and undo during saving are deterministic; storage failure retains recoverable work; corrupt imports do not partially apply; valid existing setup files still work.
 
-### Phase 7 — Embedded restoration and repair flow
+### Phase 7  -  Embedded restoration and repair flow
 
 - Return structured restoration results rather than relying only on log strings: restored mounts, reused/new assets, unresolved mounts, and reasons.
 - Show a compact completion notice after opening a ship, with Review only when attention is needed.
@@ -157,7 +157,7 @@ Acceptance: reload restores final committed state; rapid edits and undo during s
 
 Acceptance: successful loads do not open interruptive dialogs; unresolved entries are actionable; repeated imports do not duplicate assets; each repair is undoable and persistable where supported.
 
-### Phase 8 — Accessibility, performance, and release verification
+### Phase 8  -  Accessibility, performance, and release verification
 
 - Add accessible names, visible keyboard focus, discoverable shortcuts, and screen-reader status messages. Provide numeric/property alternatives to every pointer-only operation.
 - Test narrow Properties columns, maximized workspaces, multiple viewports, high-DPI displays, and supported Blender/Laptop controls. Do not claim Trackpad support while it remains unavailable elsewhere in the app.
