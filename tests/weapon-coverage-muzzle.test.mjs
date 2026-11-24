@@ -16,14 +16,24 @@ function fixture(){
 test('native muzzle inside its own barrel can fire into empty space',()=>{
  const e=createCoverageEngine(fixture());for(const p of [[0,1.2,10],[0,10,10],[10,5,0],[-10,5,0]]){const r=e.evaluate(p);assert.equal(r.clear,1);assert.equal(r.obstructed,0);assert.deepEqual(r.contributors[0].paths[0].sourceBarrelBlocks,['b2']);}
 });
-test('muzzle exclusion does not remove nearby hull, other turrets or separate barrel geometry',()=>{
+test('own turret design never blocks muzzle rays, but hull and other turrets still do',()=>{
  const f=fixture();f.blocks=[makeBlock({id:'armor',position:{x:0,y:1.2,z:1.4},size:{x:1,y:1,z:.02}})];let r=createCoverageEngine(f).evaluate([0,1.2,10]);assert.equal(r.obstructed,1);assert.equal(r.contributors[0].paths[0].blocker.blockId,'armor');
- f.blocks=[];f.mounts[0].asset.blocks.push(makeBlock({id:'forward-piece',position:{x:0,y:6,z:9},size:{x:2,y:2,z:1}}));f.mounts[0].asset.parts['forward-piece']='barrel';r=createCoverageEngine(f).evaluate([0,1.2,10]);assert.equal(r.obstructed,1);assert.equal(r.contributors[0].paths[0].blocker.blockId,'forward-piece');
- f.mounts[0].asset.parts['forward-piece']='body';assert.equal(createCoverageEngine(f).evaluate([0,1.2,10]).obstructed,1);
+ f.blocks=[];f.mounts[0].asset.blocks.push(makeBlock({id:'forward-piece',position:{x:0,y:6,z:9},size:{x:2,y:2,z:1}}));
+ for(const part of ['base','body','barrel']){
+  f.mounts[0].asset.parts['forward-piece']=part;r=createCoverageEngine(f).evaluate([0,1.2,10]);
+  assert.equal(r.clear,1,`${part} geometry belongs to the firing turret`);assert.equal(r.obstructed,0);assert.equal(r.contributors[0].partial,false);assert.equal(r.contributors[0].paths[0].blocker,null);
+ }
  const other=structuredClone(f.mounts[0]);other.id='other';other.socketId='s2';other.asset.blocks=other.asset.blocks.filter(b=>b.id==='forward-piece');f.mounts[0].asset.blocks=f.mounts[0].asset.blocks.filter(b=>b.id!=='forward-piece');f.mounts.push(other);f.sockets.push({...f.sockets[0],id:'s2'});r=createCoverageEngine(f).evaluate([0,1.2,10]);assert.equal(r.contributors[0].paths[0].blocker.turretId,'other');
 });
 test('source-barrel exclusion follows scaled, angled, yawed and elevated native geometry',()=>{
  const f=fixture();f.sockets[0].position=[4,-2,3];f.sockets[0].rotation=[20,0,-70];const m=f.mounts[0];m.turretSize=.5;m.twist=30;
  const matrix=partMatrices(m.asset,f.sockets[0],{...m,yaw:63,pitch:45}).barrel,target=new THREE.Vector3(0,6,6.5).applyMatrix4(matrix).addScaledVector(new THREE.Vector3(0,0,1).transformDirection(matrix),10);
  assert.equal(createCoverageEngine(f).evaluate(target.toArray()).clear,1);
+});
+test('multiple muzzles are not reported as partially blocked by their own design',()=>{
+ const f=fixture(),a=f.mounts[0].asset;a.muzzlePositions.push([1,0,6.5]);
+ a.blocks.push(makeBlock({id:'forward-piece',position:{x:0,y:6,z:9},size:{x:2,y:2,z:1}}));a.parts['forward-piece']='barrel';
+ const r=createCoverageEngine(f).evaluate([0,1.2,10]);
+ assert.equal(r.clear,1);assert.equal(r.obstructed,0);assert.equal(r.contributors[0].partial,false);
+ assert.equal(r.contributors[0].paths.length,2);assert.ok(r.contributors[0].paths.every(p=>p.blocker===null));
 });

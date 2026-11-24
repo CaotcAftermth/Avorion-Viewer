@@ -961,15 +961,29 @@ function headerFor(node){
   }else{
     header.insertAdjacentHTML('beforeend',`<span class="header-name">${escape(t(EDITORS[node.editor]))}</span><span class="spacer"></span>`);
     if(node.editor==='info'){
-      for(const [mode,label] of [['all','Activity'],['problems','Problems'],['performance','Performance']]){
-        const tab=button('Show '+label,label,()=>{node.infoFilter=mode;save();render();});
-        tab.classList.toggle('active',(node.infoFilter||'all')===mode);tab.setAttribute('aria-pressed',String((node.infoFilter||'all')===mode));header.append(tab);
-      }
-      if(node.infoFilter!=='performance'){
-      const order=button('Reverse activity order',node.infoNewestFirst?'Newest on Top':'Newest on Bottom',()=>{node.infoNewestFirst=!node.infoNewestFirst;order.textContent=node.infoNewestFirst?'Newest on Top':'Newest on Bottom';order.setAttribute('aria-pressed',String(node.infoNewestFirst));updateLogs();save();});
-      order.title='Reverse entry order: newest on top or bottom';order.setAttribute('aria-pressed',String(!!node.infoNewestFirst));
-      header.append(order,button('Copy activity log','Copy',()=>copyLog(node.infoFilter==='problems')),button('Clear activity log','Clear',()=>clearLog()));
-      }
+      const dropdown=(label,glyph,items,decorate)=>{
+        const b=button(label,icon(glyph),()=>{
+          if(activeMainMenu===b){closeMenu();return;}
+          anchorMenu(b,label,items());
+          const popup=$('#menu'),rect=b.getBoundingClientRect();
+          if(rect.bottom+3+popup.offsetHeight>innerHeight-6)popup.style.top=`${Math.max(6,rect.top-popup.offsetHeight-3)}px`;
+          activeMainMenu=b;b.setAttribute('aria-expanded','true');decorate?.(popup);
+        },'icon-button');
+        b.setAttribute('aria-haspopup','menu');b.setAttribute('aria-expanded','false');header.append(b);return b;
+      };
+      const modes=[['all','Activity'],['problems','Problems'],['performance','Performance']];
+      const filter=dropdown('Info filter','infoFilter',()=>modes.map(([mode,label])=>({label,action:()=>{node.infoFilter=mode;save();render();}})),menu=>{
+        [...menu.querySelectorAll('button')].forEach((b,i)=>{b.role='menuitemradio';b.setAttribute('aria-checked',String((node.infoFilter||'all')===modes[i][0]));});
+      });
+      filter.title=t('Info filter')+': '+t(modes.find(([mode])=>mode===(node.infoFilter||'all'))?.[1]||'Activity');
+      dropdown('Info settings','infoSettings',()=>{
+        const disabled=node.infoFilter==='performance',disabledReason='Available in Activity or Problems';
+        return [
+          {label:'Newest on Top',disabled,disabledReason,action:()=>{node.infoNewestFirst=!node.infoNewestFirst;updateLogs();save();}},
+          {label:'Copy',disabled,disabledReason,action:()=>copyLog(node.infoFilter==='problems')},
+          {label:'Clear',disabled,disabledReason,action:()=>clearLog()}
+        ];
+      },menu=>{const order=menu.querySelector('button');order.role='menuitemcheckbox';order.setAttribute('aria-checked',String(!!node.infoNewestFirst));});
     }
   }
   if(node.editor==='assets'){
@@ -1154,8 +1168,8 @@ function mountPropertyTab(tab,content,node,searching=false){
   if(['turrets','components','coverage'].includes(tab)&&node.attachmentPin&&(inspectorPins.get(node)!==scene.model||!resolveAttachmentContext(scene,context,{turret:turretLibrary,component:componentLibrary}))){content.textContent='Pinned attachment is no longer available. Unpin to follow selection.';return;}
   if(tab==='object')mountBlockInspector(content,scene,(change)=>{if(change?.appearance){refreshStructure();return;}scene.model={...makeModel(scene.model.blocks,scene.model.fileName),turretMounts:scene.model.turretMounts,componentSetup:scene.model.componentSetup,placementOffset:scene.model.placementOffset};scene.revision++;render();},{reveal:revealStructure,preferences,openVariant:editGalleryVariant});
   const showCoverageView=(direction,bounds)=>{const viewport=captureViewport();if(viewport){if(direction==='coverage'){viewport.view.target=nativeToView(bounds.center);viewport.view.zoom=3/Math.max(.1,bounds.radius);viewport.view.panX=viewport.view.panY=0;save();renderers.find(r=>r.id===viewport.id)?.draw();}else{viewport.view.projection='orthographic';setView(viewport,direction);}}};
-  if(tab==='coverage')mountCoverageControls(content,attachmentScene,refreshStructure,showCoverageView,()=>{node.propertyTab='turrets';node.panelOpen??={};node.panelOpen['turrets:Aiming Configuration']=true;commit();});
-  if(tab==='turrets')mountTurretProperties(content,attachmentScene,refreshStructure,socket=>{const node=leaves(workspace().root).find(n=>n.editor==='viewport');const canvas=node&&areaElement(node.id)?.querySelector('canvas');return !!canvas&&socketExposed(scene,node.view,canvas.clientWidth,canvas.clientHeight,socket,preferences.value);});
+  if(tab==='coverage')mountCoverageControls(content,attachmentScene,refreshStructure,showCoverageView);
+  if(tab==='turrets')mountTurretProperties(content,attachmentScene,refreshStructure,socket=>{const node=leaves(workspace().root).find(n=>n.editor==='viewport');const canvas=node&&areaElement(node.id)?.querySelector('canvas');return !!canvas&&socketExposed(scene,node.view,canvas.clientWidth,canvas.clientHeight,socket,preferences.value);},()=>{node.propertyTab='coverage';node.panelOpen??={};node.panelOpen['coverage:Turret Settings']=true;commit();});
   if(tab==='turrets'&&!searching)mountRestorationReview(content,scene,{selectBlock:id=>{selectStructure([id]);focusStructure([id]);},changed:refreshStructure});
   if(tab==='components')mountComponentProperties(content,attachmentScene,refreshStructure,context);
   // World and Shaders edit live preferences beside an unobscured viewport. The Properties search covers them, so they have no search bar of their own.

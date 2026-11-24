@@ -18,7 +18,7 @@ Coverage estimates where attached turrets can aim and whether geometry blocks th
 5. Wait for analysis to finish.
 6. Increase quality to investigate a particular result.
 
-Weapon Coverage is its own Properties tab in this release. Per-turret participation and fixed-aim settings are under **Turrets > Aiming Configuration**.
+The tab has four main sections: **Coverage**, **Turret Settings**, **Results**, and **Advanced**. Coverage holds the main display and quality controls; its **Display Options** and **Slice Settings** are collapsed by default. Per-turret participation, fixed aiming, groups, and field color are under **Turret Settings**. The Turrets tab's **Edit coverage assumptions** shortcut opens that section.
 
 ## Choose the display metric
 
@@ -89,15 +89,15 @@ Use **Sphere radius** to choose the analysis distance. The classic palette uses 
 <!-- end-inline-capture -->
 
 
-**Turret Scope** offers All Turrets, Selected Turrets, or a Turret Group. Assign groups in the selected turret's Aiming Configuration.
+**Coverage > Turret Selection** offers All Turrets, Selected Turrets, or a Turret Group. Assign groups in **Turret Settings**.
 
 The scope filters the displayed result. The underlying analysis evaluates all enabled turrets. Changing a display filter does not require a new analysis.
 
-Analysis controls can show the ship, grid, structural obstructions, or only overlapping clear coverage. **Show Ship** changes display visibility; it does not remove the hull from obstruction analysis.
+**Coverage > Display Options** can show the ship, grid, structural obstructions, or only overlapping clear coverage. The overlap filter appears for Clear Coverage. **Show Ship** changes display visibility; it does not remove the hull from obstruction analysis.
 
-In **Advanced Analysis**, choose whether hidden, transparent, or decorative geometry participates as obstacles. Hidden and decorative geometry are excluded by default.
+In **Advanced > Obstacles**, choose whether hidden, transparent, or decorative geometry participates as obstacles. Hidden and decorative geometry are excluded by default.
 
-**GPU hull rays (experimental)** can accelerate the hull part on supported hardware. If unavailable, the app uses its CPU path. Grazing contacts can differ between the paths.
+**Advanced > Experimental & Legacy** contains the legacy slice style and **GPU hull rays (experimental)**. GPU hull rays can accelerate the hull part on supported hardware. If unavailable, the app uses its CPU path. Grazing contacts can differ between the paths.
 
 ## Inspect a point
 
@@ -108,7 +108,7 @@ In **Advanced Analysis**, choose whether hidden, transparent, or decorative geom
 <!-- end-inline-capture -->
 
 
-Enable **Inspect coverage points**, then inspect the displayed field. Read the exact analyzed sample, contributing turrets, and blocking geometry.
+Under **Results**, enable **Inspect coverage points**, then inspect the displayed field. Read the exact analyzed sample, contributing turrets, and blocking geometry. Point-specific actions appear after a point has been inspected. Statistics and export controls appear when an analysis result is available.
 
 Use **Select contributing turrets** to identify those mounts. **Open slice through inspected point** creates a side slice through that point.
 
@@ -124,7 +124,7 @@ The visible color field interpolates samples. The inspected sample is more speci
 
 
 1. Finish an analysis of the original layout.
-2. Open **Comparison & Export**.
+2. Open **Results > Comparison & Export**.
 3. Select **Save as comparison baseline** and give it a name.
 4. Change the layout or aiming assumptions.
 5. Wait for the revised analysis.
@@ -144,6 +144,8 @@ Use **Export coverage CSV** or **Export coverage JSON** to keep sample targets, 
 
 
 Coverage uses imported pivot and muzzle information where available. Missing muzzle information can require estimates. Traversal, fixed-aim behavior, and spread include assumptions. Other turrets obstruct paths at their displayed poses.
+
+Muzzle rays pass through their own turret design, including its base, body, and barrels. The ship hull and other mounted turrets can still block them. A partial-muzzle obstruction means those external obstacles block some eligible muzzles while another has a clear path.
 
 Coverage does not calculate damage, simulate a battle, prove simultaneous barrel hits, or reproduce native game behavior exactly. Keep the assumptions consistent when comparing layouts.
 

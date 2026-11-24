@@ -1,13 +1,12 @@
 import {mountLifecycleControls} from '../attachments/lifecycle-controls.js';
 import {mountPoseEditor} from './editors.js';
-import {mountAimingControls} from './coverage-ui.js';
 import {placeFromLibrary} from './placement.js';
 import {mounts,mountHistory,canMountHistory,removeTurret} from './mounts.js';
 import {sceneSockets} from './sockets.js';
 import {turretLibrary} from './library.js';
 import {liveBlocks,nativeItemIndex} from '../ship-structure.js';
 import {propertyPanel,propertyNote,propertyAction,propertyDataRow} from '../property-ui.js';
-export function mountTurretProperties(host,scene,changed,canAttach=()=>false){
+export function mountTurretProperties(host,scene,changed,canAttach=()=>false,openCoverage=null){
  const state=scene.turretSockets??={};state.scope??='selected';state.selectedId??=null;
  const display=propertyPanel(host,'Socket Display',true);
  display.innerHTML+='<label class="field-row">Show Through Geometry<input type="checkbox" data-through></label><label class="field-row">Socket Scope<select data-scope aria-label="Socket scope"><option value="selected">Selected Turret Blocks</option><option value="all">All Turret Blocks</option></select></label>';
@@ -27,7 +26,7 @@ export function mountTurretProperties(host,scene,changed,canAttach=()=>false){
   const info=propertyPanel(host,'Selected Turret',true);
   mountLifecycleControls(info,scene,'turret',mounted,changed,{inline:true});
   mountPoseEditor(host,scene,changed,candidates);
-  mountAimingControls(propertyPanel(host,'Aiming Configuration'),scene,changed);
+  if(openCoverage)propertyAction(info,'Edit coverage assumptions',openCoverage);
  }
  const details=propertyPanel(host,'Socket Details');
  const socket=selected||candidates.find(s=>s.id===mounted?.socketId);

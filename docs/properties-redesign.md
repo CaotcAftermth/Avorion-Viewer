@@ -9,8 +9,8 @@ The port was prepared from the current working tree, including existing uncommit
 ## New organization
 
 - Ship editor: separate Turrets, Components and Weapon Coverage categories.
-- Turrets: Socket Display, Mounting, Selected Turret (including existing Library Source actions), Transform & Pose, Aiming Configuration, Socket Details.
-- Weapon Coverage: Visualization, Turret Scope, Analysis, Slice Settings, Appearance & Colors, Inspection & Statistics, Comparison & Export, Advanced Analysis. Legacy and experimental controls remain accessible. The aiming shortcut edits the same mounted-turret coverage state.
+- Turrets: Socket Display, Mounting, Selected Turret (including existing Library Source actions and an Edit coverage assumptions shortcut), Transform & Pose, Socket Details.
+- Weapon Coverage: four main sections — Coverage, Turret Settings, Results, Advanced. Coverage contains the main display, scope, quality, and framing controls, with collapsed Slice Settings and Display Options. Turret Settings holds the mounted-turret selector, aiming assumptions, group, and field color. Results contains inspection, collapsed Statistics and Comparison & Export; result-only actions appear as worker results become available. Advanced holds recalculate/reset, obstacle rules, and collapsed Experimental & Legacy controls. Long explanations live in the coverage guide. Fixed weapon spread appears only for fixed aiming; the count scale upper bound appears only when automatic scaling is off. Hidden fields retain their values.
 - Components: Socket Display, Attachment, Selected Component, Transform, Position & Alignment, Socket Details and Socket Creation. Existing Library Asset, History, Symmetry, Appearance, Clearance and Component Setup controls remain available. The source-component window retains its attachment-point editor.
 - Turret asset editor: Structure, Pose & Mechanics, Turret Studio, Showcase & Timeline, Showcase Export, Calibration & Development. Search spans all six categories.
 
@@ -28,16 +28,15 @@ Turret/coverage/asset transactions use turret history with one record per drag. 
 | Socket selector, attach/detach, attachment history and errors | Turrets / Mounting |
 | Mounted identity and source edit/update/save-as-new actions | Turrets / Selected Turret / Library Source |
 | Mount/body rotation, elevation, size, presets, copy/paste | Turrets / Transform & Pose |
-| Coverage enable, fixed aiming, azimuth/elevation limits, spread, group, field color | Turrets / Aiming Configuration |
+| Coverage enable, fixed aiming, spread, group, selected turret field color | Weapon Coverage / Turret Settings |
 | Socket identifiers, owner, normal, availability | Turrets / Socket Details |
-| Coverage mode, metric, opacity, sphere radius | Weapon Coverage / Visualization |
-| All/selected/group filters | Weapon Coverage / Turret Scope |
-| Sampling, ship/grid/obstacles, overlap, recalculate/reset | Weapon Coverage / Analysis |
-| Six directions, slice offset/radius, polar/legacy view | Weapon Coverage / Slice Settings |
-| Palette, count scale and legacy turret colors | Weapon Coverage / Appearance & Colors |
-| Picking, frame, statistics and contributing turrets | Weapon Coverage / Inspection & Statistics |
-| Baselines and CSV/JSON | Weapon Coverage / Comparison & Export |
-| Inclusion rules, GPU rays and assumptions | Weapon Coverage / Advanced Analysis |
+| Coverage mode, metric, sphere radius, sampling, frame | Weapon Coverage / Coverage |
+| All/selected/group filters | Weapon Coverage / Coverage |
+| Opacity, ship/grid/obstruction visibility, clear-overlap filter, palette, count scale, legacy turret colors | Weapon Coverage / Coverage / Display Options |
+| Six directions, slice offset/radius | Weapon Coverage / Coverage / Slice Settings |
+| Picking, statistics and contributing turrets | Weapon Coverage / Results |
+| Baselines and CSV/JSON | Weapon Coverage / Results / Comparison & Export |
+| Recalculate/reset, inclusion rules, GPU rays, legacy slice style | Weapon Coverage / Advanced |
 | Component socket display | Components / Socket Display |
 | Component socket selection, attachment and swap | Components / Attachment |
 | Mounted component identity/source lifecycle | Components / Selected Component |

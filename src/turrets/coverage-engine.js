@@ -202,11 +202,8 @@ export function createCoverageEngine(input,previous=null){
    const {t,origin,direction,limit,pose,muzzleIndex}=ray;
    let blocker=shipHits?shipHits[i]:rayHit(ship,origin,direction,limit,t.epsilon);
    for(const other of solidTurrets)if(other.id!==t.id&&other.tree&&rayBoxEntry(other.tree.box,origin,direction)<(blocker?.distance??limit)){const hit=rayHit(other.tree,origin,direction,blocker?.distance??limit,t.epsilon);if(hit)blocker={...hit,turretId:other.id};}
-   for(const [part,tree] of Object.entries(t.own)){
-    if(!tree)continue;const inverse=part==='base'?t.baseInverse:pose.matrices[part].clone().invert();
-    const hit=rayHit(tree,origin.clone().applyMatrix4(inverse),direction.clone().transformDirection(inverse),(blocker?.distance??limit)/t.scale,t.epsilon/t.scale,part==='barrel'?t.sourceBlocks[muzzleIndex]:null);
-    if(hit)blocker={...hit,distance:hit.distance*t.scale,point:v(hit.point).applyMatrix4(pose.matrices[part]).toArray(),turretId:t.id,part};
-   }
+   // Muzzles fire through their own turret design. Only hull geometry and
+   // other mounted turrets can obstruct this turret's firing paths.
    ray.result={origin:pose.origin.toArray(),yaw:pose.yaw,pitch:pose.pitch,blocker:blocker||null,sourceBarrelBlocks:[...t.sourceBlocks[muzzleIndex]],...(pose.offAxis!==undefined?{offAxis:pose.offAxis}:{})};
   });
   for(const {t,paths,unresolved} of planned.turrets){
