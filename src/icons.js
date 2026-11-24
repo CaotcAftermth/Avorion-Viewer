@@ -1,6 +1,10 @@
 import {cursorIcon} from './viewport-cursors.js';
 const cursorTools={select:'select',socket:'sockets',orbit:'orbit',pan:'pan-open',frame:'frame',paintBrush:'brush',eyedropper:'eyedropper',replaceColor:'replace',fillPaint:'fill',restorePaint:'restore'};
 const paths = {
+  folderUp:'<path d="M8 14V2M3 7l5-5 5 5"/>',
+  assetXml:'<path d="M9 1H3v14h10V5ZM9 1v4h4M6 8l-2 2 2 2M10 8l2 2-2 2"/>',
+  assetMove:'<path d="M1 4V2.5h5L8 5h7v8.5H9M1 10h8M6 7l3 3-3 3"/>',
+
   regions:'<rect x="1.5" y="1.5" width="5" height="5" rx=".6" fill="currentColor" fill-opacity=".35"/><rect x="9.5" y="1.5" width="5" height="5" rx=".6" opacity=".45"/><rect x="1.5" y="9.5" width="5" height="5" rx=".6" fill="currentColor" fill-opacity=".35"/><rect x="9.5" y="9.5" width="5" height="5" rx=".6" fill="currentColor" fill-opacity=".35"/><path d="M4 6.5v3M6.5 12h3"/>',
 
   boxOutline:'<path d="m8 1 6 3.5v7L8 15l-6-3.5v-7ZM2 4.5 8 8l6-3.5M8 8v7"/>',

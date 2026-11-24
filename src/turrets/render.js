@@ -12,6 +12,16 @@ let group,model,items,preview,revision,components,componentPreview;
 export function syncTurrets(world,scene,view,configureDepth,textureOptions){
   const next=mounts(scene),ghost=scene.turretPreview,componentGhost=scene.componentPreview;
   if(componentPreview!==componentGhost||components!==scene.model?.componentSetup||revision!==scene.revision||model!==scene.model||items!==next||preview!==ghost){
+    const socketsNow=sceneSockets(scene),entriesNow=next.map(m=>({asset:m.asset,socket:socketsNow.find(s=>s.id===m.socketId),instance:m}));entriesNow.push(...componentEntries(scene));
+    const compatible=group&&revision===scene.revision&&model===scene.model&&preview===ghost&&componentPreview===componentGhost&&group.children.length===entriesNow.length&&entriesNow.every((e,i)=>{const old=group.children[i].userData.renderEntry;return e.socket&&old&&!old.ghost&&old.asset===e.asset&&old.instance.id===e.instance.id&&old.socket.id===e.socket.id&&JSON.stringify(old.instance.colors)===JSON.stringify(e.instance.colors);});
+    if(compatible){
+      for(let i=0;i<entriesNow.length;i++){
+        const e=entriesNow[i],holder=group.children[i],matrices=e.component?{base:e.matrix,body:e.matrix,barrel:e.matrix}:partMatrices(e.asset,e.socket,e.instance);
+        holder.userData.renderEntry={...e,matrices};holder.userData.hidden=!!e.instance.hidden||!!e.socket.ancestorHidden;
+        for(const child of holder.children)if(child.userData.attachmentPart)child.matrix.copy(matrices[child.userData.attachmentPart]);
+      }
+      delete group.userData.bounds;items=next;components=scene.model?.componentSetup;
+    }else{
     if(group){for(const holder of group.children)disposeAttachmentTextures(holder);world.remove(group);group.traverse(o=>{o.material?.dispose();});}
     group=new THREE.Group();world.add(group);model=scene.model;revision=scene.revision;items=next;preview=ghost;componentPreview=componentGhost;components=scene.model?.componentSetup;
     const used=new Set();
@@ -39,19 +49,20 @@ export function syncTurrets(world,scene,view,configureDepth,textureOptions){
       };
       material.customProgramCacheKey=()=> 'turret-lime-highlight-v1';
       configureDepth(material);
-      for(const [part,geometry] of parts){const mesh=new THREE.Mesh(geometry,material);mesh.matrixAutoUpdate=false;mesh.matrix.copy(matrices[part]);holder.add(mesh);
+      for(const [part,geometry] of parts){const mesh=new THREE.Mesh(geometry,material);mesh.userData.attachmentPart=part;mesh.matrixAutoUpdate=false;mesh.matrix.copy(matrices[part]);holder.add(mesh);
         const technicalMaterial=new THREE.LineBasicMaterial({color:new THREE.Color(.72,.88,1)});configureDepth(technicalMaterial);
         const technicalEdges=new THREE.LineSegments(geometry.userData.blueprintEdges,technicalMaterial);
-        technicalEdges.userData.blueprintEdges=true;technicalEdges.matrixAutoUpdate=false;technicalEdges.matrix.copy(matrices[part]);technicalEdges.visible=false;holder.add(technicalEdges);
+        technicalEdges.userData.attachmentPart=part;technicalEdges.userData.blueprintEdges=true;technicalEdges.matrixAutoUpdate=false;technicalEdges.matrix.copy(matrices[part]);technicalEdges.visible=false;holder.add(technicalEdges);
         if(e.ghost){
           geometry.userData.previewEdges??=new THREE.EdgesGeometry(geometry,25);
           const outlineMaterial=new THREE.LineBasicMaterial({color:new THREE.Color(...TURRET_HIGHLIGHT),depthWrite:false});configureDepth(outlineMaterial);
-          const outline=new THREE.LineSegments(geometry.userData.previewEdges,outlineMaterial);outline.matrixAutoUpdate=false;outline.matrix.copy(matrices[part]);holder.add(outline);
+          const outline=new THREE.LineSegments(geometry.userData.previewEdges,outlineMaterial);outline.userData.attachmentPart=part;outline.matrixAutoUpdate=false;outline.matrix.copy(matrices[part]);holder.add(outline);
         }
       }
 
     }
     for(const [key,parts] of geometryCache)if(!used.has(key)){for(const g of parts.values()){g.userData.previewEdges?.dispose();g.userData.blueprintEdges?.dispose();g.dispose();}geometryCache.delete(key);}
+  }
   }
   const blueprint=!!view.display?.blueprint;
   group.traverse(object=>{

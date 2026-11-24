@@ -19,9 +19,10 @@ export function syncAttachmentTextures(group,scene,view,configureDepth,options){
    rendered.setBlockTransforms(new Map(entry.asset.blocks.map(block=>[block.id,entry.matrices[entry.asset.parts?.[block.id]||'base']])));
    for(const material of rendered.materials)configureDepth(material);
    Object.assign(rendered.group.userData,{mountId:holder.userData.mountId,componentMountId:holder.userData.componentMountId,socketId:holder.userData.socketId,blockId:holder.userData.blockId});
-   holder.add(rendered.group);cached={rendered,revision:textureRevision};holder.userData.texturedAttachment=cached;
+   holder.add(rendered.group);cached={rendered,revision:textureRevision,matrices:entry.matrices};holder.userData.texturedAttachment=cached;
   }
   const {rendered}=cached;
+  if(cached.matrices!==entry.matrices){rendered.setBlockTransforms(new Map(entry.asset.blocks.map(block=>[block.id,entry.matrices[entry.asset.parts?.[block.id]||'base']])));cached.matrices=entry.matrices;}
   for(const child of holder.children)child.visible=child===rendered.group;
   rendered.setParams(options.params);rendered.setTime(options.time);
   const selected=view.display?.showOverlays!==false&&!view.display?.blueprint&&(holder.userData.mountId&&(scene.selectedTurretIds?.has(holder.userData.mountId)||scene.selectedTurretId===holder.userData.mountId)||holder.userData.componentMountId===scene.selectedComponentMountId&&!!scene.selectedComponentMountId);

@@ -1,3 +1,4 @@
+import {createBrushCoverage} from './brush-coverage.js';
 import {createSocketEditor} from './components/socket-editor.js';
 import {socketToolActive} from './interaction-modes.js';
 import {createTurretToolbar} from './turrets/context-toolbar.js';
@@ -40,6 +41,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
   const faces = [[0,1,2,3],[0,4,5,1],[1,5,6,2],[2,6,7,3],[3,7,4,0],[4,7,6,5]];
   canvas.classList?.toggle('paint-mode',view.interactionMode==='paint');
   let suppressContext=false,magnifier=null,paintPointer=null,brushCache=null,paintPreview=null;
+  const completeBrushCoverage=createBrushCoverage();
   let rightHeld=false;
   const originalCursor=canvas.style?.cursor||'';
   const hoverLabel=globalThis.document?.createElement('div');if(hoverLabel){hoverLabel.className='paint-hover-label';hoverLabel.hidden=true;body.append?.(hoverLabel);}
@@ -393,6 +395,7 @@ export function mountViewport(canvas, area, scene, onChange, onSelect, getPrefer
     if(brushCache&&key.every((v,i)=>v===brushCache.key[i]))return brushCache.ids;
     const hit=(px,py)=>{if(px<0||py<0||px>=width||py>=height)return;const id=pickGame(scene,view,width,height,px,py,getPreferences());if(id)ids.add(id);};hit(x,y);
     if(radius>0){const step=Math.max(2,radius/6);for(let dy=-radius;dy<=radius;dy+=step)for(let dx=-radius;dx<=radius;dx+=step)if(dx*dx+dy*dy<=radius*radius)hit(x+dx,y+dy);}
+    if(radius>0)completeBrushCoverage(scene,view,width,height,x,y,radius,ids,(px,py)=>px>=0&&py>=0&&px<width&&py<height?pickGame(scene,view,width,height,px,py,getPreferences()):null);
     brushCache={key,ids:[...ids]};return brushCache.ids;
   }
   function sampleBrush(x,y,painted,batch){

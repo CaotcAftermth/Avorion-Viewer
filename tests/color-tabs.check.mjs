@@ -9,8 +9,14 @@ const page=await browser.newPage({viewport:{width:900,height:900}});const errors
 await page.route('**/color-harness',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><html><body></body></html>'}));
 await page.goto(`http://127.0.0.1:${server.address().port}/color-harness`);
 await page.setContent('<link rel="stylesheet" href="/src/styles.css"><link rel="stylesheet" href="/src/color-editor.css"><div id="test" style="width:450px;height:800px"></div>');
-await page.evaluate(async()=>{const {mountColorEditor}=await import('/src/color-editor.js');mountColorEditor(document.querySelector('#test'),{id:'test'},{selectedIds:new Set(),regions:[]},{save(){},changed(){},brushChanged(){}});});
+await page.evaluate(async()=>{const {mountColorEditor}=await import('/src/color-editor.js');const area={id:'test'},scene={selectedIds:new Set(),regions:[]};window.colorProof={area,scene};window.colorProof.controller=mountColorEditor(document.querySelector('#test'),area,scene,{save(){},changed(){},brushChanged(){}});});
 await page.getByRole('tab',{name:'Wheel',exact:true}).waitFor();
+await page.evaluate(()=>{
+ const {area,scene,controller}=colorProof,anchor=area.colorEditor.baseId,variants=JSON.stringify(area.colorEditor.variants),harmony=JSON.stringify(scene.paintHarmony);
+ const choices=[...scene.paintHarmony].reverse();
+ for(const id of choices){scene.paintBrush={colorId:id,channel:'color',strength:'preserve'};controller.sync();if(area.colorEditor.baseId!==anchor||JSON.stringify(scene.paintHarmony)!==harmony||JSON.stringify(area.colorEditor.variants)!==variants)throw Error('Header palette pick changed harmony');if(area.colorEditor.activeId!==id)throw Error('Brush color did not update');}
+ controller.choosePaintColor('Red');if(area.colorEditor.baseId!==anchor||JSON.stringify(scene.paintHarmony)!==harmony)throw Error('External palette color reanchored harmony');
+});
 for(const width of [450,300]){
 await page.locator('#test').evaluate((el,w)=>el.style.width=w+'px',width);
 const rail=await page.getByRole('tablist').boundingBox(),panel=await page.getByRole('tabpanel').boundingBox();assert.ok(rail.width<=36);assert.ok(panel.x>=rail.x+rail.width-1);

@@ -1,19 +1,19 @@
 import {rotateSurfaceComponent,detachSurfaceComponent} from '../components/mounting.js';
-import {componentSetup,componentSockets} from '../components/core.js';
+import {componentSetup,componentSockets,componentMatrix} from '../components/core.js';
 import {componentLibrary,loadComponentLibrary} from '../components/library.js';
 import {beginComponentEdit,endComponentEdit,previewSetup,changeSetup,patchMount,placeComponent,detachComponent} from '../components/mounting.js';
 import {selectSocketMarker} from '../socket-markers.js';
 import {mounts,selectTurrets,editTurrets,removeTurret,copyTurretPose,replaceTurret,beginPropertyEdit,endPropertyEdit} from './mounts.js';
 import {sceneSockets} from './sockets.js';
 import {turretLibrary,loadTurretLibrary} from './library.js';
-import {frame} from './core.js';
+import {frame,partMatrices} from './core.js';
 import * as THREE from '../vendor/three.module.js';
 import {nativeToView} from '../block-model.js';
 import {projectPoint} from '../navigation.js';
 
 export function socketSizeLimit(socket){return Math.min(10,Math.floor((socket?.fitSize||0)*2)/2);}
 export function fittedSize(value,socket){const max=socketSizeLimit(socket);return max<.5?null:Math.max(.5,Math.min(max,Math.round(value*2)/2));}
-export function snappedMountRotation(start,delta){return ((start+Math.round(delta/90)*90+180)%360+360)%360-180;}
+export function snappedMountRotation(start,delta){const value=start+delta,nearest=Math.round(value/90)*90,snapped=Math.abs(value-nearest)<=10?nearest:value;return ((snapped+180)%360+360)%360-180;}
 
 export function createTurretToolbar(canvas,scene,view,{changed,selected,invalidate}){
  const body=canvas.parentElement,events=new AbortController(),bar=document.createElement('div');bar.className='turret-context-toolbar';bar.hidden=true;bar.setAttribute('role','toolbar');bar.setAttribute('aria-label','Turret context tools');body.append(bar);
@@ -36,6 +36,7 @@ export function createTurretToolbar(canvas,scene,view,{changed,selected,invalida
  function build(){
   status.textContent='';bar.replaceChildren();
   if(component){
+   action('↻ Rotate',()=>{cancel();mode=mode==='rotate'?null:'rotate';scene.attachmentTransform=false;invalidate();});
    for(const [label,step] of [['−90°',-1],['+90°',1]])action(label,async()=>{const mount=current();if(mount){await changeSetup(scene,rotateSurfaceComponent(scene,mount,step));changed();invalidate();}});
    action('Edit Socket Position',()=>{const s=socket();close();if(s)window.dispatchEvent(new CustomEvent('component-socket-edit',{detail:s.id}));});
    action('Detach Component',async()=>{const mount=current();if(mount)await changeSetup(scene,detachSurfaceComponent(scene,mount));close();changed();invalidate();});
@@ -87,23 +88,36 @@ export function createTurretToolbar(canvas,scene,view,{changed,selected,invalida
    const matrix=frame(s.position,s.rotation),sample=a=>project(new THREE.Vector3(Math.cos(a),0,Math.sin(a)).applyMatrix4(matrix).toArray());
    const samples=Array.from({length:97},(_,i)=>sample(i*Math.PI/48)),span=Math.max(...samples.filter(Boolean).map(p=>Math.hypot(p[0]-center[0],p[1]-center[1])),1);geometry.ring=samples.map(p=>p?[center[0]+(p[0]-center[0])*55/span,center[1]+(p[1]-center[1])*55/span]:null);
    ctx.beginPath();let started=false;for(const p of geometry.ring){if(p){started?ctx.lineTo(...p):ctx.moveTo(...p);started=true;}}ctx.stroke();
-   ctx.font='12px sans-serif';ctx.fillText(`${m.twist}° · 90° snap`,center[0]+12,center[1]-65);
+   const posed=component?componentMatrix(m.asset,s,m).multiply(frame(m.asset.attachment.position,m.asset.attachment.rotation)):partMatrices(m.asset,s,m).barrel;
+   const forward=new THREE.Vector3(0,0,1).transformDirection(posed).transformDirection(matrix.clone().invert());
+   const a=Math.hypot(forward.x,forward.z)>1e-6?Math.atan2(forward.z,forward.x):Math.PI/2-THREE.MathUtils.degToRad(m.twist||0),tip=sample(a);
+   if(tip){
+    geometry.arrow=[center[0]+(tip[0]-center[0])*55/span,center[1]+(tip[1]-center[1])*55/span];
+    const dx=geometry.arrow[0]-center[0],dy=geometry.arrow[1]-center[1],len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len;
+    ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(center[0]+ux*18,center[1]+uy*18);ctx.lineTo(...geometry.arrow);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(geometry.arrow[0]+ux*5,geometry.arrow[1]+uy*5);ctx.lineTo(geometry.arrow[0]-ux*10-uy*7,geometry.arrow[1]-uy*10+ux*7);ctx.lineTo(geometry.arrow[0]-ux*10+uy*7,geometry.arrow[1]-uy*10-ux*7);ctx.closePath();ctx.fill();
+   }
+   ctx.font='12px sans-serif';ctx.fillText(`${Number((m.twist||0).toFixed(1))}° · 90° snap`,center[0]+12,center[1]-65);
   }else{geometry.handle=[center[0]+65,center[1]-45];ctx.beginPath();ctx.moveTo(...center);ctx.lineTo(...geometry.handle);ctx.stroke();ctx.fillRect(geometry.handle[0]-5,geometry.handle[1]-5,10,10);ctx.font='12px sans-serif';ctx.fillText(component?`×${Number(m.scale.toPrecision(5))}`:`${m.turretSize} / ${socketSizeLimit(s)} · ×${(m.turretSize/(m.asset.sourceSize||1)).toFixed(2)}`,center[0]+12,center[1]-60);}
   ctx.restore();
  }
  const position=e=>{const r=canvas.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top];};
- const angle=p=>{let best=Infinity,index=0;geometry.ring?.forEach((q,i)=>{if(q){const d=Math.hypot(q[0]-p[0],q[1]-p[1]);if(d<best){best=d;index=i;}}});return {distance:best,value:index*Math.PI/48};};
- listen(canvas,'pointerdown',event=>{if(event.button!==0||!mode||!current()||!(mode==='rotate'?geometry?.ring:geometry?.handle))return;const p=position(event),hit=mode==='rotate'?angle(p).distance<=9:Math.hypot(p[0]-geometry.handle[0],p[1]-geometry.handle[1])<=12;if(!hit)return;
-  event.preventDefault();event.stopImmediatePropagation();if(component)beginComponentEdit(scene);else beginPropertyEdit(scene);gesture={pointer:event.pointerId,start:p,angle:mode==='rotate'?angle(p).value:0,mount:current()};canvas.setPointerCapture(event.pointerId);
+ const angle=p=>{let best=Infinity,value=0;const ring=geometry.ring||[];
+  for(let i=0;i<ring.length-1;i++){const a=ring[i],b=ring[i+1];if(!a||!b)continue;const dx=b[0]-a[0],dy=b[1]-a[1],t=Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1))),distance=Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy);if(distance<best){best=distance;value=(i+t)*Math.PI/48;}}
+  return {distance:best,value};};
+ const arrowHit=p=>{if(!geometry?.arrow)return false;const a=geometry.center,b=geometry.arrow,dx=b[0]-a[0],dy=b[1]-a[1],t=((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1);return t>=.3&&t<=1.2&&Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy)<=12;};
+ listen(canvas,'pointerdown',event=>{if(event.button!==0||!mode||!current()||!(mode==='rotate'?geometry?.ring:geometry?.handle))return;const p=position(event),hit=mode==='rotate'?(angle(p).distance<=9||arrowHit(p)):Math.hypot(p[0]-geometry.handle[0],p[1]-geometry.handle[1])<=12;if(!hit)return;
+  event.preventDefault();event.stopImmediatePropagation();if(component)beginComponentEdit(scene);else beginPropertyEdit(scene);gesture={pointer:event.pointerId,start:p,angle:mode==='rotate'?angle(p).value:0,delta:0,mount:{twist:current().twist,scale:current().scale,turretSize:current().turretSize}};canvas.setPointerCapture(event.pointerId);
  },{capture:true});
  listen(canvas,'pointermove',event=>{if(!gesture||gesture.pointer!==event.pointerId)return;event.preventDefault();event.stopImmediatePropagation();if(!current()||scene.model!==model){cancel();return;}const p=position(event);
+  if(mode==='rotate'){const next=angle(p).value;gesture.delta-=Math.atan2(Math.sin(next-gesture.angle),Math.cos(next-gesture.angle))*180/Math.PI;gesture.angle=next;}
   if(component){
-   const delta=angle(p).value-gesture.angle, movement=((p[0]-gesture.start[0])-(p[1]-gesture.start[1]))/48;
-   const patch=mode==='rotate'?{twist:snappedMountRotation(gesture.mount.twist,Math.atan2(Math.sin(delta),Math.cos(delta))*180/Math.PI)}:{scale:Math.max(Number.MIN_VALUE,Math.min(1000,gesture.mount.scale*Math.exp(movement)))};
+   const movement=((p[0]-gesture.start[0])-(p[1]-gesture.start[1]))/48;
+   const patch=mode==='rotate'?{twist:snappedMountRotation(gesture.mount.twist,gesture.delta)}:{scale:Math.max(Number.MIN_VALUE,Math.min(1000,gesture.mount.scale*Math.exp(movement)))};
    previewSetup(scene,patchMount(scene,current(),patch));invalidate();return;
   }
-  if(mode==='rotate'){const delta=angle(p).value-gesture.angle;editTurrets(scene,[id],{twist:snappedMountRotation(gesture.mount.twist,Math.atan2(Math.sin(delta),Math.cos(delta))*180/Math.PI)});}else{const value=gesture.mount.turretSize+((p[0]-gesture.start[0])-(p[1]-gesture.start[1]))/48;const size=fittedSize(value,socket());if(size!==null)editTurrets(scene,[id],{turretSize:size});}invalidate();},{capture:true});
- listen(canvas,'pointerup',async event=>{if(!gesture||gesture.pointer!==event.pointerId)return;event.preventDefault();event.stopImmediatePropagation();gesture=null;canvas.releasePointerCapture(event.pointerId);await finish(false);changed();invalidate();},{capture:true});
+  if(mode==='rotate'){editTurrets(scene,[id],{twist:snappedMountRotation(gesture.mount.twist,gesture.delta)});}else{const value=gesture.mount.turretSize+((p[0]-gesture.start[0])-(p[1]-gesture.start[1]))/48;const size=fittedSize(value,socket());if(size!==null)editTurrets(scene,[id],{turretSize:size});}invalidate();},{capture:true});
+ listen(canvas,'pointerup',async event=>{if(!gesture||gesture.pointer!==event.pointerId)return;event.preventDefault();event.stopImmediatePropagation();if(mode==='rotate'&&current()){const twist=Math.round(current().twist/90)*90;if(component)previewSetup(scene,patchMount(scene,current(),{twist}));else editTurrets(scene,[id],{twist});}gesture=null;canvas.releasePointerCapture(event.pointerId);invalidate();await finish(false);changed();invalidate();},{capture:true});
  listen(canvas,'pointercancel',()=>cancel(),{capture:true});listen(window,'blur',close);
  listen(window,'keydown',event=>{if(!bar.hidden&&event.key==='Escape'&&(bar.contains(event.target)||event.target===canvas||gesture)){event.preventDefault();event.stopImmediatePropagation();close();invalidate();}},{capture:true});
  listen(document,'pointerdown',event=>{if(!bar.hidden&&!bar.contains(event.target)&&event.target!==canvas)close();},{capture:true});

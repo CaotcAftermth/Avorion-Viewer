@@ -1,3 +1,4 @@
+import {assetImportTile,groupAssetCards} from '../asset-import.js';
 import {revisedAsset} from '../attachments/lifecycle.js';
 import {openTurretWorkspace} from './workspace.js';
 import {thumbnail} from './thumbnail.js';
@@ -31,7 +32,7 @@ export function openTurretProject(asset,changed=()=>{}){
   });
 }
 export function mountTurretLibrary(host,changed){
-  host.classList.add('turret-library');let error='',busy=false,disposed=false,query='';
+  host.classList.add('turret-library');let error='',busy=false,disposed=false,query='',folderPath='';
   const draw=(selectionOnly=false)=>{
     if(selectionOnly){for(const tile of host.querySelectorAll('[data-asset-id]'))tile.setAttribute('aria-pressed',String(tile.dataset.assetId===turretLibrary.selectedId));return;}
     if(disposed)return;const scrollTop=host.scrollTop,scrollLeft=host.scrollLeft;host.replaceChildren();const grid=document.createElement('div');grid.className='turret-asset-grid';host.append(grid);
@@ -67,11 +68,15 @@ export function mountTurretLibrary(host,changed){
       name.onpointerup=e=>{if(e.pointerType==='touch'){const now=performance.now();if(lastTap&&now-lastTap<400)rename();lastTap=now;}};
       const remove=document.createElement('button');remove.className='turret-asset-remove';remove.textContent='×';remove.setAttribute('aria-label','Remove '+asset.name+' from library');remove.title='Remove from library; mounted copies remain on ships';
       remove.onclick=async()=>{remove.disabled=true;try{await records(asset,true);turretLibrary.assets=turretLibrary.assets.filter(a=>a.id!==asset.id);if(turretLibrary.selectedId===asset.id)turretLibrary.selectedId=null;emit();changed();}catch(e){error=e.message;draw();}};
-      card.append(tile,name,remove);grid.append(card);
+      card.dataset.folder=asset.folder||'';card.append(tile,name,remove);grid.append(card);
     }
     const add=document.createElement('button');add.className='turret-asset-tile turret-import';add.textContent='+';add.title='Import turret XML';add.setAttribute('aria-label','Import turret XML');add.disabled=busy;grid.append(add);
-    const input=document.createElement('input');input.type='file';input.accept='.xml';input.hidden=true;host.append(input);add.onclick=()=>input.click();
-    input.onchange=async()=>{const file=input.files[0];if(!file)return;busy=true;error='';draw();try{const asset=importTurretXml(await file.text(),file.name,crypto.randomUUID());const saved=await addTurretAsset(asset);turretLibrary.selectedId=saved.id;if(saved.id!==asset.id)error='Already imported: '+saved.name;changed();}catch(e){error=e.message;}finally{busy=false;emit();}};
+  groupAssetCards(grid,{path:folderPath,navigate:path=>{folderPath=path;draw();},assets:turretLibrary.assets});
+  assetImportTile(add,host,async items=>{
+   if(busy)return;busy=true;error='';draw();let imported=0,skipped=0;const failures=[];
+   try{for(const {file,folder} of items){try{const asset=importTurretXml(await file.text(),file.name,crypto.randomUUID());asset.folder=folder;const saved=await addTurretAsset(asset);turretLibrary.selectedId=saved.id;if(saved.id===asset.id)imported++;else skipped++;}catch(e){failures.push(file.name+': '+e.message);}}changed();}
+   finally{busy=false;error=`Imported ${imported}, skipped ${skipped}, failed ${failures.length}.`+(failures.length?' '+failures.join('; '):'');draw();}
+  },{path:folderPath,assets:turretLibrary.assets,move:async asset=>{await updateTurretAsset(asset);changed();}});
     const status=document.createElement('p');status.className='panel-note';status.setAttribute('role','status');status.textContent=error||(busy?'Importing turret…':'Turret assets · Saved in this browser');host.append(status);host.scrollTop=scrollTop;host.scrollLeft=scrollLeft;
   };
   listeners.add(draw);draw();loadTurretLibrary().catch(e=>{error=e.message;draw();});

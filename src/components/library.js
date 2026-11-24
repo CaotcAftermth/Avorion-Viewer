@@ -1,3 +1,4 @@
+import {assetImportTile,groupAssetCards} from '../asset-import.js';
 import {diagnosticDownload} from '../performance-diagnostics.js';
 import {revisedAsset} from '../attachments/lifecycle.js';
 import {thumbnail} from '../turrets/thumbnail.js';
@@ -41,7 +42,7 @@ export function filteredComponents(){
 
 // Same cards as the turret library: gray tile with a preview, editable name, hover ×, and a + tile to import.
 export function mountComponentLibrary(host,changed,{externalSearch=false}={}){
- host.classList.add('turret-library','component-library');let error='',busy=false,disposed=false;
+ host.classList.add('turret-library','component-library');let error='',busy=false,disposed=false,folderPath='';
  const draw=(selectionOnly=false)=>{
   if(disposed)return;
   if(selectionOnly){for(const tile of host.querySelectorAll('[data-asset-id]'))tile.setAttribute('aria-pressed',String(tile.dataset.assetId===componentLibrary.selectedId));return;}
@@ -52,12 +53,8 @@ export function mountComponentLibrary(host,changed,{externalSearch=false}={}){
   componentLibrary.folder='';
   if(!externalSearch)tools.append(search);else tools.remove();
   if(!externalSearch&&focused==='search'){search.focus();search.setSelectionRange(search.value.length,search.value.length);}
-  const shown=filteredComponents(),groups=new Map();for(const asset of shown){const key=asset.folder||'';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(asset);}
-  const keys=[...groups.keys()].sort((a,b)=>a===''?1:b===''?-1:a.localeCompare(b)),grouped=keys.length>1||keys[0]&&keys[0]!=='';
-  let grid;const newGrid=label=>{if(label!==undefined){const heading=document.createElement('h3');heading.className='component-folder-heading';heading.textContent=label;host.append(heading);}grid=document.createElement('div');grid.className='turret-asset-grid';host.append(grid);};
-  if(!grouped)newGrid();
-  for(const key of grouped?keys:[keys[0]??''])for(const [index,asset] of (groups.get(key)||[]).entries()){
-   if(grouped&&index===0)newGrid(key||'Unfiled');
+  const shown=filteredComponents(),grid=document.createElement('div');grid.className='turret-asset-grid';host.append(grid);
+  for(const asset of shown){
    const card=document.createElement('div');card.className='turret-asset-card';
    const tile=document.createElement('button');tile.type='button';tile.className='turret-asset-tile';tile.dataset.assetId=asset.id;tile.setAttribute('aria-label',asset.name);tile.setAttribute('aria-pressed',String(asset.id===componentLibrary.selectedId));tile.draggable=true;
    tile.title=[asset.folder&&'Folder: '+asset.folder,asset.tags?.length&&'Tags: '+asset.tags.join(', '),'Click to edit in Properties › Components · Double-click to open · Drag onto a component socket in the viewport'].filter(Boolean).join('\n');
@@ -88,13 +85,17 @@ export function mountComponentLibrary(host,changed,{externalSearch=false}={}){
    name.onpointerup=e=>{if(e.pointerType==='touch'){const now=performance.now();if(lastTap&&now-lastTap<400)rename();lastTap=now;}};
    const remove=document.createElement('button');remove.type='button';remove.className='turret-asset-remove';remove.textContent='×';remove.setAttribute('aria-label','Remove '+asset.name+' from library');remove.title='Remove from library; mounted copies remain on ships';
    remove.onclick=async()=>{remove.disabled=true;try{await removeComponentAsset(asset);changed();}catch(e){error=e.message;draw();}};
-   card.append(tile,name,remove);grid.append(card);
+   card.dataset.folder=asset.folder||'';card.append(tile,name,remove);grid.append(card);
   }
-  if(!grid)newGrid();
   if(!shown.length&&componentLibrary.assets.length){const none=document.createElement('p');none.className='panel-note';none.textContent='No components match.';grid.before(none);}
   const add=document.createElement('button');add.type='button';add.className='turret-asset-tile turret-import';add.textContent='+';add.title='Import component XML';add.setAttribute('aria-label','Import component XML');add.disabled=busy;grid.append(add);
-  const input=document.createElement('input');input.type='file';input.accept='.xml';input.hidden=true;host.append(input);add.onclick=()=>input.click();
-  input.onchange=async()=>{const file=input.files[0];if(!file)return;busy=true;error='';draw();try{const asset=importComponent(await file.text(),file.name.replace(/\.xml$/i,''));const saved=await addComponentAsset(asset);componentLibrary.selectedId=saved.id;if(saved.id!==asset.id)error='Already imported: '+saved.name;changed();if(saved.id===asset.id)openComponentWorkspace(saved,async next=>{await updateComponentAsset(next);changed();});}catch(e){error=e.message;}finally{busy=false;draw();}};
+  groupAssetCards(grid,{path:folderPath,navigate:path=>{folderPath=path;draw();},assets:componentLibrary.assets});
+  assetImportTile(add,host,async items=>{
+   if(busy)return;busy=true;error='';draw();let imported=0,skipped=0,newAsset;const failures=[];
+   try{for(const {file,folder} of items){try{const asset=importComponent(await file.text(),file.name.replace(/\.xml$/i,''));asset.folder=folder;const saved=await addComponentAsset(asset);componentLibrary.selectedId=saved.id;if(saved.id===asset.id){imported++;newAsset=saved;}else skipped++;}catch(e){failures.push(file.name+': '+e.message);}}changed();}
+   finally{busy=false;error=`Imported ${imported}, skipped ${skipped}, failed ${failures.length}.`+(failures.length?' '+failures.join('; '):'');draw();}
+   if(items.length===1&&!items[0].folder&&newAsset)openComponentWorkspace(newAsset,async next=>{await updateComponentAsset(next);changed();});
+  },{path:folderPath,assets:componentLibrary.assets,move:async asset=>{await updateComponentAsset(asset);changed();}});
   const status=document.createElement('p');status.className='panel-note';status.setAttribute('role','status');status.textContent=error||componentLibrary.error||(busy?'Importing component…':'Component assets · Saved in this browser');host.append(status);host.scrollTop=scrollTop;host.scrollLeft=scrollLeft;
  };
  listeners.add(draw);draw();loadComponentLibrary().catch(e=>{error=e.message;draw();});

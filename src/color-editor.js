@@ -49,7 +49,8 @@ export function mountColorEditor(host,area,scene,actions){
 
     const brush=scene.paintBrush,c=palette.byId.get(brush?.colorId),changed=c&&state.activeId!==c.id;
 
-    if(c){state.activeId=c.id;state.channel=brush.channel;state.strength=brush.strength;if(changed){state.baseId=c.baseName;state.variants[c.baseName]=c.variant;}}
+    // External brush picks do not redefine the wheel's harmony anchor or variants.
+    if(c){state.activeId=c.id;state.channel=brush.channel;state.strength=brush.strength;}
 
     return changed;
 
@@ -455,7 +456,7 @@ export function mountColorEditor(host,area,scene,actions){
 
   loadPalette().then(data=>{if(disposed)return;palette=data;if(!palette.byId.has(state.baseId))state.baseId=palette.wheel[0].id;if(!palette.byId.has(state.activeId))state.activeId=chosen(base()).id;state.draft=state.draft.filter(id=>palette.byId.has(id)).slice(0,32);if(!palette.categories.includes(state.category))state.category='';readSharedBrush();render();}).catch(error=>{if(!disposed){host.replaceChildren(node('p','color-note',error.message));}});
 
-  return {colorAreaId:area.id,choosePaintColor(id){const c=palette?.byId.get(id);if(c)pick(c,!scene.paintHarmony?.includes(c.id));},sync(){
+  return {colorAreaId:area.id,choosePaintColor(id){const c=palette?.byId.get(id);if(c)pick(c,false);},sync(){
 
     if(disposed||!palette)return;const changed=readSharedBrush();
 
