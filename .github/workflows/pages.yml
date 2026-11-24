@@ -37,23 +37,34 @@ jobs:
         with:
           name: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: dist
-      # Upload completion can precede visibility in the Actions artifact API.
+      # Match the artifact client bundled by deploy-pages@v4. Keep this CI-only
+      # dependency outside the app's package.json and node_modules.
+      - name: Install Pages artifact client
+        run: npm install --prefix "$RUNNER_TEMP/pages-artifact-client" --no-save --package-lock=false --ignore-scripts @actions/artifact@2.1.3
+      # REST visibility does not guarantee visibility in the Results service
+      # used by deploy-pages. Poll the same client and backend as deployment.
       - name: Wait for Pages artifact metadata
         uses: actions/github-script@v7
         env:
           PAGES_ARTIFACT_NAME: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
         with:
           script: |
+            const { DefaultArtifactClient } = require(`${process.env.RUNNER_TEMP}/pages-artifact-client/node_modules/@actions/artifact`);
+            const client = new DefaultArtifactClient();
             for (let attempt = 0; attempt < 12; attempt++) {
-              const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
-                ...context.repo, run_id: context.runId
-              });
-              const matches = artifacts.filter(artifact => artifact.name === process.env.PAGES_ARTIFACT_NAME && !artifact.expired);
-              if (matches.length === 1) return;
+              const { artifacts } = await client.listArtifacts();
+              const matches = artifacts.filter(artifact => artifact.name === process.env.PAGES_ARTIFACT_NAME);
+              if (matches.length === 1) {
+                core.info(`Pages artifact ${matches[0].id} is visible to the deployment artifact service.`);
+                return;
+              }
               if (matches.length > 1) throw new Error('Multiple Pages artifacts found for this attempt.');
-              await new Promise(resolve => setTimeout(resolve, 5000));
+              if (attempt < 11) {
+                core.info(`Waiting for Pages artifact visibility (${attempt + 1}/12)...`);
+                await new Promise(resolve => setTimeout(resolve, 5000));
+              }
             }
-            throw new Error('Pages artifact metadata did not become available.');
+            throw new Error('Pages artifact did not become visible in the deployment artifact service after 12 checks.');
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
